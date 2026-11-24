@@ -1859,6 +1859,22 @@ async function muatM3BankSoal(paksa = false) {
   renderTabelSoal();
 }
 
+function bersihkanNamaPaketSoal(namaFile) {
+  return String(namaFile || '').replace(/\.[^/.]+$/, '').trim();
+}
+
+function namaSumberPaketSoal(s) {
+  const eksplisit = String(s?.sumberPaket || '').trim();
+  if (eksplisit) return eksplisit;
+  const kode = String(s?.kodeSoal || '').trim();
+  const mBatch = kode.match(/^([A-Za-z0-9]+-[WS]\d+)-\d+/i);
+  if (mBatch) return `Paket_Impor_${mBatch[1]}`;
+  const mCsv = kode.match(/^([A-Za-z0-9]+-\d{4})-\d+/i);
+  if (mCsv) return `Paket_Impor_${mCsv[1]}`;
+  const mapel = namaMapelById(s?.mapelId).replace(/\s+/g, '_');
+  return `Soal_Manual_${mapel}_Tingkat_${s?.tingkat || 'Umum'}`;
+}
+
 function renderTabelSoal() {
   const q = teks(document.getElementById('cari-soal')?.value || '');
   const fMapel = document.getElementById('filter-mapel-soal')?.value || '';
@@ -1872,12 +1888,15 @@ function renderTabelSoal() {
     if (fTipe && s.tipeSoal !== fTipe) return false;
     if (fStatus === 'aktif' && !s.statusAktif) return false;
     if (fStatus === 'nonaktif' && s.statusAktif) return false;
-    if (q && !`${teks(s.kodeSoal)} ${teks(s.pertanyaan)} ${teks(s.kunciJawaban)}`.includes(q)) return false;
+    if (q && !`${teks(s.kodeSoal)} ${teks(namaSumberPaketSoal(s))} ${teks(s.pertanyaan)} ${teks(s.kunciJawaban)}`.includes(q)) return false;
     return true;
   });
 
   renderTabelDnc('tbody-soal', data, [
-    { label: 'Kode Soal', render: s => `<span class="dnc-mono">${esc(s.kodeSoal)}</span>` },
+    {
+      label: 'Kode Soal',
+      render: s => `<span class="dnc-mono">${esc(s.kodeSoal)}</span><div class="dnc-form-bantuan">${esc(namaSumberPaketSoal(s))}</div>`
+    },
     { label: 'Mata Pelajaran', render: s => esc(namaMapelById(s.mapelId)) },
     { label: 'Tingkat', render: s => `<span class="dnc-badge dnc-badge-biru">${esc(s.tingkat)}</span>` },
     { label: 'Tipe Soal', render: s => badgeTipeSoal(s.tipeSoal) },
