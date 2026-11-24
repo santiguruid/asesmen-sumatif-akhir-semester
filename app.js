@@ -2154,22 +2154,97 @@ function validasiItemSoalPintar(item) {
   return item;
 }
 
-function pecahOpsiSejajar(teksBaris) {
-  const regex = /(?:^|\s{2,}|\t)([A-Ea-e])[\.\)]\s+/g;
-  const posisi = [];
+function bersihkanTandaBenarOpsi(teksOpsi) {
+  let isi = String(teksOpsi || '').trim();
+  const adaTanda = /(?:^\*\s*|\s*\*\s*$|\(\s*(?:benar|kunci|jawaban)\s*\)|\s*\[(?:benar|kunci)\])/i.test(isi);
+  if (adaTanda) {
+    isi = isi.replace(/^\*\s*|\s*\*\s*$|\s*\(\s*(?:benar|kunci|jawaban)\s*\)|\s*\[(?:benar|kunci)\]/gi, '').trim();
+  }
+  return { isi, adaTanda };
+}
+
+function pecahOpsiInlineDariTeks(teksBaris, kodeSudahAda = []) {
+  const str = String(teksBaris || '');
+  if (!str.trim()) return null;
+
+  const regex = /(?:^|[\s\t\.\?\!\,\:\;])(?:\*\s*)?(?:\(([A-Ea-e])\)|([A-Ea-e])[\.\)])(?:\s+|(?=\d))/g;
+  const kandidat = [];
   let m;
-  while ((m = regex.exec(teksBaris)) !== null) {
-    const startHuruf = m.index + m[0].search(/[A-Ea-e]/);
-    posisi.push({ kode: m[1].toUpperCase(), start: startHuruf, isiMulai: regex.lastIndex });
+  while ((m = regex.exec(str)) !== null) {
+    const huruf = (m[1] || m[2] || '').toUpperCase();
+    const matchStr = m[0];
+    const offsetLokal = matchStr.search(/[\*\(]?[A-Ea-e]/);
+    const startToken = m.index + (offsetLokal >= 0 ? offsetLokal : 0);
+    const bintangAwal = /\*/.test(matchStr.slice(0, Math.max(1, offsetLokal + 1)));
+    kandidat.push({ kode: huruf, start: startToken, isiMulai: regex.lastIndex, bintangAwal });
   }
-  if (posisi.length < 2) return null;
-  const hasil = [];
-  for (let i = 0; i < posisi.length; i++) {
-    const akhir = i + 1 < posisi.length ? posisi[i + 1].start : teksBaris.length;
-    const isi = teksBaris.slice(posisi[i].isiMulai, akhir).trim();
-    if (isi) hasil.push({ kode: posisi[i].kode, teks: isi });
+  if (kandidat.length < 2) return null;
+
+  const urutanHuruf = ['A', 'B', 'C', 'D', 'E'];
+  const cariRantai = idxMulaiTarget => {
+    for (let i = 0; i < kandidat.length; i++) {
+      if (kandidat[i].kode !== urutanHuruf[idxMulaiTarget]) continue;
+      const rantai = [kandidat[i]];
+      let nextIdx = idxMulaiTarget + 1;
+      for (let j = i + 1; j < kandidat.length && nextIdx < urutanHuruf.length; j++) {
+        if (kandidat[j].kode === urutanHuruf[nextIdx]) {
+          rantai.push(kandidat[j]);
+          nextIdx++;
+        }
+      }
+      if (rantai.length >= 2) return rantai;
+    }
+    return null;
+  };
+
+  let rantaiTerpilih = cariRantai(0);
+  if (!rantaiTerpilih && kodeSudahAda.length) {
+    const terakhir = kodeSudahAda[kodeSudahAda.length - 1];
+    const idxLanjut = urutanHuruf.indexOf(terakhir) + 1;
+    if (idxLanjut > 0 && idxLanjut < urutanHuruf.length - 1) {
+      rantaiTerpilih = cariRantai(idxLanjut);
+    }
   }
-  return hasil.length >= 2 ? hasil : null;
+  if (!rantaiTerpilih) return null;
+
+  const teksSebelum = str.slice(0, rantaiTerpilih[0].start).trim();
+  const opsi = [];
+  const kunciDariTanda = [];
+  for (let i = 0; i < rantaiTerpilih.length; i++) {
+    const akhir = i + 1 < rantaiTerpilih.length ? rantaiTerpilih[i + 1].start : str.length;
+    const mentah = str.slice(rantaiTerpilih[i].isiMulai, akhir).trim();
+    const { isi, adaTanda } = bersihkanTandaBenarOpsi(mentah);
+    if (isi) {
+      opsi.push({ kode: rantaiTerpilih[i].kode, teks: isi });
+      if (adaTanda || rantaiTerpilih[i].bintangAwal) kunciDariTanda.push(rantaiTerpilih[i].kode);
+    }
+  }
+  if (opsi.length < 2) return null;
+  return { teksSebelum, opsi, kunciDariTanda };
+}
+
+function ekstrakBarisDariElemenHtml(el) {
+  const klon = el.cloneNode(true);
+  klon.querySelectorAll('ol, ul').forEach(sub => sub.remove());
+  const imgSrc = klon.querySelector('img')?.getAttribute('src') || '';
+  klon.querySelectorAll('br').forEach(br => br.replaceWith('\n'));
+  const seluruhTebal = Boolean(klon.querySelector('strong, b, u, mark')) &&
+    (klon.textContent || '').trim().length > 0 &&
+    (klon.textContent || '').trim().length < 140;
+
+  const potongan = (klon.textContent || '')
+    .split('\n')
+    .map(b => b.replace(/[\t\u00A0]+/g, ' ').replace(/\s{2,}/g, ' ').trim())
+    .filter(Boolean);
+
+  if (!potongan.length && imgSrc) {
+    return [{ teks: '', img: imgSrc, bold: false }];
+  }
+  return potongan.map((t, idx) => ({
+    teks: t,
+    img: idx === 0 ? imgSrc : '',
+    bold: seluruhTebal
+  }));
 }
 
 function ubahHtmlWordKeBarisTerstruktur(htmlStr) {
@@ -2177,12 +2252,6 @@ function ubahHtmlWordKeBarisTerstruktur(htmlStr) {
   const hasilBaris = [];
   const tabelTerpisah = [];
   const hurufOpsi = ['A', 'B', 'C', 'D', 'E'];
-
-  const teksLangsungLi = li => {
-    const klon = li.cloneNode(true);
-    klon.querySelectorAll('ol, ul').forEach(sub => sub.remove());
-    return klon.textContent.replace(/\s+/g, ' ').trim();
-  };
 
   const prosesDaftar = (listEl, level) => {
     let nomor = Number(listEl.getAttribute('start') || 1);
@@ -2192,27 +2261,31 @@ function ubahHtmlWordKeBarisTerstruktur(htmlStr) {
 
     [...listEl.children].forEach(child => {
       if (child.tagName !== 'LI') return;
-      const imgEl = child.querySelector(':scope > img, :scope > p > img');
-      const imgSrc = imgEl ? imgEl.getAttribute('src') || '' : '';
-      const boldKuat = Boolean(child.querySelector(':scope > strong, :scope > b, :scope > p > strong, :scope > p > b'));
-      const txt = teksLangsungLi(child);
+      const barisLi = ekstrakBarisDariElemenHtml(child);
 
-      if (txt) {
+      barisLi.forEach((b, idxB) => {
+        const txt = b.teks;
+        if (!txt && b.img) {
+          hasilBaris.push(b);
+          return;
+        }
+        if (idxB > 0) {
+          hasilBaris.push(b);
+          return;
+        }
         const sudahBernomor = /^\d+[\.\)]\s/.test(txt);
-        const sudahBerhuruf = /^[A-Ea-e][\.\)]\s/.test(txt);
-        const adalahMeta = /^(?:kunci|jawaban|tipe|jenis|bobot|skor|nilai|kode)/i.test(txt);
+        const sudahBerhuruf = /^(?:\([A-Ea-e]\)|[A-Ea-e][\.\)])\s/.test(txt);
+        const adalahMeta = /^(?:kunci|jawaban|kj|tipe|jenis|bobot|skor|nilai|kode)/i.test(txt);
         if (sudahBernomor || sudahBerhuruf || adalahMeta) {
-          hasilBaris.push({ teks: txt, img: imgSrc, bold: boldKuat });
+          hasilBaris.push(b);
         } else if (isHuruf && idxHuruf < hurufOpsi.length) {
-          hasilBaris.push({ teks: `${hurufOpsi[idxHuruf]}. ${txt}`, img: imgSrc, bold: boldKuat });
+          hasilBaris.push({ teks: `${hurufOpsi[idxHuruf]}. ${txt}`, img: b.img, bold: b.bold });
           idxHuruf++;
         } else {
-          hasilBaris.push({ teks: `${nomor}. ${txt}`, img: imgSrc, bold: boldKuat });
+          hasilBaris.push({ teks: `${nomor}. ${txt}`, img: b.img, bold: b.bold });
           nomor++;
         }
-      } else if (imgSrc) {
-        hasilBaris.push({ teks: '', img: imgSrc, bold: false });
-      }
+      });
 
       [...child.children].forEach(sub => {
         if (sub.tagName === 'OL' || sub.tagName === 'UL') {
@@ -2226,22 +2299,21 @@ function ubahHtmlWordKeBarisTerstruktur(htmlStr) {
     const tag = el.tagName;
     if (tag === 'TABLE') {
       const rows = [...el.querySelectorAll('tr')].map(tr =>
-        [...tr.querySelectorAll('th,td')].map(td => ({
-          teks: td.textContent.replace(/\s+/g, ' ').trim(),
-          img: td.querySelector('img')?.getAttribute('src') || ''
-        }))
+        [...tr.querySelectorAll('th,td')].map(td => {
+          const klon = td.cloneNode(true);
+          klon.querySelectorAll('br').forEach(br => br.replaceWith('\n'));
+          return {
+            teks: (klon.textContent || '').replace(/[\t\u00A0]+/g, ' ').trim(),
+            img: td.querySelector('img')?.getAttribute('src') || '',
+            bold: Boolean(td.querySelector('strong, b, u'))
+          };
+        })
       );
       tabelTerpisah.push(rows);
     } else if (tag === 'OL' || tag === 'UL') {
       prosesDaftar(el, 0);
     } else {
-      const imgEl = el.querySelector('img');
-      const imgSrc = imgEl ? imgEl.getAttribute('src') || '' : '';
-      const txt = el.textContent.replace(/\s+/g, ' ').trim();
-      const boldKuat = Boolean(el.querySelector('strong, b')) && el.textContent.trim().length < 90;
-      if (txt || imgSrc) {
-        hasilBaris.push({ teks: txt, img: imgSrc, bold: boldKuat });
-      }
+      hasilBaris.push(...ekstrakBarisDariElemenHtml(el));
     }
   });
 
@@ -2249,34 +2321,43 @@ function ubahHtmlWordKeBarisTerstruktur(htmlStr) {
 }
 
 function ekstraksiSoalDariTabel(rows, kodeMapelPrefix, cap) {
-  if (!rows || rows.length < 2) return { soal: [], kunciMap: {}, bobotBagian: {} };
+  if (!rows || rows.length < 1) return { soal: [], kunciMap: {}, bobotBagian: {}, barisTambahan: [] };
   const header = rows[0].map(c => teks(c.teks));
-  const idxTanya = header.findIndex(h => h.includes('pertanyaan') || h.includes('butir soal') || h === 'soal');
-  const idxKunci = header.findIndex(h => h.includes('kunci') || h.includes('jawaban'));
+  const idxTanya = header.findIndex(h => h.includes('pertanyaan') || h.includes('butir soal') || h === 'soal' || h.includes('uraian soal'));
+  const idxKunci = header.findIndex(h => h.includes('kunci') || h.includes('jawaban') || h === 'kj');
   const idxNo = header.findIndex(h => h === 'no' || h === 'no.' || h.includes('nomor'));
   const idxBobot = header.findIndex(h => h.includes('bobot') || h.includes('skor') || h.includes('nilai') || h.includes('poin'));
   const idxTipe = header.findIndex(h => h.includes('tipe') || h.includes('jenis') || h.includes('bentuk'));
 
-  if (idxTanya >= 0) {
+  if (idxTanya >= 0 && rows.length >= 2) {
     const idxKode = header.findIndex(h => h.includes('kode'));
     const soal = [];
     for (let r = 1; r < rows.length; r++) {
       const sel = rows[r];
       const ambil = i => (i >= 0 && sel[i] ? sel[i].teks.trim() : '');
-      const pertanyaan = ambil(idxTanya);
+      let pertanyaan = ambil(idxTanya);
       if (!pertanyaan) continue;
-      const opsiJawaban = [];
+      let opsiJawaban = [];
       ['a', 'b', 'c', 'd', 'e'].forEach(hrf => {
-        const io = header.findIndex(h => h === hrf || h === `opsi ${hrf}` || h === `pilihan ${hrf}` || h === `opsi_${hrf}` || h === `opsi${hrf}`);
+        const io = header.findIndex(h => h === hrf || h === `opsi ${hrf}` || h === `pilihan ${hrf}` || h === `opsi_${hrf}` || h === `opsi${hrf}` || h === `jawaban ${hrf}`);
         const v = ambil(io);
         if (v) opsiJawaban.push({ kode: hrf.toUpperCase(), teks: v });
       });
-      const kunciRaw = ambil(idxKunci);
+      let kunciRaw = ambil(idxKunci);
+      if (!opsiJawaban.length) {
+        const pecah = pecahOpsiInlineDariTeks(pertanyaan.replace(/\n+/g, ' '));
+        if (pecah) {
+          pertanyaan = pecah.teksSebelum || pertanyaan;
+          opsiJawaban = pecah.opsi;
+          if (!kunciRaw && pecah.kunciDariTanda.length) kunciRaw = pecah.kunciDariTanda.join(', ');
+        }
+      }
       const tipeSoal = deteksiTipeDariTeks(ambil(idxTipe), opsiJawaban.length, kunciRaw, pertanyaan);
-      const bobotNilai = Number(ambil(idxBobot).replace(',', '.')) || 10;
+      const bobotNilai = Number(ambil(idxBobot).replace(/[^0-9\.,]/g, '').replace(',', '.')) || 10;
       soal.push(validasiItemSoalPintar({
         dipilih: true,
         nomorAsli: Number(ambil(idxNo)) || (soal.length + 1),
+        urutanGlobal: soal.length + 1,
         kodeSoal: ambil(idxKode) || `${kodeMapelPrefix}-S${cap}-${String(soal.length + 1).padStart(2, '0')}`,
         tipeSoal,
         pertanyaan,
@@ -2286,15 +2367,30 @@ function ekstraksiSoalDariTabel(rows, kodeMapelPrefix, cap) {
         bobotNilai
       }));
     }
-    return { soal, kunciMap: {}, bobotBagian: {} };
+    return { soal, kunciMap: {}, bobotBagian: {}, barisTambahan: [] };
   }
 
   const kunciMap = {};
   const bobotBagian = {};
+  const barisTambahan = [];
+
   if (idxKunci >= 0 || idxBobot >= 0) {
     for (let r = 1; r < rows.length; r++) {
       const sel = rows[r];
       const ambil = i => (i >= 0 && sel[i] ? sel[i].teks.trim() : '');
+      // Dukung tabel kunci multi-kolom berpasangan (mis. No | Kunci | No | Kunci)
+      if (sel.length >= 4 && header.filter(h => h.includes('kunci') || h.includes('jawaban') || h === 'no' || h === 'no.').length >= 4) {
+        for (let c = 0; c + 1 < sel.length; c += 2) {
+          const mNoPair = (sel[c]?.teks || '').match(/\d+/);
+          const valPair = (sel[c + 1]?.teks || '').trim();
+          if (mNoPair && valPair) {
+            const kNo = String(Number(mNoPair[0]));
+            kunciMap[kNo] = { ...(kunciMap[kNo] || {}), kunci: valPair };
+          }
+        }
+        continue;
+      }
+
       const noStr = ambil(idxNo >= 0 ? idxNo : 0);
       const kunciVal = idxKunci >= 0 ? ambil(idxKunci) : '';
       const bobotVal = idxBobot >= 0 ? Number(ambil(idxBobot).replace(/[^0-9\.,]/g, '').replace(',', '.')) : null;
@@ -2321,8 +2417,109 @@ function ekstraksiSoalDariTabel(rows, kodeMapelPrefix, cap) {
         bobotBagian[tipeRow] = bobotVal;
       }
     }
+    return { soal: [], kunciMap, bobotBagian, barisTambahan: [] };
   }
-  return { soal: [], kunciMap, bobotBagian };
+
+  // Tabel tata letak soal Word tanpa header (mis. kolom 1 nomor, kolom 2 isi soal + opsi)
+  rows.forEach(sel => {
+    const teksSel = sel.map(c => c.teks.trim()).filter(Boolean);
+    if (!teksSel.length) return;
+    if (sel.length >= 2 && /^\d+[\.\)]?$/.test(sel[0].teks.trim())) {
+      const no = sel[0].teks.trim().replace(/[\.\)]$/, '');
+      const isiGabung = sel.slice(1).map(c => c.teks.trim()).filter(Boolean).join('\n');
+      const imgCell = sel.find(c => c.img)?.img || '';
+      const pecahBaris = isiGabung.split('\n').map(x => x.trim()).filter(Boolean);
+      pecahBaris.forEach((b, idx) => {
+        barisTambahan.push({
+          teks: idx === 0 ? `${no}. ${b}` : b,
+          img: idx === 0 ? imgCell : '',
+          bold: false
+        });
+      });
+    } else {
+      sel.forEach(c => {
+        c.teks.split('\n').map(x => x.trim()).filter(Boolean).forEach((b, idx) => {
+          barisTambahan.push({ teks: b, img: idx === 0 ? c.img : '', bold: c.bold });
+        });
+      });
+    }
+  });
+
+  return { soal: [], kunciMap, bobotBagian, barisTambahan };
+}
+
+function parseTeksKunciDanPenskoran(teksRaw, kunciGlobal = {}, kunciPerBagian = {}, bobotDefaultTipe = {}) {
+  const barisList = String(teksRaw || '').split(/\r?\n/).map(b => b.replace(/\s+/g, ' ').trim()).filter(Boolean);
+  let bagianKunciAktif = '';
+
+  barisList.forEach(txt => {
+    if (/^(?:(?:[IVX]+|[A-E])[\.\)]\s*)?(?:kunci\s+jawaban|pedoman\s+penskoran|rubrik\s+penilaian|pembahasan|daftar\s+kunci)/i.test(txt)) {
+      const skorHead = ekstrakAngkaSkorTeks(txt);
+      const tipeHead = deteksiHeadingBagianSoal(txt);
+      if (tipeHead && skorHead > 0) bobotDefaultTipe[tipeHead] = skorHead;
+      return;
+    }
+
+    const headBagian = deteksiHeadingBagianSoal(txt);
+    if (headBagian) {
+      bagianKunciAktif = headBagian;
+      const skorHead = ekstrakAngkaSkorTeks(txt);
+      if (skorHead > 0) bobotDefaultTipe[headBagian] = skorHead;
+      return;
+    }
+
+    const tipeAturan = deteksiHeadingBagianSoal(txt.replace(/^[-•*]\s*/, ''));
+    const skorAturan = ekstrakAngkaSkorTeks(txt);
+    if (tipeAturan && skorAturan > 0 && !/^\d+[\.\)\:\-\s]/.test(txt)) {
+      bobotDefaultTipe[tipeAturan] = skorAturan;
+      return;
+    }
+
+    const mRentang = txt.match(/(?:no\.?\s*|soal\s*)?(\d+)\s*[-–s\.d\.]+\s*(\d+)/i);
+    if (mRentang && skorAturan > 0) {
+      for (let n = Number(mRentang[1]); n <= Number(mRentang[2]); n++) {
+        kunciGlobal[String(n)] = { ...(kunciGlobal[String(n)] || {}), bobot: skorAturan };
+      }
+      return;
+    }
+
+    const multiMatch = [...txt.matchAll(/(?:^|[\s;,|])(\d+)\s*[\.\)\:\-\=]?\s*([A-Ea-e](?:\s*(?:,|dan|&|;)\s*[A-Ea-e])*)(?=(?:[\s;,|]+\d+\s*[\.\)\:\-\=]?\s*[A-Ea-e])|\s*$)/g)];
+    if (multiMatch.length >= 2) {
+      multiMatch.forEach(mm => {
+        const noKey = String(Number(mm[1]));
+        const val = mm[2].trim();
+        const targetObj = { ...(kunciGlobal[noKey] || {}), kunci: val };
+        kunciGlobal[noKey] = targetObj;
+        if (bagianKunciAktif) kunciPerBagian[`${bagianKunciAktif}#${noKey}`] = targetObj;
+      });
+      return;
+    }
+
+    const mSatu = txt.match(/^(?:no\.?\s*|soal\s*)?(\d+)\s*[\.\)\:\-\=]\s*(.+)$/i) ||
+      txt.match(/^(\d+)\s+([A-Ea-e](?:\s*(?:,|dan|&|;)\s*[A-Ea-e])*)(?:\s+.*)?$/);
+    if (mSatu) {
+      const noKey = String(Number(mSatu[1]));
+      let isiKunci = mSatu[2].trim();
+      const skorInline = ekstrakAngkaSkorTeks(isiKunci) ||
+        (() => {
+          const mKurung = isiKunci.match(/[\(\[]\s*(\d+(?:[\.,]\d+)?)\s*[\)\]]\s*$/);
+          return mKurung ? Number(mKurung[1].replace(',', '.')) : null;
+        })();
+      isiKunci = isiKunci
+        .replace(/\s*[\(\[]?\s*(?:bobot|skor|poin|nilai)\s*(?:maks(?:imal)?)?\s*[:=@]?\s*\d+(?:[\.,]\d+)?\s*(?:poin|skor)?\s*[\)\]]?$/i, '')
+        .replace(/\s*[\(\[]\s*\d+(?:[\.,]\d+)?\s*[\)\]]\s*$/, '')
+        .trim();
+      const entri = {
+        ...(kunciGlobal[noKey] || {}),
+        ...(isiKunci ? { kunci: isiKunci } : {}),
+        ...(skorInline > 0 ? { bobot: skorInline } : {})
+      };
+      kunciGlobal[noKey] = entri;
+      if (bagianKunciAktif) kunciPerBagian[`${bagianKunciAktif}#${noKey}`] = entri;
+    }
+  });
+
+  return { kunciGlobal, kunciPerBagian, bobotDefaultTipe };
 }
 
 function ekstrakSoalPintarDariSumber({ baris, tabel }, kodeMapelPrefix) {
@@ -2331,6 +2528,7 @@ function ekstrakSoalPintarDariSumber({ baris, tabel }, kodeMapelPrefix) {
   const kunciGlobal = {};
   const kunciPerBagian = {};
   const bobotDefaultTipe = {};
+  const barisGabungan = [...(baris || [])];
 
   (tabel || []).forEach(rows => {
     const res = ekstraksiSoalDariTabel(rows, kodeMapelPrefix, cap);
@@ -2339,28 +2537,58 @@ function ekstrakSoalPintarDariSumber({ baris, tabel }, kodeMapelPrefix) {
       kunciGlobal[k] = { ...(kunciGlobal[k] || {}), ...v };
     });
     Object.assign(bobotDefaultTipe, res.bobotBagian);
+    if (res.barisTambahan && res.barisTambahan.length) {
+      barisGabungan.push(...res.barisTambahan);
+    }
   });
 
-  if (daftarSoal.length && (!baris || baris.length < 4)) {
+  if (daftarSoal.length && barisGabungan.length < 4) {
     return daftarSoal.map(s => terapkanKunciDanBobot(s, kunciGlobal, kunciPerBagian, bobotDefaultTipe));
   }
 
   let modeKunci = false;
   let bagianAktif = '';
-  let bagianKunciAktif = '';
   let aktif = null;
   let nomorUrut = 0;
+  const barisModeKunci = [];
+
+  const sisipkanOpsiKeAktif = (opsiList, kunciTanda = [], boldFlag = false) => {
+    opsiList.forEach(o => {
+      const ada = aktif.opsiJawaban.find(x => x.kode === o.kode);
+      if (ada) ada.teks = o.teks;
+      else aktif.opsiJawaban.push({ kode: o.kode, teks: o.teks });
+      if (boldFlag && !aktif.opsiTebal.includes(o.kode)) aktif.opsiTebal.push(o.kode);
+    });
+    kunciTanda.forEach(k => {
+      if (!aktif.kunciDariTanda.includes(k)) aktif.kunciDariTanda.push(k);
+    });
+  };
 
   const dorongAktif = () => {
     if (!aktif) return;
     if (!aktif.pertanyaan.trim()) { aktif = null; return; }
+    // Pemindaian ulang terakhir: jika opsi masih menempel di dalam teks pertanyaan
+    if (aktif.opsiJawaban.length < 2) {
+      const pecahUlang = pecahOpsiInlineDariTeks(aktif.pertanyaan.replace(/\n+/g, ' '));
+      if (pecahUlang && pecahUlang.opsi.length >= 2) {
+        if (pecahUlang.teksSebelum) aktif.pertanyaan = pecahUlang.teksSebelum;
+        sisipkanOpsiKeAktif(pecahUlang.opsi, pecahUlang.kunciDariTanda, false);
+      }
+    }
+    if (!aktif.kunciJawaban && aktif.kunciDariTanda.length) {
+      aktif.kunciJawaban = aktif.kunciDariTanda.join(', ');
+    }
+    if (!aktif.kunciJawaban && aktif.opsiTebal.length > 0 && aktif.opsiTebal.length < aktif.opsiJawaban.length) {
+      aktif.kunciJawaban = aktif.opsiTebal.join(', ');
+    }
     daftarSoal.push(aktif);
     aktif = null;
   };
 
-  (baris || []).forEach(item => {
+  barisGabungan.forEach(item => {
     const txt = String(item.teks || '').replace(/\s+/g, ' ').trim();
     const imgSrc = item.img || '';
+    const isBold = Boolean(item.bold);
 
     if (!txt && imgSrc && aktif && !aktif.urlGambar) {
       aktif.urlGambar = imgSrc;
@@ -2368,66 +2596,15 @@ function ekstrakSoalPintarDariSumber({ baris, tabel }, kodeMapelPrefix) {
     }
     if (!txt) return;
 
-    if (/^(?:(?:[IVX]+|[A-E])[\.\)]\s*)?(?:kunci\s+jawaban|pedoman\s+penskoran|rubrik\s+penilaian|pembahasan\s+dan\s+kunci)/i.test(txt)) {
+    if (/^(?:(?:[IVX]+|[A-E])[\.\)]\s*)?(?:kunci\s+jawaban|pedoman\s+penskoran|rubrik\s+penilaian|pembahasan\s+dan\s+kunci|daftar\s+kunci)/i.test(txt)) {
       dorongAktif();
       modeKunci = true;
-      bagianKunciAktif = '';
-      const skorHead = ekstrakAngkaSkorTeks(txt);
-      const tipeHead = deteksiHeadingBagianSoal(txt);
-      if (tipeHead && skorHead) bobotDefaultTipe[tipeHead] = skorHead;
+      barisModeKunci.push(txt);
       return;
     }
 
     if (modeKunci) {
-      const headBagian = deteksiHeadingBagianSoal(txt);
-      if (headBagian) {
-        bagianKunciAktif = headBagian;
-        const skorHead = ekstrakAngkaSkorTeks(txt);
-        if (skorHead > 0) bobotDefaultTipe[headBagian] = skorHead;
-        return;
-      }
-
-      const tipeAturan = deteksiHeadingBagianSoal(txt.replace(/^[-•*]\s*/, ''));
-      const skorAturan = ekstrakAngkaSkorTeks(txt);
-      if (tipeAturan && skorAturan > 0 && !/^\d+[\.\)]/.test(txt)) {
-        bobotDefaultTipe[tipeAturan] = skorAturan;
-        return;
-      }
-
-      const mRentang = txt.match(/(?:no\.?\s*)?(\d+)\s*[-–]\s*(\d+)/i);
-      if (mRentang && skorAturan > 0) {
-        for (let n = Number(mRentang[1]); n <= Number(mRentang[2]); n++) {
-          kunciGlobal[String(n)] = { ...(kunciGlobal[String(n)] || {}), bobot: skorAturan };
-        }
-        return;
-      }
-
-      const multiMatch = [...txt.matchAll(/(?:^|\s)(\d+)[\.\)]\s*([A-Ea-e](?:\s*(?:,|dan|&|;)\s*[A-Ea-e])*)(?=\s+\d+[\.\)]|\s*$)/g)];
-      if (multiMatch.length >= 2) {
-        multiMatch.forEach(mm => {
-          const noKey = String(Number(mm[1]));
-          const val = mm[2].trim();
-          const targetObj = { ...(kunciGlobal[noKey] || {}), kunci: val };
-          kunciGlobal[noKey] = targetObj;
-          if (bagianKunciAktif) kunciPerBagian[`${bagianKunciAktif}#${noKey}`] = targetObj;
-        });
-        return;
-      }
-
-      const mSatu = txt.match(/^(?:no\.?\s*)?(\d+)[\.\):\-]\s*(.+)$/i);
-      if (mSatu) {
-        const noKey = String(Number(mSatu[1]));
-        let isiKunci = mSatu[2].trim();
-        const skorInline = ekstrakAngkaSkorTeks(isiKunci);
-        isiKunci = isiKunci.replace(/\s*[\(\[]?\s*(?:bobot|skor|poin|nilai)\s*(?:maks(?:imal)?)?\s*[:=@]?\s*\d+(?:[\.,]\d+)?\s*(?:poin|skor)?\s*[\)\]]?$/i, '').trim();
-        const entri = {
-          ...(kunciGlobal[noKey] || {}),
-          ...(isiKunci ? { kunci: isiKunci } : {}),
-          ...(skorInline > 0 ? { bobot: skorInline } : {})
-        };
-        kunciGlobal[noKey] = entri;
-        if (bagianKunciAktif) kunciPerBagian[`${bagianKunciAktif}#${noKey}`] = entri;
-      }
+      barisModeKunci.push(txt);
       return;
     }
 
@@ -2440,17 +2617,18 @@ function ekstrakSoalPintarDariSumber({ baris, tabel }, kodeMapelPrefix) {
       return;
     }
 
-    if (!aktif && /^(?:templat|petunjuk|soal\s+asas|asesmen\s+sumatif|mata\s+pelajaran|kelas\s*:|waktu\s*:|semester\s*:)/i.test(txt)) {
+    if (!aktif && /^(?:templat|petunjuk|soal\s+asas|asesmen\s+sumatif|penilaian\s+akhir|ulangan\s+akhir|mata\s+pelajaran|kelas\s*:|waktu\s*:|semester\s*:|hari\s*\/\s*tanggal)/i.test(txt)) {
       return;
     }
 
-    const mNomor = txt.match(/^(\d+)[\.\)]\s*(.+)$/);
-    const mOpsiTunggal = txt.match(/^([A-Ea-e])[\.\)]\s*(.+)$/);
-    const opsiSejajar = pecahOpsiSejajar(txt);
-    const mKunci = txt.match(/^(?:kunci\s+jawaban|kunci|jawaban\s+benar|jawaban)\s*[:=]\s*(.+)$/i);
-    const mTipe = txt.match(/^(?:tipe\s+soal|jenis\s+soal|tipe|jenis)\s*[:=]\s*(.+)$/i);
-    const mBobot = txt.match(/^(?:bobot\s+nilai|bobot|skor\s+maks(?:imal)?|skor|poin|nilai)\s*[:=]\s*(\d+(?:[\.,]\d+)?)/i);
-    const mKode = txt.match(/^(?:kode\s+soal|kode)\s*[:=]\s*([A-Za-z0-9_\-]+)/i);
+    const mNomor = txt.match(/^(?:no\.?\s*)?(\d+)\s*[\.\)]\s*(.+)$/i);
+    const mOpsiTunggal = txt.match(/^(?:\*\s*)?(?:\(([A-Ea-e])\)|([A-Ea-e])[\.\)])\s*(.+)$/);
+    const kodeSudahAda = aktif ? aktif.opsiJawaban.map(o => o.kode) : [];
+    const opsiInline = pecahOpsiInlineDariTeks(txt, kodeSudahAda);
+    const mKunci = txt.match(/^(?:kunci\s+jawaban|kunci|jawaban\s+benar|jawaban|kj)\s*[:=\-]\s*(.+)$/i);
+    const mTipe = txt.match(/^(?:tipe\s+soal|jenis\s+soal|bentuk\s+soal|tipe|jenis)\s*[:=\-]\s*(.+)$/i);
+    const mBobot = txt.match(/^(?:bobot\s+nilai|bobot|skor\s+maks(?:imal)?|skor|poin|nilai)\s*[:=\-]\s*(\d+(?:[\.,]\d+)?)/i);
+    const mKode = txt.match(/^(?:kode\s+soal|kode)\s*[:=\-]\s*([A-Za-z0-9_\-]+)/i);
 
     if (mNomor) {
       dorongAktif();
@@ -2461,6 +2639,14 @@ function ekstrakSoalPintarDariSumber({ baris, tabel }, kodeMapelPrefix) {
       if (skorDiSoal > 0) {
         teksPertanyaan = teksPertanyaan.replace(/\s*[\(\[]\s*(?:bobot|skor|poin|nilai)\s*[:=@]?\s*\d+(?:[\.,]\d+)?\s*[\)\]]/i, '').trim();
       }
+
+      let kunciInlineDiSoal = '';
+      const mKunciAkhir = teksPertanyaan.match(/\s*[\(\[]?\s*(?:kunci|jawaban|kj)\s*[:=]\s*([^\)\]]+)[\)\]]?\s*$/i);
+      if (mKunciAkhir) {
+        kunciInlineDiSoal = mKunciAkhir[1].trim();
+        teksPertanyaan = teksPertanyaan.slice(0, mKunciAkhir.index).trim();
+      }
+
       aktif = {
         dipilih: true,
         nomorAsli: noAsli,
@@ -2471,29 +2657,20 @@ function ekstrakSoalPintarDariSumber({ baris, tabel }, kodeMapelPrefix) {
         pertanyaan: teksPertanyaan,
         urlGambar: imgSrc,
         opsiJawaban: [],
-        kunciJawaban: '',
+        opsiTebal: [],
+        kunciDariTanda: [],
+        kunciJawaban: kunciInlineDiSoal,
         bobotNilai: skorDiSoal || 0
       };
+
+      const pecahLangsung = pecahOpsiInlineDariTeks(aktif.pertanyaan, []);
+      if (pecahLangsung && pecahLangsung.opsi.length >= 2) {
+        aktif.pertanyaan = pecahLangsung.teksSebelum || aktif.pertanyaan;
+        sisipkanOpsiKeAktif(pecahLangsung.opsi, pecahLangsung.kunciDariTanda, false);
+      }
     } else if (aktif) {
       if (imgSrc && !aktif.urlGambar) aktif.urlGambar = imgSrc;
-      if (opsiSejajar) {
-        opsiSejajar.forEach(o => {
-          const ada = aktif.opsiJawaban.find(x => x.kode === o.kode);
-          if (ada) ada.teks = o.teks;
-          else aktif.opsiJawaban.push(o);
-        });
-      } else if (mOpsiTunggal) {
-        const kode = mOpsiTunggal[1].toUpperCase();
-        let isiOpsi = mOpsiTunggal[2].trim();
-        const tandaBenar = /\(\s*benar\s*\)|\*\s*$/i.test(isiOpsi);
-        if (tandaBenar) {
-          isiOpsi = isiOpsi.replace(/\s*\(\s*benar\s*\)|\s*\*\s*$/i, '').trim();
-          aktif.kunciJawaban = aktif.kunciJawaban ? `${aktif.kunciJawaban}, ${kode}` : kode;
-        }
-        const ada = aktif.opsiJawaban.find(x => x.kode === kode);
-        if (ada) ada.teks = isiOpsi;
-        else aktif.opsiJawaban.push({ kode, teks: isiOpsi });
-      } else if (mKunci) {
+      if (mKunci) {
         let kVal = mKunci[1].trim();
         const sk = ekstrakAngkaSkorTeks(kVal);
         if (sk > 0 && !aktif.bobotNilai) {
@@ -2507,14 +2684,58 @@ function ekstrakSoalPintarDariSumber({ baris, tabel }, kodeMapelPrefix) {
         aktif.bobotNilai = Number(mBobot[1].replace(',', '.')) || aktif.bobotNilai;
       } else if (mKode) {
         aktif.kodeSoal = mKode[1].trim();
+      } else if (opsiInline) {
+        if (opsiInline.teksSebelum && !aktif.opsiJawaban.length) {
+          aktif.pertanyaan += `\n${opsiInline.teksSebelum}`;
+        }
+        sisipkanOpsiKeAktif(opsiInline.opsi, opsiInline.kunciDariTanda, false);
+      } else if (mOpsiTunggal) {
+        const kode = (mOpsiTunggal[1] || mOpsiTunggal[2]).toUpperCase();
+        const bintangAwal = /^\*/.test(txt);
+        const { isi, adaTanda } = bersihkanTandaBenarOpsi(mOpsiTunggal[3]);
+        sisipkanOpsiKeAktif([{ kode, teks: isi }], (bintangAwal || adaTanda) ? [kode] : [], isBold);
       } else if (!aktif.opsiJawaban.length && !aktif.kunciJawaban) {
         aktif.pertanyaan += `\n${txt}`;
+      } else if (aktif.opsiJawaban.length && !aktif.kunciJawaban) {
+        aktif.opsiJawaban[aktif.opsiJawaban.length - 1].teks += ` ${txt}`;
       }
     }
   });
   dorongAktif();
 
+  if (barisModeKunci.length) {
+    parseTeksKunciDanPenskoran(barisModeKunci.join('\n'), kunciGlobal, kunciPerBagian, bobotDefaultTipe);
+  }
+
   return daftarSoal.map(s => terapkanKunciDanBobot(s, kunciGlobal, kunciPerBagian, bobotDefaultTipe));
+}
+
+function selesaikanKunciOpsiDariTeks(kunciRaw, opsiList, tipeSoal) {
+  const k = String(kunciRaw || '').trim();
+  if (!k) return '';
+  const daftarOpsi = opsiList || [];
+
+  if (tipeSoal === 'Pilihan Ganda') {
+    const mAwal = k.match(/^(?:opsi\s+|jawaban\s+|pilihan\s+)?\(?([A-Ea-e])\)?(?:[\.\)\s]|$)/i);
+    if (mAwal && daftarOpsi.some(o => o.kode === mAwal[1].toUpperCase())) {
+      return mAwal[1].toUpperCase();
+    }
+    const cocokTeks = daftarOpsi.find(o => normalisasiIsian(o.teks) === normalisasiIsian(k));
+    if (cocokTeks) return cocokTeks.kode;
+    return k.toUpperCase().replace(/[^A-E]/g, '').slice(0, 1);
+  }
+
+  if (tipeSoal === 'Pilihan Ganda Kompleks') {
+    if (/^(?:[A-Ea-e\s,\.\)\(&;/\-]|dan)+$/i.test(k)) {
+      return normalisasiKunciKompleks(k);
+    }
+    const potongan = k.split(/[,;|\n]/).map(normalisasiIsian).filter(Boolean);
+    const cocokKode = daftarOpsi.filter(o => potongan.includes(normalisasiIsian(o.teks))).map(o => o.kode);
+    if (cocokKode.length >= 2) return cocokKode.sort().join(', ');
+    return normalisasiKunciKompleks(k);
+  }
+
+  return k;
 }
 
 function terapkanKunciDanBobot(s, kunciGlobal, kunciPerBagian, bobotDefaultTipe) {
@@ -2529,11 +2750,16 @@ function terapkanKunciDanBobot(s, kunciGlobal, kunciPerBagian, bobotDefaultTipe)
 
   s.tipeSoal = deteksiTipeDariTeks(s.tipeSoal || s.bagianAsal, (s.opsiJawaban || []).length, s.kunciJawaban, s.pertanyaan);
 
+  if (adalahTipeBeropsi(s.tipeSoal)) {
+    s.kunciJawaban = selesaikanKunciOpsiDariTeks(s.kunciJawaban, s.opsiJawaban, s.tipeSoal);
+  } else {
+    s.opsiJawaban = [];
+  }
+
   if (!s.bobotNilai || s.bobotNilai <= 0) {
     s.bobotNilai = sumberKunci?.bobot || bobotDefaultTipe[s.tipeSoal] || (s.tipeSoal === 'Uraian' ? 20 : (s.tipeSoal === 'Pilihan Ganda Kompleks' ? 15 : 10));
   }
 
-  if (!adalahTipeBeropsi(s.tipeSoal)) s.opsiJawaban = [];
   return validasiItemSoalPintar(s);
 }
 
