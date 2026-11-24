@@ -3,960 +3,838 @@
 <html lang="id">
 
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#2563EB">
-    <meta name="description" content="Sistem Asesmen Sumatif Akhir Semester (ASAS) berbasis web - DigitalNetCare">
-    <title>Sistem Asesmen Sumatif Akhir Semester (ASAS) - DigitalNetCare</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&display=swap"
-        rel="stylesheet">
-    <link rel="icon" type="image/svg+xml"
-        href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%232563EB'/%3E%3Cpath d='M18 22h28M18 32h20M18 42h14' stroke='%23FFFFFF' stroke-width='5' stroke-linecap='round'/%3E%3Ccircle cx='44' cy='40' r='8' fill='%23F59E0B'/%3E%3C/svg%3E">
-    <link rel="stylesheet" href="./style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#2563EB">
+  <meta name="description" content="Sistem Asesmen Sumatif Akhir Semester (ASAS) berbasis web - DigitalNetCare">
+  <title>Sistem Asesmen Sumatif Akhir Semester (ASAS) - DigitalNetCare</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%232563EB'/%3E%3Cpath d='M18 22h28M18 32h20M18 42h14' stroke='%23FFFFFF' stroke-width='5' stroke-linecap='round'/%3E%3Ccircle cx='44' cy='40' r='8' fill='%23F59E0B'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="./style.css">
 </head>
 
 <body>
 
-    <!-- ===== BLOK: DNC_SVG_SPRITE ===== -->
-    <svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
-        <symbol id="icon-brand" viewBox="0 0 24 24">
-            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
-            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
-            <path d="M9 8h6M9 12h4"></path>
-        </symbol>
-        <symbol id="icon-eye" viewBox="0 0 24 24">
-            <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"></path>
-            <circle cx="12" cy="12" r="3"></circle>
-        </symbol>
-        <symbol id="icon-eye-off" viewBox="0 0 24 24">
-            <path d="M17.94 17.94A10.94 10.94 0 0 1 12 19c-7 0-11-7-11-7a21.77 21.77 0 0 1 5.06-5.94"></path>
-            <path d="M9.9 4.24A10.94 10.94 0 0 1 12 4c7 0 11 7 11 7a21.8 21.8 0 0 1-3.17 4.49"></path>
-            <path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"></path>
-            <line x1="1" y1="1" x2="23" y2="23"></line>
-        </symbol>
-        <symbol id="icon-dashboard" viewBox="0 0 24 24">
-            <rect x="3" y="3" width="7" height="7" rx="1"></rect>
-            <rect x="14" y="3" width="7" height="7" rx="1"></rect>
-            <rect x="14" y="14" width="7" height="7" rx="1"></rect>
-            <rect x="3" y="14" width="7" height="7" rx="1"></rect>
-        </symbol>
-        <symbol id="icon-master" viewBox="0 0 24 24">
-            <path d="M3 7l9-4 9 4-9 4-9-4z"></path>
-            <path d="M3 12l9 4 9-4"></path>
-            <path d="M3 17l9 4 9-4"></path>
-        </symbol>
-        <symbol id="icon-bank" viewBox="0 0 24 24">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-            <polyline points="14 2 14 8 20 8"></polyline>
-            <line x1="8" y1="13" x2="16" y2="13"></line>
-            <line x1="8" y1="17" x2="13" y2="17"></line>
-        </symbol>
-        <symbol id="icon-jadwal" viewBox="0 0 24 24">
-            <rect x="3" y="4" width="18" height="18" rx="2"></rect>
-            <line x1="16" y1="2" x2="16" y2="6"></line>
-            <line x1="8" y1="2" x2="8" y2="6"></line>
-            <line x1="3" y1="10" x2="21" y2="10"></line>
-        </symbol>
-        <symbol id="icon-ujian" viewBox="0 0 24 24">
-            <path d="M9 11l3 3L22 4"></path>
-            <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
-        </symbol>
-        <symbol id="icon-hasil" viewBox="0 0 24 24">
-            <line x1="18" y1="20" x2="18" y2="10"></line>
-            <line x1="12" y1="20" x2="12" y2="4"></line>
-            <line x1="6" y1="20" x2="6" y2="14"></line>
-        </symbol>
-        <symbol id="icon-users" viewBox="0 0 24 24">
-            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-            <circle cx="9" cy="7" r="4"></circle>
-            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-        </symbol>
-        <symbol id="icon-plus" viewBox="0 0 24 24">
-            <line x1="12" y1="5" x2="12" y2="19"></line>
-            <line x1="5" y1="12" x2="19" y2="12"></line>
-        </symbol>
-        <symbol id="icon-upload" viewBox="0 0 24 24">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-            <polyline points="17 8 12 3 7 8"></polyline>
-            <line x1="12" y1="3" x2="12" y2="15"></line>
-        </symbol>
-        <symbol id="icon-download" viewBox="0 0 24 24">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-            <polyline points="7 10 12 15 17 10"></polyline>
-            <line x1="12" y1="15" x2="12" y2="3"></line>
-        </symbol>
-        <symbol id="icon-search" viewBox="0 0 24 24">
-            <circle cx="11" cy="11" r="8"></circle>
-            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-        </symbol>
-        <symbol id="icon-refresh" viewBox="0 0 24 24">
-            <polyline points="23 4 23 10 17 10"></polyline>
-            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
-        </symbol>
-        <symbol id="icon-logout" viewBox="0 0 24 24">
-            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-            <polyline points="16 17 21 12 16 7"></polyline>
-            <line x1="21" y1="12" x2="9" y2="12"></line>
-        </symbol>
-        <symbol id="icon-close" viewBox="0 0 24 24">
-            <line x1="18" y1="6" x2="6" y2="18"></line>
-            <line x1="6" y1="6" x2="18" y2="18"></line>
-        </symbol>
-        <symbol id="icon-alert" viewBox="0 0 24 24">
-            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
-            <line x1="12" y1="9" x2="12" y2="13"></line>
-            <line x1="12" y1="17" x2="12.01" y2="17"></line>
-        </symbol>
-        <symbol id="icon-clock" viewBox="0 0 24 24">
-            <circle cx="12" cy="12" r="10"></circle>
-            <polyline points="12 6 12 12 16 14"></polyline>
-        </symbol>
-        <symbol id="icon-print" viewBox="0 0 24 24">
-            <polyline points="6 9 6 2 18 2 18 9"></polyline>
-            <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
-            <rect x="6" y="14" width="12" height="8"></rect>
-        </symbol>
-        <symbol id="icon-more" viewBox="0 0 24 24">
-            <circle cx="5" cy="12" r="1.5"></circle>
-            <circle cx="12" cy="12" r="1.5"></circle>
-            <circle cx="19" cy="12" r="1.5"></circle>
-        </symbol>
-        <symbol id="icon-shield" viewBox="0 0 24 24">
-            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
-            <polyline points="9 12 11 14 15 10"></polyline>
-        </symbol>
-    </svg>
+  <!-- ===== BLOK: DNC_SVG_SPRITE ===== -->
+  <svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
+    <symbol id="icon-brand" viewBox="0 0 24 24">
+      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+      <path d="M9 8h6M9 12h4"></path>
+    </symbol>
+    <symbol id="icon-eye" viewBox="0 0 24 24">
+      <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"></path>
+      <circle cx="12" cy="12" r="3"></circle>
+    </symbol>
+    <symbol id="icon-eye-off" viewBox="0 0 24 24">
+      <path d="M17.94 17.94A10.94 10.94 0 0 1 12 19c-7 0-11-7-11-7a21.77 21.77 0 0 1 5.06-5.94"></path>
+      <path d="M9.9 4.24A10.94 10.94 0 0 1 12 4c7 0 11 7 11 7a21.8 21.8 0 0 1-3.17 4.49"></path>
+      <path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"></path>
+      <line x1="1" y1="1" x2="23" y2="23"></line>
+    </symbol>
+    <symbol id="icon-dashboard" viewBox="0 0 24 24">
+      <rect x="3" y="3" width="7" height="7" rx="1"></rect>
+      <rect x="14" y="3" width="7" height="7" rx="1"></rect>
+      <rect x="14" y="14" width="7" height="7" rx="1"></rect>
+      <rect x="3" y="14" width="7" height="7" rx="1"></rect>
+    </symbol>
+    <symbol id="icon-master" viewBox="0 0 24 24">
+      <path d="M3 7l9-4 9 4-9 4-9-4z"></path>
+      <path d="M3 12l9 4 9-4"></path>
+      <path d="M3 17l9 4 9-4"></path>
+    </symbol>
+    <symbol id="icon-bank" viewBox="0 0 24 24">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+      <polyline points="14 2 14 8 20 8"></polyline>
+      <line x1="8" y1="13" x2="16" y2="13"></line>
+      <line x1="8" y1="17" x2="13" y2="17"></line>
+    </symbol>
+    <symbol id="icon-jadwal" viewBox="0 0 24 24">
+      <rect x="3" y="4" width="18" height="18" rx="2"></rect>
+      <line x1="16" y1="2" x2="16" y2="6"></line>
+      <line x1="8" y1="2" x2="8" y2="6"></line>
+      <line x1="3" y1="10" x2="21" y2="10"></line>
+    </symbol>
+    <symbol id="icon-ujian" viewBox="0 0 24 24">
+      <path d="M9 11l3 3L22 4"></path>
+      <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+    </symbol>
+    <symbol id="icon-hasil" viewBox="0 0 24 24">
+      <line x1="18" y1="20" x2="18" y2="10"></line>
+      <line x1="12" y1="20" x2="12" y2="4"></line>
+      <line x1="6" y1="20" x2="6" y2="14"></line>
+    </symbol>
+    <symbol id="icon-users" viewBox="0 0 24 24">
+      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+      <circle cx="9" cy="7" r="4"></circle>
+      <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+      <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+    </symbol>
+    <symbol id="icon-plus" viewBox="0 0 24 24">
+      <line x1="12" y1="5" x2="12" y2="19"></line>
+      <line x1="5" y1="12" x2="19" y2="12"></line>
+    </symbol>
+    <symbol id="icon-upload" viewBox="0 0 24 24">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+      <polyline points="17 8 12 3 7 8"></polyline>
+      <line x1="12" y1="3" x2="12" y2="15"></line>
+    </symbol>
+    <symbol id="icon-download" viewBox="0 0 24 24">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+      <polyline points="7 10 12 15 17 10"></polyline>
+      <line x1="12" y1="15" x2="12" y2="3"></line>
+    </symbol>
+    <symbol id="icon-search" viewBox="0 0 24 24">
+      <circle cx="11" cy="11" r="8"></circle>
+      <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+    </symbol>
+    <symbol id="icon-refresh" viewBox="0 0 24 24">
+      <polyline points="23 4 23 10 17 10"></polyline>
+      <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+    </symbol>
+    <symbol id="icon-logout" viewBox="0 0 24 24">
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+      <polyline points="16 17 21 12 16 7"></polyline>
+      <line x1="21" y1="12" x2="9" y2="12"></line>
+    </symbol>
+    <symbol id="icon-close" viewBox="0 0 24 24">
+      <line x1="18" y1="6" x2="6" y2="18"></line>
+      <line x1="6" y1="6" x2="18" y2="18"></line>
+    </symbol>
+    <symbol id="icon-alert" viewBox="0 0 24 24">
+      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+      <line x1="12" y1="9" x2="12" y2="13"></line>
+      <line x1="12" y1="17" x2="12.01" y2="17"></line>
+    </symbol>
+    <symbol id="icon-clock" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="10"></circle>
+      <polyline points="12 6 12 12 16 14"></polyline>
+    </symbol>
+    <symbol id="icon-print" viewBox="0 0 24 24">
+      <polyline points="6 9 6 2 18 2 18 9"></polyline>
+      <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+      <rect x="6" y="14" width="12" height="8"></rect>
+    </symbol>
+    <symbol id="icon-more" viewBox="0 0 24 24">
+      <circle cx="5" cy="12" r="1.5"></circle>
+      <circle cx="12" cy="12" r="1.5"></circle>
+      <circle cx="19" cy="12" r="1.5"></circle>
+    </symbol>
+    <symbol id="icon-shield" viewBox="0 0 24 24">
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+      <polyline points="9 12 11 14 15 10"></polyline>
+    </symbol>
+    <symbol id="icon-play" viewBox="0 0 24 24">
+      <polygon points="5 3 19 12 5 21 5 3"></polygon>
+    </symbol>
+    <symbol id="icon-stop" viewBox="0 0 24 24">
+      <rect x="5" y="5" width="14" height="14" rx="2"></rect>
+    </symbol>
+  </svg>
 
-    <!-- ===== BLOK: DNC_LOGIN ===== -->
-    <div id="dnc-halaman-login" class="dnc-halaman-login">
-        <section class="dnc-login-panel-kiri" aria-label="Informasi Aplikasi">
-            <div class="dnc-login-brand-wrap">
-                <div class="dnc-login-logo">
-                    <svg class="dnc-ikon">
-                        <use href="#icon-brand"></use>
-                    </svg>
-                </div>
-                <h1 class="dnc-login-judul">Sistem Asesmen Sumatif Akhir Semester (ASAS)</h1>
-                <p class="dnc-login-tagline">Platform terpusat pengelolaan bank soal, jadwal bertoken, ruang ujian
-                    daring, koreksi, dan rekapitulasi ketuntasan peserta didik.</p>
-                <ul class="dnc-login-manfaat">
-                    <li class="dnc-login-manfaat-item">
-                        <span class="dnc-login-manfaat-ikon"><svg class="dnc-ikon">
-                                <use href="#icon-bank"></use>
-                            </svg></span>
-                        <div>
-                            <strong>Bank Soal & Impor Word (.docx)</strong>
-                            <span>Susun soal Pilihan Ganda maupun Uraian secara manual atau unggah langsung dari dokumen
-                                Word.</span>
-                        </div>
-                    </li>
-                    <li class="dnc-login-manfaat-item">
-                        <span class="dnc-login-manfaat-ikon"><svg class="dnc-ikon">
-                                <use href="#icon-ujian"></use>
-                            </svg></span>
-                        <div>
-                            <strong>Ujian Bertoken & Autosave Real-Time</strong>
-                            <span>Timer otomatis, acak soal dan opsi jawaban, serta pemulihan sesi jika perangkat dimuat
-                                ulang.</span>
-                        </div>
-                    </li>
-                    <li class="dnc-login-manfaat-item">
-                        <span class="dnc-login-manfaat-ikon"><svg class="dnc-ikon">
-                                <use href="#icon-shield"></use>
-                            </svg></span>
-                        <div>
-                            <strong>Pemisahan Akses Admin, Guru, dan Siswa</strong>
-                            <span>Hak akses ketat per mata pelajaran ampu dan kelas dengan rekap nilai siap
-                                cetak.</span>
-                        </div>
-                    </li>
-                </ul>
+  <!-- ===== BLOK: DNC_LOGIN ===== -->
+  <div id="dnc-halaman-login" class="dnc-halaman-login">
+    <section class="dnc-login-panel-kiri" aria-label="Informasi Aplikasi">
+      <div class="dnc-login-brand-wrap">
+        <div class="dnc-login-logo">
+          <svg class="dnc-ikon"><use href="#icon-brand"></use></svg>
+        </div>
+        <h1 class="dnc-login-judul">Sistem Asesmen Sumatif Akhir Semester (ASAS)</h1>
+        <p class="dnc-login-tagline">Platform terpusat pengelolaan bank soal pintar, kontrol sesi ujian langsung oleh guru, ruang ujian acak bertoken, dan rekapitulasi ketuntasan.</p>
+        <ul class="dnc-login-manfaat">
+          <li class="dnc-login-manfaat-item">
+            <span class="dnc-login-manfaat-ikon"><svg class="dnc-ikon"><use href="#icon-bank"></use></svg></span>
+            <div>
+              <strong>Impor Soal & Kunci Jawaban Otomatis</strong>
+              <span>Deteksi cerdas Pilihan Ganda, PG Kompleks, Isian Singkat, Uraian, kunci jawaban, dan pedoman penskoran dari Word, Excel, atau PDF.</span>
             </div>
-            <div class="dnc-login-kiri-footer">DigitalNetCare@copyright</div>
+          </li>
+          <li class="dnc-login-manfaat-item">
+            <span class="dnc-login-manfaat-ikon"><svg class="dnc-ikon"><use href="#icon-ujian"></use></svg></span>
+            <div>
+              <strong>Kontrol Mulai/Berhenti & Acak Per Siswa</strong>
+              <span>Guru membuka dan menutup sesi ujian secara langsung; soal dan opsi diacak unik per siswa tanpa mengubah kunci jawaban.</span>
+            </div>
+          </li>
+          <li class="dnc-login-manfaat-item">
+            <span class="dnc-login-manfaat-ikon"><svg class="dnc-ikon"><use href="#icon-shield"></use></svg></span>
+            <div>
+              <strong>Pemisahan Akses Admin, Guru, dan Siswa</strong>
+              <span>Hak akses ketat per mata pelajaran ampu dan kelas dengan perhitungan skor otomatis sesuai bobot file soal.</span>
+            </div>
+          </li>
+        </ul>
+      </div>
+      <div class="dnc-login-kiri-footer">DigitalNetCare@copyright</div>
+    </section>
+
+    <section class="dnc-login-panel-kanan" aria-label="Formulir Masuk">
+      <div class="dnc-login-kartu">
+        <h2 class="dnc-login-heading">Masuk ke Portal ASAS</h2>
+        <p class="dnc-login-sub">Pilih peran akun Anda lalu masukkan kredensial terdaftar.</p>
+
+        <div id="dnc-preview-login-slot"></div>
+
+        <div class="dnc-role-tabs" role="tablist" aria-label="Pilih Peran">
+          <button type="button" class="dnc-role-tab aktif" data-login-role="Admin" role="tab" aria-selected="true">Admin</button>
+          <button type="button" class="dnc-role-tab" data-login-role="Guru" role="tab" aria-selected="false">Guru</button>
+          <button type="button" class="dnc-role-tab" data-login-role="Siswa" role="tab" aria-selected="false">Siswa</button>
+        </div>
+
+        <form id="form-login-dnc" novalidate>
+          <div class="dnc-form-grup">
+            <label id="label-login-identitas" class="dnc-label" for="input-login-identitas">Email</label>
+            <input id="input-login-identitas" class="dnc-input" type="email" autocomplete="username" placeholder="Masukkan email terdaftar" required>
+          </div>
+          <div class="dnc-form-grup">
+            <label class="dnc-label" for="input-login-password">Password</label>
+            <div class="dnc-wadah-input-password">
+              <input id="input-login-password" class="dnc-input" type="password" autocomplete="current-password" placeholder="Masukkan password" required>
+              <button type="button" id="btn-intip-password" class="dnc-tombol-intip" aria-label="Tampilkan atau sembunyikan password">
+                <svg class="dnc-ikon"><use href="#icon-eye"></use></svg>
+              </button>
+            </div>
+          </div>
+          <button type="submit" id="btn-masuk-dnc" class="dnc-tombol dnc-tombol-primer dnc-tombol-penuh dnc-mt-12">Masuk</button>
+        </form>
+      </div>
+      <footer class="dnc-footer">DigitalNetCare@copyright</footer>
+    </section>
+  </div>
+
+  <!-- ===== BLOK: DNC_APP_SHELL ===== -->
+  <div id="dnc-aplikasi" class="dnc-aplikasi dnc-disembunyikan">
+    <header class="dnc-bilah-atas-hp">
+      <div class="dnc-hp-brand">
+        <span class="dnc-sidebar-logo">
+          <svg class="dnc-ikon"><use href="#icon-brand"></use></svg>
+        </span>
+        <span>Portal ASAS</span>
+      </div>
+      <div class="dnc-hp-user-wrap">
+        <span id="hp-user-nama" class="dnc-hp-user-nama"></span>
+        <button type="button" id="btn-keluar-hp" class="dnc-tombol dnc-tombol-bahaya dnc-tombol-kecil">Keluar</button>
+      </div>
+    </header>
+
+    <aside class="dnc-sidebar" aria-label="Navigasi Utama">
+      <div class="dnc-sidebar-header">
+        <span class="dnc-sidebar-logo">
+          <svg class="dnc-ikon"><use href="#icon-brand"></use></svg>
+        </span>
+        <div>
+          <div class="dnc-sidebar-judul">Portal ASAS</div>
+          <div class="dnc-sidebar-sub">Asesmen Sumatif</div>
+        </div>
+      </div>
+
+      <nav id="dnc-sidebar-nav" class="dnc-sidebar-nav" aria-label="Menu Aplikasi"></nav>
+
+      <div class="dnc-sidebar-footer">
+        <div class="dnc-user-info">
+          <div id="sidebar-user-avatar" class="dnc-user-avatar">AD</div>
+          <div style="min-width:0">
+            <div id="sidebar-user-nama" class="dnc-user-nama">-</div>
+            <div id="sidebar-user-role" class="dnc-user-role">-</div>
+          </div>
+        </div>
+        <button type="button" id="btn-keluar-desktop" class="dnc-tombol dnc-tombol-bahaya dnc-tombol-penuh">
+          <svg class="dnc-ikon"><use href="#icon-logout"></use></svg>
+          <span>Keluar</span>
+        </button>
+      </div>
+    </aside>
+
+    <main class="dnc-area-konten">
+      <div class="dnc-konten-dalam">
+        <div id="dnc-preview-banner-slot"></div>
+
+        <!-- DNC-M1: Dashboard -->
+        <section id="sec-DNC-M1" class="dnc-section" aria-labelledby="judul-m1">
+          <div class="dnc-header-halaman">
+            <div>
+              <h1 id="judul-m1" class="dnc-judul-halaman">Dashboard ASAS</h1>
+              <p id="subjudul-m1" class="dnc-subjudul-halaman">Ringkasan capaian pelaksanaan, bank soal, dan status ketuntasan.</p>
+            </div>
+            <div class="dnc-aksi-header">
+              <button type="button" id="btn-muat-ulang-m1" class="dnc-tombol dnc-tombol-sekunder">
+                <svg class="dnc-ikon"><use href="#icon-refresh"></use></svg>
+                <span>Muat Ulang</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="dnc-kpi-grid">
+            <article class="dnc-kpi-kartu">
+              <div class="dnc-kpi-atas">
+                <span class="dnc-kpi-label">Peserta Didik Aktif</span>
+                <span class="dnc-kpi-ikon biru"><svg class="dnc-ikon"><use href="#icon-users"></use></svg></span>
+              </div>
+              <div id="kpi-siswa-aktif" class="dnc-kpi-nilai">0</div>
+              <div class="dnc-kpi-ket">Siswa terdaftar berstatus aktif</div>
+            </article>
+            <article class="dnc-kpi-kartu">
+              <div class="dnc-kpi-atas">
+                <span class="dnc-kpi-label">Total Bank Soal</span>
+                <span class="dnc-kpi-ikon sekunder"><svg class="dnc-ikon"><use href="#icon-bank"></use></svg></span>
+              </div>
+              <div id="kpi-bank-soal" class="dnc-kpi-nilai">0</div>
+              <div class="dnc-kpi-ket">PG, PG Kompleks, Isian & Uraian</div>
+            </article>
+            <article class="dnc-kpi-kartu">
+              <div class="dnc-kpi-atas">
+                <span class="dnc-kpi-label">Paket ASAS Aktif</span>
+                <span class="dnc-kpi-ikon amber"><svg class="dnc-ikon"><use href="#icon-jadwal"></use></svg></span>
+              </div>
+              <div id="kpi-paket-aktif" class="dnc-kpi-nilai">0</div>
+              <div class="dnc-kpi-ket">Jadwal ujian aktif / sedang dibuka</div>
+            </article>
+            <article class="dnc-kpi-kartu">
+              <div class="dnc-kpi-atas">
+                <span class="dnc-kpi-label">Rata-rata Skor</span>
+                <span class="dnc-kpi-ikon hijau"><svg class="dnc-ikon"><use href="#icon-hasil"></use></svg></span>
+              </div>
+              <div id="kpi-rata-skor" class="dnc-kpi-nilai">0</div>
+              <div class="dnc-kpi-ket">Skala 0–100 dari ujian selesai</div>
+            </article>
+          </div>
+
+          <div class="dnc-grafik-grid">
+            <article class="dnc-kartu">
+              <div class="dnc-kartu-header">
+                <h2 class="dnc-kartu-judul">Rata-rata Nilai per Mata Pelajaran</h2>
+              </div>
+              <div class="dnc-wadah-grafik-bar">
+                <canvas id="chart-rata-mapel"></canvas>
+              </div>
+            </article>
+            <article class="dnc-kartu">
+              <div class="dnc-kartu-header">
+                <h2 class="dnc-kartu-judul">Perbandingan Ketuntasan Siswa</h2>
+              </div>
+              <div class="dnc-wadah-grafik-donut">
+                <canvas id="chart-ketuntasan"></canvas>
+              </div>
+            </article>
+          </div>
+
+          <article class="dnc-kartu">
+            <div class="dnc-kartu-header">
+              <h2 class="dnc-kartu-judul">Jadwal ASAS Aktif & Status Penyelesaian Sesi Berjalan</h2>
+            </div>
+            <div class="dnc-pembungkus-tabel">
+              <table class="dnc-tabel dnc-tabel-padat">
+                <thead>
+                  <tr>
+                    <th>Judul Paket</th>
+                    <th>Mata Pelajaran</th>
+                    <th>Kelas Sasaran</th>
+                    <th>Rentang Waktu</th>
+                    <th>Progres Siswa</th>
+                    <th>Status Sesi</th>
+                  </tr>
+                </thead>
+                <tbody id="tbody-m1-jadwal"></tbody>
+              </table>
+            </div>
+            <div id="strip-peringatan-m1" class="dnc-strip-peringatan">
+              <span class="dnc-strip-peringatan-ikon"><svg class="dnc-ikon"><use href="#icon-alert"></use></svg></span>
+              <div id="teks-peringatan-m1">Memeriksa daftar siswa yang belum menyelesaikan ujian aktif...</div>
+            </div>
+          </article>
         </section>
 
-        <section class="dnc-login-panel-kanan" aria-label="Formulir Masuk">
-            <div class="dnc-login-kartu">
-                <h2 class="dnc-login-heading">Masuk ke Portal ASAS</h2>
-                <p class="dnc-login-sub">Pilih peran akun Anda lalu masukkan kredensial terdaftar.</p>
-
-                <div id="dnc-preview-login-slot"></div>
-
-                <div class="dnc-role-tabs" role="tablist" aria-label="Pilih Peran">
-                    <button type="button" class="dnc-role-tab aktif" data-login-role="Admin" role="tab"
-                        aria-selected="true">Admin</button>
-                    <button type="button" class="dnc-role-tab" data-login-role="Guru" role="tab"
-                        aria-selected="false">Guru</button>
-                    <button type="button" class="dnc-role-tab" data-login-role="Siswa" role="tab"
-                        aria-selected="false">Siswa</button>
-                </div>
-
-                <form id="form-login-dnc" novalidate>
-                    <div class="dnc-form-grup">
-                        <label id="label-login-identitas" class="dnc-label" for="input-login-identitas">Email</label>
-                        <input id="input-login-identitas" class="dnc-input" type="email" autocomplete="username"
-                            placeholder="Masukkan email terdaftar" required>
-                    </div>
-                    <div class="dnc-form-grup">
-                        <label class="dnc-label" for="input-login-password">Password</label>
-                        <div class="dnc-wadah-input-password">
-                            <input id="input-login-password" class="dnc-input" type="password"
-                                autocomplete="current-password" placeholder="Masukkan password" required>
-                            <button type="button" id="btn-intip-password" class="dnc-tombol-intip"
-                                aria-label="Tampilkan atau sembunyikan password">
-                                <svg class="dnc-ikon">
-                                    <use href="#icon-eye"></use>
-                                </svg>
-                            </button>
-                        </div>
-                    </div>
-                    <button type="submit" id="btn-masuk-dnc"
-                        class="dnc-tombol dnc-tombol-primer dnc-tombol-penuh dnc-mt-12">Masuk</button>
-                </form>
+        <!-- DNC-M2: Master Kelas & Mata Pelajaran -->
+        <section id="sec-DNC-M2" class="dnc-section" aria-labelledby="judul-m2">
+          <div class="dnc-header-halaman">
+            <div>
+              <h1 id="judul-m2" class="dnc-judul-halaman">Master Kelas & Mata Pelajaran</h1>
+              <p class="dnc-subjudul-halaman">Kelola rombongan belajar (manual atau impor PDF, Excel, Word), mata pelajaran ujian, dan batas KKM.</p>
             </div>
-            <footer class="dnc-footer">DigitalNetCare@copyright</footer>
+            <div class="dnc-aksi-header">
+              <button type="button" id="btn-muat-ulang-m2" class="dnc-tombol dnc-tombol-sekunder">
+                <svg class="dnc-ikon"><use href="#icon-refresh"></use></svg>
+                <span>Muat Ulang</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="dnc-subtabs" role="tablist">
+            <button type="button" id="tab-m2-kelas" class="dnc-subtab aktif" data-m2-tab="kelas">Data Kelas</button>
+            <button type="button" id="tab-m2-mapel" class="dnc-subtab" data-m2-tab="mapel">Mata Pelajaran</button>
+          </div>
+
+          <div id="panel-m2-kelas" class="dnc-subpanel aktif">
+            <article class="dnc-kartu">
+              <div class="dnc-toolbar">
+                <div class="dnc-cari-wrap">
+                  <svg class="dnc-ikon"><use href="#icon-search"></use></svg>
+                  <input id="cari-kelas" class="dnc-input" type="search" placeholder="Cari kode, nama kelas, atau wali kelas...">
+                </div>
+                <select id="filter-tingkat-kelas" class="dnc-select dnc-select-filter" aria-label="Filter Tingkat Kelas">
+                  <option value="">Semua Tingkat</option>
+                  <option value="VII">Tingkat VII</option>
+                  <option value="VIII">Tingkat VIII</option>
+                  <option value="IX">Tingkat IX</option>
+                  <option value="X">Tingkat X</option>
+                  <option value="XI">Tingkat XI</option>
+                  <option value="XII">Tingkat XII</option>
+                </select>
+                <button type="button" id="btn-impor-kelas" class="dnc-tombol dnc-tombol-aksen">
+                  <svg class="dnc-ikon"><use href="#icon-upload"></use></svg>
+                  <span>Impor Kelas (PDF / Excel / Word)</span>
+                </button>
+                <button type="button" id="btn-tambah-kelas" class="dnc-tombol dnc-tombol-primer">
+                  <svg class="dnc-ikon"><use href="#icon-plus"></use></svg>
+                  <span>Tambah Kelas</span>
+                </button>
+              </div>
+              <div class="dnc-pembungkus-tabel">
+                <table class="dnc-tabel">
+                  <thead>
+                    <tr>
+                      <th>Kode Kelas</th>
+                      <th>Nama Kelas</th>
+                      <th>Tingkat</th>
+                      <th>Tahun Ajaran</th>
+                      <th>Wali Kelas</th>
+                      <th>Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tbody-kelas"></tbody>
+                </table>
+              </div>
+            </article>
+          </div>
+
+          <div id="panel-m2-mapel" class="dnc-subpanel">
+            <article class="dnc-kartu">
+              <div class="dnc-toolbar">
+                <div class="dnc-cari-wrap">
+                  <svg class="dnc-ikon"><use href="#icon-search"></use></svg>
+                  <input id="cari-mapel" class="dnc-input" type="search" placeholder="Cari kode atau nama mata pelajaran...">
+                </div>
+                <button type="button" id="btn-tambah-mapel" class="dnc-tombol dnc-tombol-primer">
+                  <svg class="dnc-ikon"><use href="#icon-plus"></use></svg>
+                  <span>Tambah Mata Pelajaran</span>
+                </button>
+              </div>
+              <div class="dnc-pembungkus-tabel">
+                <table class="dnc-tabel">
+                  <thead>
+                    <tr>
+                      <th>Kode Mapel</th>
+                      <th>Nama Mata Pelajaran</th>
+                      <th>KKM</th>
+                      <th>Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tbody-mapel"></tbody>
+                </table>
+              </div>
+            </article>
+          </div>
         </section>
-    </div>
 
-    <!-- ===== BLOK: DNC_APP_SHELL ===== -->
-    <div id="dnc-aplikasi" class="dnc-aplikasi dnc-disembunyikan">
-        <header class="dnc-bilah-atas-hp">
-            <div class="dnc-hp-brand">
-                <span class="dnc-sidebar-logo">
-                    <svg class="dnc-ikon">
-                        <use href="#icon-brand"></use>
-                    </svg>
-                </span>
-                <span>Portal ASAS</span>
+        <!-- DNC-M3: Bank Soal -->
+        <section id="sec-DNC-M3" class="dnc-section" aria-labelledby="judul-m3">
+          <div class="dnc-header-halaman">
+            <div>
+              <h1 id="judul-m3" class="dnc-judul-halaman">Bank Soal</h1>
+              <p id="subjudul-m3" class="dnc-subjudul-halaman">Deteksi otomatis Pilihan Ganda, PG Kompleks, Isian Singkat, Uraian, kunci jawaban, dan pedoman penskoran dari Word, Excel, atau PDF.</p>
             </div>
-            <div class="dnc-hp-user-wrap">
-                <span id="hp-user-nama" class="dnc-hp-user-nama"></span>
-                <button type="button" id="btn-keluar-hp"
-                    class="dnc-tombol dnc-tombol-bahaya dnc-tombol-kecil">Keluar</button>
+            <div class="dnc-aksi-header">
+              <button type="button" id="btn-impor-word" class="dnc-tombol dnc-tombol-aksen">
+                <svg class="dnc-ikon"><use href="#icon-upload"></use></svg>
+                <span>Impor Pintar (Word / PDF / Excel)</span>
+              </button>
+              <button type="button" id="btn-impor-csv-soal" class="dnc-tombol dnc-tombol-sekunder">
+                <svg class="dnc-ikon"><use href="#icon-upload"></use></svg>
+                <span>Impor CSV</span>
+              </button>
+              <button type="button" id="btn-tambah-soal" class="dnc-tombol dnc-tombol-primer">
+                <svg class="dnc-ikon"><use href="#icon-plus"></use></svg>
+                <span>Tambah Soal</span>
+              </button>
             </div>
-        </header>
+          </div>
 
-        <aside class="dnc-sidebar" aria-label="Navigasi Utama">
-            <div class="dnc-sidebar-header">
-                <span class="dnc-sidebar-logo">
-                    <svg class="dnc-ikon">
-                        <use href="#icon-brand"></use>
-                    </svg>
-                </span>
-                <div>
-                    <div class="dnc-sidebar-judul">Portal ASAS</div>
-                    <div class="dnc-sidebar-sub">Asesmen Sumatif</div>
-                </div>
+          <article class="dnc-kartu">
+            <div class="dnc-toolbar">
+              <div class="dnc-cari-wrap">
+                <svg class="dnc-ikon"><use href="#icon-search"></use></svg>
+                <input id="cari-soal" class="dnc-input" type="search" placeholder="Cari kode atau kata kunci pertanyaan...">
+              </div>
+              <select id="filter-mapel-soal" class="dnc-select dnc-select-filter" aria-label="Filter Mata Pelajaran">
+                <option value="">Semua Mapel</option>
+              </select>
+              <select id="filter-tingkat-soal" class="dnc-select dnc-select-filter" aria-label="Filter Tingkat">
+                <option value="">Semua Tingkat</option>
+                <option value="VII">VII</option>
+                <option value="VIII">VIII</option>
+                <option value="IX">IX</option>
+                <option value="X">X</option>
+                <option value="XI">XI</option>
+                <option value="XII">XII</option>
+              </select>
+              <select id="filter-tipe-soal" class="dnc-select dnc-select-filter" aria-label="Filter Tipe Soal">
+                <option value="">Semua Tipe</option>
+                <option value="Pilihan Ganda">Pilihan Ganda</option>
+                <option value="Pilihan Ganda Kompleks">Pilihan Ganda Kompleks</option>
+                <option value="Isian Singkat">Isian Singkat</option>
+                <option value="Uraian">Uraian</option>
+              </select>
+              <select id="filter-status-soal" class="dnc-select dnc-select-filter" aria-label="Filter Status Soal">
+                <option value="">Semua Status</option>
+                <option value="aktif">Aktif</option>
+                <option value="nonaktif">Nonaktif</option>
+              </select>
+              <button type="button" id="btn-muat-ulang-m3" class="dnc-tombol dnc-tombol-sekunder" title="Muat ulang bank soal">
+                <svg class="dnc-ikon"><use href="#icon-refresh"></use></svg>
+              </button>
             </div>
+            <div class="dnc-pembungkus-tabel">
+              <table class="dnc-tabel">
+                <thead>
+                  <tr>
+                    <th>Kode Soal</th>
+                    <th>Mata Pelajaran</th>
+                    <th>Tingkat</th>
+                    <th>Tipe Soal</th>
+                    <th>Pertanyaan</th>
+                    <th>Kunci Jawaban</th>
+                    <th>Bobot</th>
+                    <th>Status</th>
+                    <th>Aksi</th>
+                  </tr>
+                </thead>
+                <tbody id="tbody-soal"></tbody>
+              </table>
+            </div>
+          </article>
+        </section>
 
-            <nav id="dnc-sidebar-nav" class="dnc-sidebar-nav" aria-label="Menu Aplikasi"></nav>
+        <!-- DNC-M4: Jadwal & Paket ASAS -->
+        <section id="sec-DNC-M4" class="dnc-section" aria-labelledby="judul-m4">
+          <div class="dnc-header-halaman">
+            <div>
+              <h1 id="judul-m4" class="dnc-judul-halaman">Jadwal & Paket ASAS</h1>
+              <p class="dnc-subjudul-halaman">Susun paket soal (PG & PG Kompleks), acak soal & opsi per siswa, dan kendalikan tombol Mulai / Berhenti Ujian.</p>
+            </div>
+            <div class="dnc-aksi-header">
+              <button type="button" id="btn-muat-ulang-m4" class="dnc-tombol dnc-tombol-sekunder">
+                <svg class="dnc-ikon"><use href="#icon-refresh"></use></svg>
+                <span>Muat Ulang</span>
+              </button>
+              <button type="button" id="btn-tambah-paket" class="dnc-tombol dnc-tombol-primer">
+                <svg class="dnc-ikon"><use href="#icon-plus"></use></svg>
+                <span>Buat Paket ASAS</span>
+              </button>
+            </div>
+          </div>
 
-            <div class="dnc-sidebar-footer">
-                <div class="dnc-user-info">
-                    <div id="sidebar-user-avatar" class="dnc-user-avatar">AD</div>
-                    <div style="min-width:0">
-                        <div id="sidebar-user-nama" class="dnc-user-nama">-</div>
-                        <div id="sidebar-user-role" class="dnc-user-role">-</div>
-                    </div>
-                </div>
-                <button type="button" id="btn-keluar-desktop" class="dnc-tombol dnc-tombol-bahaya dnc-tombol-penuh">
-                    <svg class="dnc-ikon">
-                        <use href="#icon-logout"></use>
-                    </svg>
-                    <span>Keluar</span>
+          <article class="dnc-kartu">
+            <div class="dnc-toolbar">
+              <div class="dnc-cari-wrap">
+                <svg class="dnc-ikon"><use href="#icon-search"></use></svg>
+                <input id="cari-paket" class="dnc-input" type="search" placeholder="Cari judul paket atau token...">
+              </div>
+              <select id="filter-semester-paket" class="dnc-select dnc-select-filter" aria-label="Filter Semester">
+                <option value="">Semua Semester</option>
+                <option value="Ganjil">Ganjil</option>
+                <option value="Genap">Genap</option>
+              </select>
+              <select id="filter-mapel-paket" class="dnc-select dnc-select-filter" aria-label="Filter Mapel Paket">
+                <option value="">Semua Mapel</option>
+              </select>
+              <select id="filter-kelas-paket" class="dnc-select dnc-select-filter" aria-label="Filter Kelas Paket">
+                <option value="">Semua Kelas</option>
+              </select>
+              <select id="filter-status-paket" class="dnc-select dnc-select-filter" aria-label="Filter Status Paket">
+                <option value="">Semua Status</option>
+                <option value="Draft">Draft</option>
+                <option value="Aktif">Aktif</option>
+                <option value="Selesai">Selesai</option>
+              </select>
+            </div>
+            <div class="dnc-pembungkus-tabel">
+              <table class="dnc-tabel">
+                <thead>
+                  <tr>
+                    <th>Judul Paket</th>
+                    <th>Mapel & Semester</th>
+                    <th>Kelas Sasaran</th>
+                    <th>Jadwal & Durasi</th>
+                    <th>Soal & Bobot</th>
+                    <th>Token</th>
+                    <th>Status & Kontrol Sesi</th>
+                    <th>Aksi</th>
+                  </tr>
+                </thead>
+                <tbody id="tbody-paket"></tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+
+        <!-- DNC-M5: Ruang Ujian ASAS (Khusus Siswa) -->
+        <section id="sec-DNC-M5" class="dnc-section" aria-labelledby="judul-m5">
+          <div id="m5-daftar-view">
+            <div class="dnc-header-halaman">
+              <div>
+                <h1 id="judul-m5" class="dnc-judul-halaman">Ruang Ujian ASAS</h1>
+                <p id="subjudul-m5" class="dnc-subjudul-halaman">Ujian hanya dapat dimulai setelah Guru menekan tombol Mulai Ujian. Siapkan token dari pengawas.</p>
+              </div>
+              <div class="dnc-aksi-header">
+                <button type="button" id="btn-muat-ulang-m5" class="dnc-tombol dnc-tombol-sekunder">
+                  <svg class="dnc-ikon"><use href="#icon-refresh"></use></svg>
+                  <span>Muat Ulang</span>
                 </button>
+              </div>
             </div>
-        </aside>
+            <div id="grid-ujian-siswa" class="dnc-daftar-ujian-grid"></div>
+          </div>
 
-        <main class="dnc-area-konten">
-            <div class="dnc-konten-dalam">
-                <div id="dnc-preview-banner-slot"></div>
-
-                <!-- DNC-M1: Dashboard -->
-                <section id="sec-DNC-M1" class="dnc-section" aria-labelledby="judul-m1">
-                    <div class="dnc-header-halaman">
-                        <div>
-                            <h1 id="judul-m1" class="dnc-judul-halaman">Dashboard ASAS</h1>
-                            <p id="subjudul-m1" class="dnc-subjudul-halaman">Ringkasan capaian pelaksanaan, bank soal,
-                                dan status ketuntasan.</p>
-                        </div>
-                        <div class="dnc-aksi-header">
-                            <button type="button" id="btn-muat-ulang-m1" class="dnc-tombol dnc-tombol-sekunder">
-                                <svg class="dnc-ikon">
-                                    <use href="#icon-refresh"></use>
-                                </svg>
-                                <span>Muat Ulang</span>
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="dnc-kpi-grid">
-                        <article class="dnc-kpi-kartu">
-                            <div class="dnc-kpi-atas">
-                                <span class="dnc-kpi-label">Peserta Didik Aktif</span>
-                                <span class="dnc-kpi-ikon biru"><svg class="dnc-ikon">
-                                        <use href="#icon-users"></use>
-                                    </svg></span>
-                            </div>
-                            <div id="kpi-siswa-aktif" class="dnc-kpi-nilai">0</div>
-                            <div class="dnc-kpi-ket">Siswa terdaftar berstatus aktif</div>
-                        </article>
-                        <article class="dnc-kpi-kartu">
-                            <div class="dnc-kpi-atas">
-                                <span class="dnc-kpi-label">Total Bank Soal</span>
-                                <span class="dnc-kpi-ikon sekunder"><svg class="dnc-ikon">
-                                        <use href="#icon-bank"></use>
-                                    </svg></span>
-                            </div>
-                            <div id="kpi-bank-soal" class="dnc-kpi-nilai">0</div>
-                            <div class="dnc-kpi-ket">Butir soal Pilihan Ganda & Uraian</div>
-                        </article>
-                        <article class="dnc-kpi-kartu">
-                            <div class="dnc-kpi-atas">
-                                <span class="dnc-kpi-label">Paket ASAS Aktif</span>
-                                <span class="dnc-kpi-ikon amber"><svg class="dnc-ikon">
-                                        <use href="#icon-jadwal"></use>
-                                    </svg></span>
-                            </div>
-                            <div id="kpi-paket-aktif" class="dnc-kpi-nilai">0</div>
-                            <div class="dnc-kpi-ket">Jadwal ujian sedang dibuka</div>
-                        </article>
-                        <article class="dnc-kpi-kartu">
-                            <div class="dnc-kpi-atas">
-                                <span class="dnc-kpi-label">Rata-rata Skor</span>
-                                <span class="dnc-kpi-ikon hijau"><svg class="dnc-ikon">
-                                        <use href="#icon-hasil"></use>
-                                    </svg></span>
-                            </div>
-                            <div id="kpi-rata-skor" class="dnc-kpi-nilai">0</div>
-                            <div class="dnc-kpi-ket">Skala 0–100 dari ujian selesai</div>
-                        </article>
-                    </div>
-
-                    <div class="dnc-grafik-grid">
-                        <article class="dnc-kartu">
-                            <div class="dnc-kartu-header">
-                                <h2 class="dnc-kartu-judul">Rata-rata Nilai per Mata Pelajaran</h2>
-                            </div>
-                            <div class="dnc-wadah-grafik-bar">
-                                <canvas id="chart-rata-mapel"></canvas>
-                            </div>
-                        </article>
-                        <article class="dnc-kartu">
-                            <div class="dnc-kartu-header">
-                                <h2 class="dnc-kartu-judul">Perbandingan Ketuntasan Siswa</h2>
-                            </div>
-                            <div class="dnc-wadah-grafik-donut">
-                                <canvas id="chart-ketuntasan"></canvas>
-                            </div>
-                        </article>
-                    </div>
-
-                    <article class="dnc-kartu">
-                        <div class="dnc-kartu-header">
-                            <h2 class="dnc-kartu-judul">Jadwal ASAS Aktif & Status Penyelesaian Sesi Berjalan</h2>
-                        </div>
-                        <div class="dnc-pembungkus-tabel">
-                            <table class="dnc-tabel dnc-tabel-padat">
-                                <thead>
-                                    <tr>
-                                        <th>Judul Paket</th>
-                                        <th>Mata Pelajaran</th>
-                                        <th>Kelas Sasaran</th>
-                                        <th>Rentang Waktu</th>
-                                        <th>Progres Siswa</th>
-                                        <th>Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="tbody-m1-jadwal"></tbody>
-                            </table>
-                        </div>
-                        <div id="strip-peringatan-m1" class="dnc-strip-peringatan">
-                            <span class="dnc-strip-peringatan-ikon"><svg class="dnc-ikon">
-                                    <use href="#icon-alert"></use>
-                                </svg></span>
-                            <div id="teks-peringatan-m1">Memeriksa daftar siswa yang belum menyelesaikan ujian aktif...
-                            </div>
-                        </div>
-                    </article>
-                </section>
-
-                <!-- DNC-M2: Master Kelas & Mata Pelajaran -->
-                <section id="sec-DNC-M2" class="dnc-section" aria-labelledby="judul-m2">
-                    <div class="dnc-header-halaman">
-                        <div>
-                            <h1 id="judul-m2" class="dnc-judul-halaman">Master Kelas & Mata Pelajaran</h1>
-                            <p class="dnc-subjudul-halaman">Kelola rombongan belajar, mata pelajaran ujian, dan batas
-                                ketuntasan (KKM).</p>
-                        </div>
-                        <div class="dnc-aksi-header">
-                            <button type="button" id="btn-muat-ulang-m2" class="dnc-tombol dnc-tombol-sekunder">
-                                <svg class="dnc-ikon">
-                                    <use href="#icon-refresh"></use>
-                                </svg>
-                                <span>Muat Ulang</span>
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="dnc-subtabs" role="tablist">
-                        <button type="button" id="tab-m2-kelas" class="dnc-subtab aktif" data-m2-tab="kelas">Data
-                            Kelas</button>
-                        <button type="button" id="tab-m2-mapel" class="dnc-subtab" data-m2-tab="mapel">Mata
-                            Pelajaran</button>
-                    </div>
-
-                    <div id="panel-m2-kelas" class="dnc-subpanel aktif">
-                        <article class="dnc-kartu">
-                            <div class="dnc-toolbar">
-                                <div class="dnc-cari-wrap">
-                                    <svg class="dnc-ikon">
-                                        <use href="#icon-search"></use>
-                                    </svg>
-                                    <input id="cari-kelas" class="dnc-input" type="search"
-                                        placeholder="Cari kode, nama kelas, atau wali kelas...">
-                                </div>
-                                <select id="filter-tingkat-kelas" class="dnc-select dnc-select-filter"
-                                    aria-label="Filter Tingkat Kelas">
-                                    <option value="">Semua Tingkat</option>
-                                    <option value="VII">Tingkat VII</option>
-                                    <option value="VIII">Tingkat VIII</option>
-                                    <option value="IX">Tingkat IX</option>
-                                    <option value="X">Tingkat X</option>
-                                    <option value="XI">Tingkat XI</option>
-                                    <option value="XII">Tingkat XII</option>
-                                </select>
-                                <button type="button" id="btn-tambah-kelas" class="dnc-tombol dnc-tombol-primer">
-                                    <svg class="dnc-ikon">
-                                        <use href="#icon-plus"></use>
-                                    </svg>
-                                    <span>Tambah Kelas</span>
-                                </button>
-                            </div>
-                            <div class="dnc-pembungkus-tabel">
-                                <table class="dnc-tabel">
-                                    <thead>
-                                        <tr>
-                                            <th>Kode Kelas</th>
-                                            <th>Nama Kelas</th>
-                                            <th>Tingkat</th>
-                                            <th>Tahun Ajaran</th>
-                                            <th>Wali Kelas</th>
-                                            <th>Aksi</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="tbody-kelas"></tbody>
-                                </table>
-                            </div>
-                        </article>
-                    </div>
-
-                    <div id="panel-m2-mapel" class="dnc-subpanel">
-                        <article class="dnc-kartu">
-                            <div class="dnc-toolbar">
-                                <div class="dnc-cari-wrap">
-                                    <svg class="dnc-ikon">
-                                        <use href="#icon-search"></use>
-                                    </svg>
-                                    <input id="cari-mapel" class="dnc-input" type="search"
-                                        placeholder="Cari kode atau nama mata pelajaran...">
-                                </div>
-                                <button type="button" id="btn-tambah-mapel" class="dnc-tombol dnc-tombol-primer">
-                                    <svg class="dnc-ikon">
-                                        <use href="#icon-plus"></use>
-                                    </svg>
-                                    <span>Tambah Mata Pelajaran</span>
-                                </button>
-                            </div>
-                            <div class="dnc-pembungkus-tabel">
-                                <table class="dnc-tabel">
-                                    <thead>
-                                        <tr>
-                                            <th>Kode Mapel</th>
-                                            <th>Nama Mata Pelajaran</th>
-                                            <th>KKM</th>
-                                            <th>Aksi</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="tbody-mapel"></tbody>
-                                </table>
-                            </div>
-                        </article>
-                    </div>
-                </section>
-
-                <!-- DNC-M3: Bank Soal -->
-                <section id="sec-DNC-M3" class="dnc-section" aria-labelledby="judul-m3">
-                    <div class="dnc-header-halaman">
-                        <div>
-                            <h1 id="judul-m3" class="dnc-judul-halaman">Bank Soal</h1>
-                            <p class="dnc-subjudul-halaman">Kelola butir soal Pilihan Ganda dan Uraian secara manual,
-                                CSV, atau impor dokumen Word (.docx).</p>
-                        </div>
-                        <div class="dnc-aksi-header">
-                            <button type="button" id="btn-impor-word" class="dnc-tombol dnc-tombol-aksen">
-                                <svg class="dnc-ikon">
-                                    <use href="#icon-upload"></use>
-                                </svg>
-                                <span>Impor Word (.docx)</span>
-                            </button>
-                            <button type="button" id="btn-impor-csv-soal" class="dnc-tombol dnc-tombol-sekunder">
-                                <svg class="dnc-ikon">
-                                    <use href="#icon-upload"></use>
-                                </svg>
-                                <span>Impor CSV</span>
-                            </button>
-                            <button type="button" id="btn-tambah-soal" class="dnc-tombol dnc-tombol-primer">
-                                <svg class="dnc-ikon">
-                                    <use href="#icon-plus"></use>
-                                </svg>
-                                <span>Tambah Soal</span>
-                            </button>
-                        </div>
-                    </div>
-
-                    <article class="dnc-kartu">
-                        <div class="dnc-toolbar">
-                            <div class="dnc-cari-wrap">
-                                <svg class="dnc-ikon">
-                                    <use href="#icon-search"></use>
-                                </svg>
-                                <input id="cari-soal" class="dnc-input" type="search"
-                                    placeholder="Cari kode atau kata kunci pertanyaan...">
-                            </div>
-                            <select id="filter-mapel-soal" class="dnc-select dnc-select-filter"
-                                aria-label="Filter Mata Pelajaran">
-                                <option value="">Semua Mapel</option>
-                            </select>
-                            <select id="filter-tingkat-soal" class="dnc-select dnc-select-filter"
-                                aria-label="Filter Tingkat">
-                                <option value="">Semua Tingkat</option>
-                                <option value="VII">VII</option>
-                                <option value="VIII">VIII</option>
-                                <option value="IX">IX</option>
-                                <option value="X">X</option>
-                                <option value="XI">XI</option>
-                                <option value="XII">XII</option>
-                            </select>
-                            <select id="filter-tipe-soal" class="dnc-select dnc-select-filter"
-                                aria-label="Filter Tipe Soal">
-                                <option value="">Semua Tipe</option>
-                                <option value="Pilihan Ganda">Pilihan Ganda</option>
-                                <option value="Uraian">Uraian</option>
-                            </select>
-                            <select id="filter-status-soal" class="dnc-select dnc-select-filter"
-                                aria-label="Filter Status Soal">
-                                <option value="">Semua Status</option>
-                                <option value="aktif">Aktif</option>
-                                <option value="nonaktif">Nonaktif</option>
-                            </select>
-                            <button type="button" id="btn-muat-ulang-m3" class="dnc-tombol dnc-tombol-sekunder"
-                                title="Muat ulang bank soal">
-                                <svg class="dnc-ikon">
-                                    <use href="#icon-refresh"></use>
-                                </svg>
-                            </button>
-                        </div>
-                        <div class="dnc-pembungkus-tabel">
-                            <table class="dnc-tabel">
-                                <thead>
-                                    <tr>
-                                        <th>Kode Soal</th>
-                                        <th>Mata Pelajaran</th>
-                                        <th>Tingkat</th>
-                                        <th>Tipe</th>
-                                        <th>Pertanyaan</th>
-                                        <th>Kunci</th>
-                                        <th>Bobot</th>
-                                        <th>Status</th>
-                                        <th>Aksi</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="tbody-soal"></tbody>
-                            </table>
-                        </div>
-                    </article>
-                </section>
-
-                <!-- DNC-M4: Jadwal & Paket ASAS -->
-                <section id="sec-DNC-M4" class="dnc-section" aria-labelledby="judul-m4">
-                    <div class="dnc-header-halaman">
-                        <div>
-                            <h1 id="judul-m4" class="dnc-judul-halaman">Jadwal & Paket ASAS</h1>
-                            <p class="dnc-subjudul-halaman">Susun paket soal ujian, rentang waktu pelaksanaan,
-                                pengaturan acak, dan token akses.</p>
-                        </div>
-                        <div class="dnc-aksi-header">
-                            <button type="button" id="btn-muat-ulang-m4" class="dnc-tombol dnc-tombol-sekunder">
-                                <svg class="dnc-ikon">
-                                    <use href="#icon-refresh"></use>
-                                </svg>
-                                <span>Muat Ulang</span>
-                            </button>
-                            <button type="button" id="btn-tambah-paket" class="dnc-tombol dnc-tombol-primer">
-                                <svg class="dnc-ikon">
-                                    <use href="#icon-plus"></use>
-                                </svg>
-                                <span>Buat Paket ASAS</span>
-                            </button>
-                        </div>
-                    </div>
-
-                    <article class="dnc-kartu">
-                        <div class="dnc-toolbar">
-                            <div class="dnc-cari-wrap">
-                                <svg class="dnc-ikon">
-                                    <use href="#icon-search"></use>
-                                </svg>
-                                <input id="cari-paket" class="dnc-input" type="search"
-                                    placeholder="Cari judul paket atau token...">
-                            </div>
-                            <select id="filter-semester-paket" class="dnc-select dnc-select-filter"
-                                aria-label="Filter Semester">
-                                <option value="">Semua Semester</option>
-                                <option value="Ganjil">Ganjil</option>
-                                <option value="Genap">Genap</option>
-                            </select>
-                            <select id="filter-mapel-paket" class="dnc-select dnc-select-filter"
-                                aria-label="Filter Mapel Paket">
-                                <option value="">Semua Mapel</option>
-                            </select>
-                            <select id="filter-kelas-paket" class="dnc-select dnc-select-filter"
-                                aria-label="Filter Kelas Paket">
-                                <option value="">Semua Kelas</option>
-                            </select>
-                            <select id="filter-status-paket" class="dnc-select dnc-select-filter"
-                                aria-label="Filter Status Paket">
-                                <option value="">Semua Status</option>
-                                <option value="Draft">Draft</option>
-                                <option value="Aktif">Aktif</option>
-                                <option value="Selesai">Selesai</option>
-                            </select>
-                        </div>
-                        <div class="dnc-pembungkus-tabel">
-                            <table class="dnc-tabel">
-                                <thead>
-                                    <tr>
-                                        <th>Judul Paket</th>
-                                        <th>Mapel & Semester</th>
-                                        <th>Kelas Sasaran</th>
-                                        <th>Jadwal & Durasi</th>
-                                        <th>Soal & Bobot</th>
-                                        <th>Token</th>
-                                        <th>Status</th>
-                                        <th>Aksi</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="tbody-paket"></tbody>
-                            </table>
-                        </div>
-                    </article>
-                </section>
-
-                <!-- DNC-M5: Ruang Ujian ASAS (Khusus Siswa) -->
-                <section id="sec-DNC-M5" class="dnc-section" aria-labelledby="judul-m5">
-                    <div id="m5-daftar-view">
-                        <div class="dnc-header-halaman">
-                            <div>
-                                <h1 id="judul-m5" class="dnc-judul-halaman">Ruang Ujian ASAS</h1>
-                                <p id="subjudul-m5" class="dnc-subjudul-halaman">Daftar jadwal ujian aktif sesuai kelas
-                                    Anda. Siapkan token dari pengawas sebelum memulai.</p>
-                            </div>
-                            <div class="dnc-aksi-header">
-                                <button type="button" id="btn-muat-ulang-m5" class="dnc-tombol dnc-tombol-sekunder">
-                                    <svg class="dnc-ikon">
-                                        <use href="#icon-refresh"></use>
-                                    </svg>
-                                    <span>Muat Ulang</span>
-                                </button>
-                            </div>
-                        </div>
-                        <div id="grid-ujian-siswa" class="dnc-daftar-ujian-grid"></div>
-                    </div>
-
-                    <div id="m5-lembar-view" class="dnc-disembunyikan">
-                        <div class="dnc-ujian-topbar">
-                            <div>
-                                <div id="m5-judul-ujian" style="font-size:15px;font-weight:700">-</div>
-                                <div id="m5-info-mapel" class="dnc-teks-muted" style="font-size:12px">-</div>
-                            </div>
-                            <div class="dnc-flex-gap">
-                                <span id="m5-status-simpan" class="dnc-badge dnc-badge-abu">Autosave siap</span>
-                                <div id="m5-timer" class="dnc-timer-badge">
-                                    <svg class="dnc-ikon">
-                                        <use href="#icon-clock"></use>
-                                    </svg>
-                                    <span id="m5-timer-teks">00:00:00</span>
-                                </div>
-                                <button type="button" id="btn-kumpul-ujian"
-                                    class="dnc-tombol dnc-tombol-sukses">Selesaikan Ujian</button>
-                            </div>
-                        </div>
-
-                        <div class="dnc-ujian-layout">
-                            <article class="dnc-soal-panel">
-                                <div class="dnc-soal-nomor-bar">
-                                    <strong id="m5-nomor-label">Soal 1 dari 1</strong>
-                                    <span id="m5-tipe-badge" class="dnc-badge dnc-badge-biru">Pilihan Ganda</span>
-                                </div>
-                                <div id="m5-soal-konten"></div>
-                                <div class="dnc-soal-nav-footer">
-                                    <button type="button" id="m5-btn-prev"
-                                        class="dnc-tombol dnc-tombol-sekunder">Sebelumnya</button>
-                                    <button type="button" id="m5-btn-ragu" class="dnc-tombol dnc-tombol-sekunder">Tandai
-                                        Ragu-ragu</button>
-                                    <button type="button" id="m5-btn-next"
-                                        class="dnc-tombol dnc-tombol-primer">Selanjutnya</button>
-                                </div>
-                            </article>
-
-                            <aside class="dnc-navigasi-soal-panel" aria-label="Navigasi Nomor Soal">
-                                <div class="dnc-kartu-judul">Navigasi Nomor Soal</div>
-                                <div id="m5-ringkasan-progres" class="dnc-teks-muted"
-                                    style="font-size:12px;margin-top:4px">0 terjawab</div>
-                                <div id="m5-nomor-grid" class="dnc-nomor-grid"></div>
-                                <div class="dnc-legenda-ujian">
-                                    <span>Hijau: Sudah dijawab</span>
-                                    <span>Kuning: Ditandai ragu-ragu</span>
-                                    <span>Putih: Belum dijawab</span>
-                                </div>
-                            </aside>
-                        </div>
-                    </div>
-                </section>
-
-                <!-- DNC-M6: Hasil, Koreksi & Rekap Nilai -->
-                <section id="sec-DNC-M6" class="dnc-section" aria-labelledby="judul-m6">
-                    <div class="dnc-header-halaman">
-                        <div>
-                            <h1 id="judul-m6" class="dnc-judul-halaman">Hasil, Koreksi & Rekap Nilai</h1>
-                            <p id="subjudul-m6" class="dnc-subjudul-halaman">Pantau pengerjaan ujian, koreksi jawaban
-                                uraian, dan ekspor daftar nilai ASAS.</p>
-                        </div>
-                        <div class="dnc-aksi-header">
-                            <button type="button" id="btn-muat-ulang-m6" class="dnc-tombol dnc-tombol-sekunder">
-                                <svg class="dnc-ikon">
-                                    <use href="#icon-refresh"></use>
-                                </svg>
-                                <span>Muat Ulang</span>
-                            </button>
-                            <button type="button" id="btn-ekspor-csv-nilai" class="dnc-tombol dnc-tombol-sekunder">
-                                <svg class="dnc-ikon">
-                                    <use href="#icon-download"></use>
-                                </svg>
-                                <span>Ekspor CSV</span>
-                            </button>
-                            <button type="button" id="btn-cetak-nilai" class="dnc-tombol dnc-tombol-primer">
-                                <svg class="dnc-ikon">
-                                    <use href="#icon-print"></use>
-                                </svg>
-                                <span>Cetak Rekap</span>
-                            </button>
-                        </div>
-                    </div>
-
-                    <div id="cetak-header-m6" class="dnc-cetak-header">
-                        <h2>BERITA ACARA & DAFTAR REKAPITULASI NILAI ASAS</h2>
-                        <p id="cetak-sub-m6">Sistem Asesmen Sumatif Akhir Semester (ASAS)</p>
-                    </div>
-
-                    <article class="dnc-kartu">
-                        <div id="toolbar-m6" class="dnc-toolbar">
-                            <div class="dnc-cari-wrap">
-                                <svg class="dnc-ikon">
-                                    <use href="#icon-search"></use>
-                                </svg>
-                                <input id="cari-hasil" class="dnc-input" type="search"
-                                    placeholder="Cari nama siswa, NIS, atau judul paket...">
-                            </div>
-                            <select id="filter-paket-hasil" class="dnc-select dnc-select-filter"
-                                aria-label="Filter Paket Hasil">
-                                <option value="">Semua Paket</option>
-                            </select>
-                            <select id="filter-mapel-hasil" class="dnc-select dnc-select-filter"
-                                aria-label="Filter Mapel Hasil">
-                                <option value="">Semua Mapel</option>
-                            </select>
-                            <select id="filter-kelas-hasil" class="dnc-select dnc-select-filter"
-                                aria-label="Filter Kelas Hasil">
-                                <option value="">Semua Kelas</option>
-                            </select>
-                            <select id="filter-status-hasil" class="dnc-select dnc-select-filter"
-                                aria-label="Filter Status Ujian">
-                                <option value="">Semua Status Ujian</option>
-                                <option value="Sedang Dikerjakan">Sedang Dikerjakan</option>
-                                <option value="Menunggu Koreksi">Menunggu Koreksi</option>
-                                <option value="Selesai">Selesai</option>
-                            </select>
-                            <select id="filter-tuntas-hasil" class="dnc-select dnc-select-filter"
-                                aria-label="Filter Ketuntasan">
-                                <option value="">Semua Ketuntasan</option>
-                                <option value="Tuntas">Tuntas</option>
-                                <option value="Belum Tuntas">Belum Tuntas</option>
-                                <option value="Menunggu Koreksi">Menunggu Koreksi</option>
-                            </select>
-                        </div>
-                        <div class="dnc-pembungkus-tabel">
-                            <table class="dnc-tabel">
-                                <thead>
-                                    <tr>
-                                        <th>Peserta Didik</th>
-                                        <th>Kelas</th>
-                                        <th>Paket & Mapel</th>
-                                        <th>Status Ujian</th>
-                                        <th>PG / Uraian</th>
-                                        <th>Skor Akhir</th>
-                                        <th>Ketuntasan</th>
-                                        <th>Aksi</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="tbody-hasil"></tbody>
-                            </table>
-                        </div>
-                    </article>
-                </section>
-
-                <!-- DNC-M7: Manajemen Pengguna (Khusus Admin) -->
-                <section id="sec-DNC-M7" class="dnc-section" aria-labelledby="judul-m7">
-                    <div class="dnc-header-halaman">
-                        <div>
-                            <h1 id="judul-m7" class="dnc-judul-halaman">Manajemen Pengguna</h1>
-                            <p class="dnc-subjudul-halaman">Kelola akun Admin, Guru pengampu mata pelajaran, dan Siswa
-                                peserta ASAS.</p>
-                        </div>
-                        <div class="dnc-aksi-header">
-                            <button type="button" id="btn-muat-ulang-m7" class="dnc-tombol dnc-tombol-sekunder">
-                                <svg class="dnc-ikon">
-                                    <use href="#icon-refresh"></use>
-                                </svg>
-                                <span>Muat Ulang</span>
-                            </button>
-                            <button type="button" id="btn-tambah-pengguna" class="dnc-tombol dnc-tombol-primer">
-                                <svg class="dnc-ikon">
-                                    <use href="#icon-plus"></use>
-                                </svg>
-                                <span>Tambah Pengguna</span>
-                            </button>
-                        </div>
-                    </div>
-
-                    <article class="dnc-kartu">
-                        <div class="dnc-toolbar">
-                            <div class="dnc-cari-wrap">
-                                <svg class="dnc-ikon">
-                                    <use href="#icon-search"></use>
-                                </svg>
-                                <input id="cari-pengguna" class="dnc-input" type="search"
-                                    placeholder="Cari nama lengkap, nomor induk, atau email...">
-                            </div>
-                            <select id="filter-role-pengguna" class="dnc-select dnc-select-filter"
-                                aria-label="Filter Role Pengguna">
-                                <option value="">Semua Role</option>
-                                <option value="Admin">Admin</option>
-                                <option value="Guru">Guru</option>
-                                <option value="Siswa">Siswa</option>
-                            </select>
-                            <select id="filter-kelas-pengguna" class="dnc-select dnc-select-filter"
-                                aria-label="Filter Kelas Pengguna">
-                                <option value="">Semua Kelas</option>
-                            </select>
-                            <select id="filter-mapel-pengguna" class="dnc-select dnc-select-filter"
-                                aria-label="Filter Mapel Ampu">
-                                <option value="">Semua Mapel Ampu</option>
-                            </select>
-                            <select id="filter-status-pengguna" class="dnc-select dnc-select-filter"
-                                aria-label="Filter Status Akun">
-                                <option value="">Semua Status</option>
-                                <option value="aktif">Aktif</option>
-                                <option value="nonaktif">Nonaktif</option>
-                            </select>
-                        </div>
-                        <div class="dnc-pembungkus-tabel">
-                            <table class="dnc-tabel">
-                                <thead>
-                                    <tr>
-                                        <th>Nomor Induk</th>
-                                        <th>Nama Lengkap</th>
-                                        <th>Email</th>
-                                        <th>Role</th>
-                                        <th>Kelas / Mapel Ampu</th>
-                                        <th>Status</th>
-                                        <th>Aksi</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="tbody-pengguna"></tbody>
-                            </table>
-                        </div>
-                    </article>
-                </section>
-            </div>
-
-            <footer class="dnc-footer">DigitalNetCare@copyright</footer>
-        </main>
-
-        <nav id="dnc-tabbar-hp" class="dnc-tabbar-hp" aria-label="Navigasi Bawah HP"></nav>
-    </div>
-
-    <!-- ===== BLOK: DNC_MODALS_TOAST ===== -->
-    <div id="dnc-modal-backdrop" class="dnc-modal-backdrop dnc-disembunyikan" role="dialog" aria-modal="true"
-        aria-labelledby="dnc-modal-judul">
-        <div id="dnc-modal-box" class="dnc-modal">
-            <div class="dnc-modal-header">
-                <h2 id="dnc-modal-judul" class="dnc-modal-judul">Formulir</h2>
-                <button type="button" id="btn-tutup-modal" class="dnc-modal-tutup" aria-label="Tutup modal">
-                    <svg class="dnc-ikon">
-                        <use href="#icon-close"></use>
-                    </svg>
-                </button>
-            </div>
-            <form id="dnc-modal-form" style="display:flex;flex-direction:column;flex:1;min-height:0" novalidate>
-                <div id="dnc-modal-fields" class="dnc-modal-body"></div>
-                <div id="dnc-modal-footer" class="dnc-modal-footer">
-                    <button type="button" id="btn-batal-modal" class="dnc-tombol dnc-tombol-sekunder">Batal</button>
-                    <button type="submit" id="btn-simpan-modal" class="dnc-tombol dnc-tombol-primer">Simpan</button>
+          <div id="m5-lembar-view" class="dnc-disembunyikan">
+            <div class="dnc-ujian-topbar">
+              <div>
+                <div id="m5-judul-ujian" style="font-size:15px;font-weight:700">-</div>
+                <div id="m5-info-mapel" class="dnc-teks-muted" style="font-size:12px">-</div>
+              </div>
+              <div class="dnc-flex-gap">
+                <span id="m5-status-live" class="dnc-badge dnc-badge-hijau"><span class="dnc-dot-live"></span>Sesi Dibuka Guru</span>
+                <span id="m5-status-simpan" class="dnc-badge dnc-badge-abu">Autosave siap</span>
+                <div id="m5-timer" class="dnc-timer-badge">
+                  <svg class="dnc-ikon"><use href="#icon-clock"></use></svg>
+                  <span id="m5-timer-teks">00:00:00</span>
                 </div>
-            </form>
-        </div>
-    </div>
-
-    <div id="dnc-modal-konfirmasi" class="dnc-modal-backdrop dnc-disembunyikan" role="alertdialog" aria-modal="true"
-        aria-labelledby="dnc-konfirmasi-judul">
-        <div class="dnc-modal" style="max-width:440px">
-            <div class="dnc-modal-header">
-                <h2 id="dnc-konfirmasi-judul" class="dnc-modal-judul">Konfirmasi</h2>
-                <button type="button" id="btn-tutup-konfirmasi" class="dnc-modal-tutup"
-                    aria-label="Tutup dialog konfirmasi">
-                    <svg class="dnc-ikon">
-                        <use href="#icon-close"></use>
-                    </svg>
-                </button>
+                <button type="button" id="btn-kumpul-ujian" class="dnc-tombol dnc-tombol-sukses">Selesaikan Ujian</button>
+              </div>
             </div>
-            <div class="dnc-modal-body">
-                <p id="dnc-konfirmasi-pesan" style="font-size:13px;color:var(--text-main)"></p>
+
+            <div class="dnc-ujian-layout">
+              <article class="dnc-soal-panel">
+                <div class="dnc-soal-nomor-bar">
+                  <strong id="m5-nomor-label">Soal 1 dari 1</strong>
+                  <span id="m5-tipe-badge" class="dnc-badge dnc-badge-biru">Pilihan Ganda</span>
+                </div>
+                <div id="m5-soal-konten"></div>
+                <div class="dnc-soal-nav-footer">
+                  <button type="button" id="m5-btn-prev" class="dnc-tombol dnc-tombol-sekunder">Sebelumnya</button>
+                  <button type="button" id="m5-btn-ragu" class="dnc-tombol dnc-tombol-sekunder">Tandai Ragu-ragu</button>
+                  <button type="button" id="m5-btn-next" class="dnc-tombol dnc-tombol-primer">Selanjutnya</button>
+                </div>
+              </article>
+
+              <aside class="dnc-navigasi-soal-panel" aria-label="Navigasi Nomor Soal">
+                <div class="dnc-kartu-judul">Navigasi Nomor Soal</div>
+                <div id="m5-ringkasan-progres" class="dnc-teks-muted" style="font-size:12px;margin-top:4px">0 terjawab</div>
+                <div id="m5-nomor-grid" class="dnc-nomor-grid"></div>
+                <div class="dnc-legenda-ujian">
+                  <span>Hijau: Sudah dijawab</span>
+                  <span>Kuning: Ditandai ragu-ragu</span>
+                  <span>Putih: Belum dijawab</span>
+                </div>
+              </aside>
             </div>
-            <div class="dnc-modal-footer">
-                <button type="button" id="btn-batal-konfirmasi" class="dnc-tombol dnc-tombol-sekunder">Batal</button>
-                <button type="button" id="btn-ya-konfirmasi" class="dnc-tombol dnc-tombol-bahaya-solid">Ya,
-                    Lanjutkan</button>
+          </div>
+        </section>
+
+        <!-- DNC-M6: Hasil, Koreksi & Rekap Nilai -->
+        <section id="sec-DNC-M6" class="dnc-section" aria-labelledby="judul-m6">
+          <div class="dnc-header-halaman">
+            <div>
+              <h1 id="judul-m6" class="dnc-judul-halaman">Hasil, Koreksi & Rekap Nilai</h1>
+              <p id="subjudul-m6" class="dnc-subjudul-halaman">Pantau pengerjaan ujian, koreksi jawaban, perhitungan skor otomatis dari bobot soal, dan ekspor nilai ASAS.</p>
             </div>
+            <div class="dnc-aksi-header">
+              <button type="button" id="btn-muat-ulang-m6" class="dnc-tombol dnc-tombol-sekunder">
+                <svg class="dnc-ikon"><use href="#icon-refresh"></use></svg>
+                <span>Muat Ulang</span>
+              </button>
+              <button type="button" id="btn-ekspor-csv-nilai" class="dnc-tombol dnc-tombol-sekunder">
+                <svg class="dnc-ikon"><use href="#icon-download"></use></svg>
+                <span>Ekspor CSV</span>
+              </button>
+              <button type="button" id="btn-cetak-nilai" class="dnc-tombol dnc-tombol-primer">
+                <svg class="dnc-ikon"><use href="#icon-print"></use></svg>
+                <span>Cetak Rekap</span>
+              </button>
+            </div>
+          </div>
+
+          <div id="cetak-header-m6" class="dnc-cetak-header">
+            <h2>BERITA ACARA & DAFTAR REKAPITULASI NILAI ASAS</h2>
+            <p id="cetak-sub-m6">Sistem Asesmen Sumatif Akhir Semester (ASAS)</p>
+          </div>
+
+          <article class="dnc-kartu">
+            <div id="toolbar-m6" class="dnc-toolbar">
+              <div class="dnc-cari-wrap">
+                <svg class="dnc-ikon"><use href="#icon-search"></use></svg>
+                <input id="cari-hasil" class="dnc-input" type="search" placeholder="Cari nama siswa, NIS, atau judul paket...">
+              </div>
+              <select id="filter-paket-hasil" class="dnc-select dnc-select-filter" aria-label="Filter Paket Hasil">
+                <option value="">Semua Paket</option>
+              </select>
+              <select id="filter-mapel-hasil" class="dnc-select dnc-select-filter" aria-label="Filter Mapel Hasil">
+                <option value="">Semua Mapel</option>
+              </select>
+              <select id="filter-kelas-hasil" class="dnc-select dnc-select-filter" aria-label="Filter Kelas Hasil">
+                <option value="">Semua Kelas</option>
+              </select>
+              <select id="filter-status-hasil" class="dnc-select dnc-select-filter" aria-label="Filter Status Ujian">
+                <option value="">Semua Status Ujian</option>
+                <option value="Sedang Dikerjakan">Sedang Dikerjakan</option>
+                <option value="Menunggu Koreksi">Menunggu Koreksi</option>
+                <option value="Selesai">Selesai</option>
+              </select>
+              <select id="filter-tuntas-hasil" class="dnc-select dnc-select-filter" aria-label="Filter Ketuntasan">
+                <option value="">Semua Ketuntasan</option>
+                <option value="Tuntas">Tuntas</option>
+                <option value="Belum Tuntas">Belum Tuntas</option>
+                <option value="Menunggu Koreksi">Menunggu Koreksi</option>
+              </select>
+            </div>
+            <div class="dnc-pembungkus-tabel">
+              <table class="dnc-tabel">
+                <thead>
+                  <tr>
+                    <th>Peserta Didik</th>
+                    <th>Kelas</th>
+                    <th>Paket & Mapel</th>
+                    <th>Status Ujian</th>
+                    <th>Skor Otomatis / Manual</th>
+                    <th>Skor Akhir</th>
+                    <th>Ketuntasan</th>
+                    <th>Aksi</th>
+                  </tr>
+                </thead>
+                <tbody id="tbody-hasil"></tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+
+        <!-- DNC-M7: Manajemen Pengguna (Khusus Admin) -->
+        <section id="sec-DNC-M7" class="dnc-section" aria-labelledby="judul-m7">
+          <div class="dnc-header-halaman">
+            <div>
+              <h1 id="judul-m7" class="dnc-judul-halaman">Manajemen Pengguna</h1>
+              <p class="dnc-subjudul-halaman">Kelola akun Admin, Guru pengampu mata pelajaran, dan Siswa peserta ASAS.</p>
+            </div>
+            <div class="dnc-aksi-header">
+              <button type="button" id="btn-muat-ulang-m7" class="dnc-tombol dnc-tombol-sekunder">
+                <svg class="dnc-ikon"><use href="#icon-refresh"></use></svg>
+                <span>Muat Ulang</span>
+              </button>
+              <button type="button" id="btn-tambah-pengguna" class="dnc-tombol dnc-tombol-primer">
+                <svg class="dnc-ikon"><use href="#icon-plus"></use></svg>
+                <span>Tambah Pengguna</span>
+              </button>
+            </div>
+          </div>
+
+          <article class="dnc-kartu">
+            <div class="dnc-toolbar">
+              <div class="dnc-cari-wrap">
+                <svg class="dnc-ikon"><use href="#icon-search"></use></svg>
+                <input id="cari-pengguna" class="dnc-input" type="search" placeholder="Cari nama lengkap, nomor induk, atau email...">
+              </div>
+              <select id="filter-role-pengguna" class="dnc-select dnc-select-filter" aria-label="Filter Role Pengguna">
+                <option value="">Semua Role</option>
+                <option value="Admin">Admin</option>
+                <option value="Guru">Guru</option>
+                <option value="Siswa">Siswa</option>
+              </select>
+              <select id="filter-kelas-pengguna" class="dnc-select dnc-select-filter" aria-label="Filter Kelas Pengguna">
+                <option value="">Semua Kelas</option>
+              </select>
+              <select id="filter-mapel-pengguna" class="dnc-select dnc-select-filter" aria-label="Filter Mapel Ampu">
+                <option value="">Semua Mapel Ampu</option>
+              </select>
+              <select id="filter-status-pengguna" class="dnc-select dnc-select-filter" aria-label="Filter Status Akun">
+                <option value="">Semua Status</option>
+                <option value="aktif">Aktif</option>
+                <option value="nonaktif">Nonaktif</option>
+              </select>
+            </div>
+            <div class="dnc-pembungkus-tabel">
+              <table class="dnc-tabel">
+                <thead>
+                  <tr>
+                    <th>Nomor Induk</th>
+                    <th>Nama Lengkap</th>
+                    <th>Email</th>
+                    <th>Role</th>
+                    <th>Kelas / Mapel Ampu</th>
+                    <th>Status</th>
+                    <th>Aksi</th>
+                  </tr>
+                </thead>
+                <tbody id="tbody-pengguna"></tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+      </div>
+
+      <footer class="dnc-footer">DigitalNetCare@copyright</footer>
+    </main>
+
+    <nav id="dnc-tabbar-hp" class="dnc-tabbar-hp" aria-label="Navigasi Bawah HP"></nav>
+  </div>
+
+  <!-- ===== BLOK: DNC_MODALS_TOAST ===== -->
+  <div id="dnc-modal-backdrop" class="dnc-modal-backdrop dnc-disembunyikan" role="dialog" aria-modal="true" aria-labelledby="dnc-modal-judul">
+    <div id="dnc-modal-box" class="dnc-modal">
+      <div class="dnc-modal-header">
+        <h2 id="dnc-modal-judul" class="dnc-modal-judul">Formulir</h2>
+        <button type="button" id="btn-tutup-modal" class="dnc-modal-tutup" aria-label="Tutup modal">
+          <svg class="dnc-ikon"><use href="#icon-close"></use></svg>
+        </button>
+      </div>
+      <form id="dnc-modal-form" style="display:flex;flex-direction:column;flex:1;min-height:0" novalidate>
+        <div id="dnc-modal-fields" class="dnc-modal-body"></div>
+        <div id="dnc-modal-footer" class="dnc-modal-footer">
+          <button type="button" id="btn-batal-modal" class="dnc-tombol dnc-tombol-sekunder">Batal</button>
+          <button type="submit" id="btn-simpan-modal" class="dnc-tombol dnc-tombol-primer">Simpan</button>
         </div>
+      </form>
     </div>
+  </div>
 
-    <div id="dnc-sheet-lainnya" class="dnc-sheet-backdrop dnc-disembunyikan" aria-label="Menu Lainnya">
-        <div class="dnc-sheet">
-            <div class="dnc-sheet-handle"></div>
-            <div id="dnc-sheet-menu-list"></div>
-            <button type="button" id="btn-tutup-sheet"
-                class="dnc-tombol dnc-tombol-sekunder dnc-tombol-penuh dnc-mt-12">Tutup</button>
-        </div>
+  <div id="dnc-modal-konfirmasi" class="dnc-modal-backdrop dnc-disembunyikan" role="alertdialog" aria-modal="true" aria-labelledby="dnc-konfirmasi-judul">
+    <div class="dnc-modal" style="max-width:440px">
+      <div class="dnc-modal-header">
+        <h2 id="dnc-konfirmasi-judul" class="dnc-modal-judul">Konfirmasi</h2>
+        <button type="button" id="btn-tutup-konfirmasi" class="dnc-modal-tutup" aria-label="Tutup dialog konfirmasi">
+          <svg class="dnc-ikon"><use href="#icon-close"></use></svg>
+        </button>
+      </div>
+      <div class="dnc-modal-body">
+        <p id="dnc-konfirmasi-pesan" style="font-size:13px;color:var(--text-main)"></p>
+      </div>
+      <div class="dnc-modal-footer">
+        <button type="button" id="btn-batal-konfirmasi" class="dnc-tombol dnc-tombol-sekunder">Batal</button>
+        <button type="button" id="btn-ya-konfirmasi" class="dnc-tombol dnc-tombol-bahaya-solid">Ya, Lanjutkan</button>
+      </div>
     </div>
+  </div>
 
-    <div id="dnc-toast-container" class="dnc-toast-container" aria-live="polite"></div>
+  <div id="dnc-sheet-lainnya" class="dnc-sheet-backdrop dnc-disembunyikan" aria-label="Menu Lainnya">
+    <div class="dnc-sheet">
+      <div class="dnc-sheet-handle"></div>
+      <div id="dnc-sheet-menu-list"></div>
+      <button type="button" id="btn-tutup-sheet" class="dnc-tombol dnc-tombol-sekunder dnc-tombol-penuh dnc-mt-12">Tutup</button>
+    </div>
+  </div>
 
-    <script type="module" src="./app.js"></script>
+  <div id="dnc-toast-container" class="dnc-toast-container" aria-live="polite"></div>
+
+  <script type="module" src="./app.js"></script>
 </body>
 
 </html>
