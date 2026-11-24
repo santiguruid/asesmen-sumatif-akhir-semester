@@ -1969,6 +1969,13 @@ function bukaFormSoal(item = null) {
           </select>
         </div>
         <div class="dnc-form-grup dnc-form-full">
+          <label class="dnc-label" for="f-sumberPaket">Nama Paket / Grup Soal (Opsional)</label>
+          <input id="f-sumberPaket" class="dnc-input" type="text" list="daftar-paket-soal-eksisting" placeholder="Contoh: Bank_Soal_ASAS_Matematika_Kelas_6_Semester_1" value="${esc(item?.sumberPaket || '')}">
+          <datalist id="daftar-paket-soal-eksisting">
+            ${[...new Set(stateMemori.bankSoal.map(s => namaSumberPaketSoal(s)))].map(nm => `<option value="${esc(nm)}"></option>`).join('')}
+          </datalist>
+        </div>
+        <div class="dnc-form-grup dnc-form-full">
           <label class="dnc-label" for="f-pertanyaan">Pertanyaan *</label>
           <textarea id="f-pertanyaan" class="dnc-textarea" placeholder="Tulis pertanyaan soal secara lengkap..." required>${esc(item?.pertanyaan || '')}</textarea>
         </div>
