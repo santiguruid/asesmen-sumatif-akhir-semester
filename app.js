@@ -771,6 +771,46 @@ function setRoleLogin(role) {
   }
 }
 
+let sedangProsesLogin = false;
+
+function normalisasiRoleDnc(roleRaw) {
+  const r = teks(String(roleRaw || '').trim());
+  if (r === 'admin' || r === 'administrator') return 'Admin';
+  if (r === 'guru' || r === 'pengajar') return 'Guru';
+  if (r === 'siswa' || r === 'peserta didik') return 'Siswa';
+  return String(roleRaw || '').trim();
+}
+
+async function sinkronProfilAdminDnc(fbUser, profilKetemu = null) {
+  const uid = fbUser.uid;
+  const emailBersih = (fbUser.email || profilKetemu?.email || '').trim();
+  const profilFinal = {
+    id: uid,
+    email: emailBersih,
+    namaLengkap: profilKetemu?.namaLengkap || fbUser.displayName || 'Administrator ASAS',
+    nomorInduk: profilKetemu?.nomorInduk || 'ADMIN-01',
+    role: 'Admin',
+    kelasId: '',
+    mapelIds: [],
+    statusAktif: true
+  };
+  try {
+    const dokUid = await dbGetById(COLLECTIONS.pengguna, uid);
+    if (!dokUid || normalisasiRoleDnc(dokUid.role) !== 'Admin') {
+      await dbCreate(COLLECTIONS.pengguna, {
+        email: profilFinal.email,
+        namaLengkap: profilFinal.namaLengkap,
+        nomorInduk: profilFinal.nomorInduk,
+        role: 'Admin',
+        kelasId: '',
+        mapelIds: [],
+        statusAktif: true
+      }, uid);
+    }
+  } catch (_) {}
+  return profilFinal;
+}
+
 async function prosesLoginDnc(identitas, password) {
   const idTrim = String(identitas || '').trim();
   const pw = String(password || '');
@@ -780,68 +820,76 @@ async function prosesLoginDnc(identitas, password) {
     const daftar = memoriPreview[COLLECTIONS.pengguna] || [];
     const cari = teks(idTrim);
     const cocok = daftar.find(u =>
-      u.role === roleLoginDipilih &&
+      normalisasiRoleDnc(u.role) === roleLoginDipilih &&
       (teks(u.email) === cari || teks(u.nomorInduk) === cari)
     );
     if (!cocok) throw new Error(`Akun ${roleLoginDipilih} tidak ditemukan pada data preview.`);
     if (!cocok.statusAktif) throw new Error('Akun Anda sedang dinonaktifkan oleh Admin.');
-    if (cocok.role === 'Admin') {
+    if (normalisasiRoleDnc(cocok.role) === 'Admin') {
       if (pw !== 'admin123') throw new Error('Password Admin salah.');
     } else {
       const h = await hashTeks(pw);
       if (cocok.passwordHash && cocok.passwordHash !== h) throw new Error('Password salah.');
     }
-    return cocok;
+    return { ...cocok, role: normalisasiRoleDnc(cocok.role) };
   }
 
   // MODE PRODUKSI MURNI (HYBRID AUTH)
-  const { auth, authMod } = await muatFirebaseSdk();
-  if (roleLoginDipilih === 'Admin') {
-    let cred;
-    try {
-      cred = await authMod.signInWithEmailAndPassword(auth, idTrim, pw);
-    } catch (e) {
-      throw new Error('Email atau password Admin tidak valid.');
-    }
-    const uid = cred.user.uid;
-    let profil = await dbGetById(COLLECTIONS.pengguna, uid);
-    if (!profil) {
-      const semua = await dbList(COLLECTIONS.pengguna);
-      profil = semua.find(u => teks(u.email) === teks(idTrim)) || null;
-    }
-    if (profil && profil.role !== 'Admin') {
-      await authMod.signOut(auth);
-      throw new Error('Akun ini tidak memiliki hak akses Admin.');
-    }
-    if (profil && profil.statusAktif === false) {
-      await authMod.signOut(auth);
-      throw new Error('Akun Admin ini berstatus nonaktif.');
-    }
-    return profil || {
-      id: uid,
-      email: cred.user.email || idTrim,
-      namaLengkap: cred.user.displayName || 'Administrator ASAS',
-      nomorInduk: 'ADMIN-01',
-      role: 'Admin',
-      kelasId: '',
-      mapelIds: [],
-      statusAktif: true
-    };
-  }
+  sedangProsesLogin = true;
+  try {
+    const { auth, authMod } = await muatFirebaseSdk();
+    if (roleLoginDipilih === 'Admin') {
+      let cred;
+      try {
+        cred = await authMod.signInWithEmailAndPassword(auth, idTrim, pw);
+      } catch (e) {
+        throw new Error('Email atau password Admin tidak valid.');
+      }
+      const uid = cred.user.uid;
+      let profilUid = null;
+      try {
+        profilUid = await dbGetById(COLLECTIONS.pengguna, uid);
+      } catch (_) {}
 
-  const hashInput = await hashTeks(pw);
-  const semuaPengguna = await dbList(COLLECTIONS.pengguna);
-  const cari = teks(idTrim);
-  const userCocok = semuaPengguna.find(u =>
-    u.role === roleLoginDipilih &&
-    (teks(u.email) === cari || teks(u.nomorInduk) === cari)
-  );
-  if (!userCocok) throw new Error(`Akun ${roleLoginDipilih} tidak ditemukan.`);
-  if (userCocok.statusAktif === false) throw new Error('Akun Anda berstatus nonaktif. Hubungi Admin.');
-  if (!userCocok.passwordHash || userCocok.passwordHash !== hashInput) {
-    throw new Error('Password yang dimasukkan salah.');
+      if (profilUid && profilUid.statusAktif === false) {
+        await authMod.signOut(auth);
+        throw new Error('Akun Admin ini berstatus nonaktif.');
+      }
+      if (profilUid && profilUid.role && normalisasiRoleDnc(profilUid.role) !== 'Admin') {
+        await authMod.signOut(auth);
+        throw new Error('Akun ini tidak memiliki hak akses Admin.');
+      }
+
+      let profilCocok = profilUid;
+      if (!profilCocok) {
+        try {
+          const semua = await dbList(COLLECTIONS.pengguna);
+          profilCocok = semua.find(u => teks(u.email) === teks(idTrim) && normalisasiRoleDnc(u.role) === 'Admin') || null;
+        } catch (_) {}
+      }
+      if (profilCocok && profilCocok.statusAktif === false) {
+        await authMod.signOut(auth);
+        throw new Error('Akun Admin ini berstatus nonaktif.');
+      }
+      return await sinkronProfilAdminDnc(cred.user, profilCocok);
+    }
+
+    const hashInput = await hashTeks(pw);
+    const semuaPengguna = await dbList(COLLECTIONS.pengguna);
+    const cari = teks(idTrim);
+    const userCocok = semuaPengguna.find(u =>
+      normalisasiRoleDnc(u.role) === roleLoginDipilih &&
+      (teks(u.email) === cari || teks(u.nomorInduk) === cari)
+    );
+    if (!userCocok) throw new Error(`Akun ${roleLoginDipilih} tidak ditemukan.`);
+    if (userCocok.statusAktif === false) throw new Error('Akun Anda berstatus nonaktif. Hubungi Admin.');
+    if (!userCocok.passwordHash || userCocok.passwordHash !== hashInput) {
+      throw new Error('Password yang dimasukkan salah.');
+    }
+    return { ...userCocok, role: normalisasiRoleDnc(userCocok.role) };
+  } finally {
+    sedangProsesLogin = false;
   }
-  return userCocok;
 }
 
 async function masukKeAplikasi(userObj) {
