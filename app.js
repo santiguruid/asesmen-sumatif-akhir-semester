@@ -4824,6 +4824,540 @@ async function toggleStatusPengguna(id) {
   await muatM7Pengguna(true);
   tampilkanToast(`Akun ${u.namaLengkap} kini berstatus ${statusBaru ? 'Aktif' : 'Nonaktif'}.`);
 }
+
+// --- Impor Massal Data Siswa Bebas Template (Excel, CSV, Word, PDF, TXT) ---
+function rapikanTokenKelasSiswa(str) {
+  return teks(String(str || '').replace(/^(?:kelas|kls|rombel)\s*/i, '').replace(/[^a-z0-9]/gi, ''));
+}
+
+function cocokkanKelasSiswaDnc(nilaiRaw, kelasDefaultId = '') {
+  const raw = String(nilaiRaw || '').trim();
+  if (!raw) return kelasDefaultId;
+  const norm = rapikanTokenKelasSiswa(raw);
+  if (!norm) return kelasDefaultId;
+
+  const cocokPersis = stateMemori.kelas.find(k =>
+    rapikanTokenKelasSiswa(k.kodeKelas) === norm ||
+    rapikanTokenKelasSiswa(k.namaKelas) === norm ||
+    rapikanTokenKelasSiswa(`${k.kodeKelas}${k.namaKelas}`) === norm
+  );
+  if (cocokPersis) return cocokPersis.id;
+
+  const tingkatDeteksi = deteksiTingkat(raw);
+  const mHurufAkhir = raw.toUpperCase().match(/(?:[\-\s\/]|1[0-2]|[1-9]|XII|XI|IX|VIII|VII|VI|IV|III|II|X|V|I)([A-Z])$/);
+  const sufiks = mHurufAkhir ? mHurufAkhir[1] : '';
+
+  if (tingkatDeteksi) {
+    if (sufiks) {
+      const targetGabung = rapikanTokenKelasSiswa(`${tingkatDeteksi}${sufiks}`);
+      const cocokSufiks = stateMemori.kelas.find(k =>
+        k.tingkat === tingkatDeteksi && (
+          rapikanTokenKelasSiswa(k.kodeKelas) === targetGabung ||
+          rapikanTokenKelasSiswa(k.kodeKelas).endsWith(teks(sufiks)) ||
+          rapikanTokenKelasSiswa(k.namaKelas).endsWith(teks(sufiks))
+        )
+      );
+      if (cocokSufiks) return cocokSufiks.id;
+    }
+    const cocokTingkat = stateMemori.kelas.filter(k => k.tingkat === tingkatDeteksi);
+    if (cocokTingkat.length === 1) return cocokTingkat[0].id;
+  }
+
+  return kelasDefaultId;
+}
+
+function buatEmailOtomatisSiswa(nomorInduk, namaLengkap, indeks) {
+  const basisNis = String(nomorInduk || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  if (basisNis.length >= 3) return `${basisNis}@siswa.asas.id`;
+  const basisNama = String(namaLengkap || 'siswa').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 14) || 'siswa';
+  return `${basisNama}${indeks + 1}@siswa.asas.id`;
+}
+
+function tentukanPasswordSiswa(passwordFile, nomorInduk, modePassword, passwordBawaan) {
+  const pwFile = String(passwordFile || '').trim();
+  const pwDef = String(passwordBawaan || 'siswa123').trim() || 'siswa123';
+  const nisBersih = String(nomorInduk || '').replace(/\s+/g, '');
+
+  if (modePassword === 'file_dulu' && pwFile.length >= 6) return pwFile;
+  if (modePassword === 'nis') {
+    if (nisBersih.length >= 6) return nisBersih;
+    if (nisBersih.length > 0) return nisBersih.padEnd(6, '0');
+    return pwDef;
+  }
+  return pwFile.length >= 6 ? pwFile : pwDef;
+}
+
+function deteksiKelasJudulDokumen(barisMatriks, kelasDefaultId) {
+  for (let i = 0; i < Math.min(4, barisMatriks.length); i++) {
+    const gabung = (Array.isArray(barisMatriks[i]) ? barisMatriks[i] : [barisMatriks[i]]).join(' ').trim();
+    if (!gabung || gabung.length > 100) continue;
+    if (/(?:kelas|rombel|daftar\s+siswa|peserta\s+didik|absen)/i.test(gabung)) {
+      const mKelas = gabung.match(/(?:kelas|rombel)\s*[:\-]?\s*([A-Za-z0-9\-\s]{1,16})/i);
+      const ketemu = cocokkanKelasSiswaDnc(mKelas ? mKelas[1] : gabung, '');
+      if (ketemu) return ketemu;
+    }
+  }
+  return kelasDefaultId;
+}
+
+function adalahTeksNamaSiswa(str) {
+  const t = String(str || '').trim();
+  if (t.length < 3 || t.length > 85) return false;
+  if (/@/.test(t)) return false;
+  if (/^\d[\d\s\-\/\.\:]+$/.test(t)) return false;
+  if (/^(?:l|p|l\/p|laki[\-\s]?laki|perempuan|islam|kristen|katolik|hindu|buddha|konghucu|aktif|nonaktif|siswa|ya|tidak|no|no\.|nama|nama\s+lengkap|nama\s+siswa|nis|nisn|kelas|rombel|email|password|sandi|jenis\s+kelamin|jk|ttl|tanggal\s+lahir|alamat|keterangan)$/i.test(t)) {
+    return false;
+  }
+  if (/^\d{1,2}[\-\/\.]\d{1,2}[\-\/\.]\d{2,4}$/.test(t)) return false;
+  const huruf = (t.match(/[A-Za-zÀ-ÿ]/g) || []).length;
+  return huruf >= 3 && huruf / t.replace(/\s/g, '').length >= 0.65;
+}
+
+function adalahKodeNisSiswa(str) {
+  const t = String(str || '').replace(/[\s\-\.]/g, '');
+  if (/^\d{4,16}$/.test(t)) return true;
+  if (/^[A-Za-z]{1,4}\d{4,12}$/.test(t)) return true;
+  return false;
+}
+
+function petakanMatriksSiswaBebas(barisMatriks, { kelasDefaultId, modePassword, passwordBawaan }) {
+  const bersih = (barisMatriks || [])
+    .map(r => (Array.isArray(r) ? r : [r]).map(c => String(c ?? '').replace(/\s+/g, ' ').trim()))
+    .filter(r => r.some(c => c !== ''));
+  if (!bersih.length) return [];
+
+  const kelasFallback = deteksiKelasJudulDokumen(bersih, kelasDefaultId);
+  let idxHeader = -1;
+  let iNis = -1, iNama = -1, iKelas = -1, iEmail = -1, iPass = -1;
+
+  for (let i = 0; i < Math.min(8, bersih.length); i++) {
+    const rowLower = bersih[i].map(c => teks(c));
+    const skorHeader =
+      (rowLower.some(c => c.includes('nama') || c.includes('peserta didik') || c.includes('siswa')) ? 1 : 0) +
+      (rowLower.some(c => c.includes('nis') || c.includes('induk') || c.includes('no.') || c === 'no' || c.includes('kelas') || c.includes('rombel') || c.includes('email')) ? 1 : 0);
+    if (skorHeader >= 2) {
+      idxHeader = i;
+      const cariKol = daftarKata => rowLower.findIndex(h => daftarKata.some(k => h === k || h.includes(k)));
+      iNis = cariKol(['nisn', 'nomor induk', 'no induk', 'nis', 'induk', 'id siswa']);
+      iNama = cariKol(['nama lengkap', 'nama siswa', 'nama peserta', 'peserta didik', 'nama']);
+      iKelas = cariKol(['kode kelas', 'nama kelas', 'kelas', 'rombel', 'tingkat']);
+      iEmail = cariKol(['email', 'e-mail', 'surel']);
+      iPass = cariKol(['password', 'kata sandi', 'sandi', 'pin', 'pass']);
+      break;
+    }
+  }
+
+  const mulai = idxHeader >= 0 ? idxHeader + 1 : 0;
+  const hasil = [];
+  const capAuto = String(new Date().getFullYear()).slice(-2);
+
+  for (let r = mulai; r < bersih.length; r++) {
+    const row = bersih[r];
+    const gabungBaris = row.join(' ').trim();
+    if (!gabungBaris) continue;
+    if (/^(?:daftar\s+(?:siswa|nama|peserta)|data\s+siswa|rekap\s+siswa|semester|tahun\s+ajaran|sekolah|sdn|smpn|sman|smkn|wali\s+kelas|jumlah\s+siswa|total\s+siswa)/i.test(gabungBaris) && row.filter(Boolean).length <= 2) {
+      continue;
+    }
+
+    let nomorInduk = iNis >= 0 ? (row[iNis] || '').trim() : '';
+    let namaLengkap = iNama >= 0 ? (row[iNama] || '').trim() : '';
+    let kelasRaw = iKelas >= 0 ? (row[iKelas] || '').trim() : '';
+    let email = iEmail >= 0 ? (row[iEmail] || '').trim() : '';
+    let passwordFile = iPass >= 0 ? (row[iPass] || '').trim() : '';
+
+    // Deteksi heuristik bebas template jika kolom header tidak ada atau sebagian kosong
+    row.forEach((sel, idxSel) => {
+      if (!sel) return;
+      if (idxSel === 0 && /^\d{1,3}[\.\)]?$/.test(sel) && row.length >= 2) return;
+      if (!email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(sel)) {
+        email = sel;
+        return;
+      }
+      if (!nomorInduk && adalahKodeNisSiswa(sel)) {
+        nomorInduk = sel.replace(/\s+/g, '');
+        return;
+      }
+      if (!kelasRaw && idxSel !== iNama && sel.length <= 24) {
+        const cekKls = cocokkanKelasSiswaDnc(sel, '');
+        if (cekKls) {
+          kelasRaw = sel;
+          return;
+        }
+      }
+      if (!namaLengkap && adalahTeksNamaSiswa(sel)) {
+        namaLengkap = sel;
+      }
+    });
+
+    if (!namaLengkap) {
+      const kandidatNama = row.filter((sel, idxSel) =>
+        idxSel !== iNis && idxSel !== iKelas && idxSel !== iEmail && idxSel !== iPass && adalahTeksNamaSiswa(sel)
+      );
+      if (kandidatNama.length) {
+        namaLengkap = kandidatNama.sort((a, b) => b.length - a.length)[0];
+      }
+    }
+
+    namaLengkap = namaLengkap.replace(/^\d+[\.\)]\s*/, '').trim();
+    if (!namaLengkap || !adalahTeksNamaSiswa(namaLengkap)) continue;
+
+    if (!nomorInduk) {
+      nomorInduk = `SIS${capAuto}${String(hasil.length + 1).padStart(4, '0')}`;
+    }
+
+    const kelasId = cocokkanKelasSiswaDnc(kelasRaw, kelasFallback);
+    const emailFinal = email || buatEmailOtomatisSiswa(nomorInduk, namaLengkap, hasil.length);
+    const passwordFinal = tentukanPasswordSiswa(passwordFile, nomorInduk, modePassword, passwordBawaan);
+
+    hasil.push({
+      dipilih: true,
+      nomorInduk,
+      namaLengkap,
+      kelasId,
+      email: emailFinal,
+      password: passwordFinal
+    });
+  }
+
+  return hasil;
+}
+
+function parseTeksBarisSiswaBebas(daftarBaris, opsi) {
+  const matriks = [];
+  (daftarBaris || []).forEach(line => {
+    const t = String(line || '').trim();
+    if (!t) return;
+    if (t.includes('\t')) {
+      matriks.push(t.split('\t').map(x => x.trim()));
+      return;
+    }
+    if (t.includes('|')) {
+      matriks.push(t.split('|').map(x => x.trim()));
+      return;
+    }
+    if (t.includes(';')) {
+      matriks.push(t.split(';').map(x => x.trim()));
+      return;
+    }
+    if (t.includes(',') && t.split(',').length >= 2) {
+      matriks.push(t.split(',').map(x => x.trim()));
+      return;
+    }
+    if (/\s{2,}/.test(t)) {
+      matriks.push(t.split(/\s{2,}/).map(x => x.trim()));
+      return;
+    }
+
+    // Baris polos dipisah spasi tunggal (mis. "1. 0098765432 Ahmad Fauzi VI-A" atau "1. Ahmad Fauzi")
+    let sisa = t.replace(/^\d+[\.\)]\s*/, '').trim();
+    let email = '';
+    const mEmail = sisa.match(/[^\s@]+@[^\s@]+\.[^\s@]+/);
+    if (mEmail) {
+      email = mEmail[0];
+      sisa = sisa.replace(mEmail[0], ' ').trim();
+    }
+    let nis = '';
+    const mNis = sisa.match(/\b\d{4,16}\b/);
+    if (mNis) {
+      nis = mNis[0];
+      sisa = sisa.replace(mNis[0], ' ').trim();
+    }
+    let kelasToken = '';
+    const potongan = sisa.split(/\s+/).filter(Boolean);
+    if (potongan.length >= 2) {
+      const cekAkhir = cocokkanKelasSiswaDnc(potongan[potongan.length - 1], '');
+      if (cekAkhir) {
+        kelasToken = potongan.pop();
+      }
+    }
+    const nama = potongan.filter(p => !/^(?:l|p|l\/p)$/i.test(p)).join(' ').trim();
+    if (nama) {
+      matriks.push([nis, nama, kelasToken, email]);
+    }
+  });
+
+  return petakanMatriksSiswaBebas(matriks, opsi);
+}
+
+function validasiDaftarSiswaImpor(daftar, nisSudahAda, emailSudahAda) {
+  const nisDalamFile = new Set();
+  const emailDalamFile = new Set();
+
+  return daftar.map(it => {
+    const masalah = [];
+    const nisKey = teks(it.nomorInduk);
+    const emailKey = teks(it.email);
+
+    if (!it.nomorInduk) masalah.push('NIS/NISN kosong');
+    if (!it.namaLengkap) masalah.push('Nama kosong');
+    if (!it.kelasId || !cariById('kelas', it.kelasId)) masalah.push('Kelas belum dipilih');
+    if (!it.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(it.email)) masalah.push('Format email tidak valid');
+    if (!it.password || String(it.password).length < 6) masalah.push('Password min. 6 karakter');
+
+    if (nisKey && nisSudahAda.has(nisKey)) masalah.push('NIS sudah terdaftar');
+    else if (nisKey && nisDalamFile.has(nisKey)) masalah.push('NIS duplikat di file');
+
+    if (emailKey && emailSudahAda.has(emailKey)) masalah.push('Email sudah terdaftar');
+    else if (emailKey && emailDalamFile.has(emailKey)) masalah.push('Email duplikat di file');
+
+    if (nisKey) nisDalamFile.add(nisKey);
+    if (emailKey) emailDalamFile.add(emailKey);
+
+    it.valid = masalah.length === 0;
+    it.statusTeks = it.valid ? 'Valid' : (masalah.some(m => m.includes('terdaftar') || m.includes('duplikat')) ? 'Duplikat' : 'Perlu Perbaikan');
+    it.catatan = masalah.length ? masalah.join('; ') : 'Siap disimpan';
+    return it;
+  });
+}
+
+function bukaModalImporSiswa() {
+  if (!stateMemori.kelas.length) {
+    tampilkanToast('Tambahkan minimal satu Data Kelas di Master Kelas terlebih dahulu.', 'error');
+    return;
+  }
+
+  const nisSudahAda = new Set(stateMemori.pengguna.map(u => teks(u.nomorInduk)));
+  const emailSudahAda = new Set(stateMemori.pengguna.map(u => teks(u.email)));
+  let daftarSiswaImpor = [];
+
+  const renderPratinjauSiswa = () => {
+    daftarSiswaImpor = validasiDaftarSiswaImpor(daftarSiswaImpor, nisSudahAda, emailSudahAda);
+    const wadah = document.getElementById('wadah-pratinjau-siswa');
+    const info = document.getElementById('info-impor-siswa');
+    if (!wadah) return;
+
+    const jmlValid = daftarSiswaImpor.filter(x => x.valid).length;
+    info.textContent = daftarSiswaImpor.length
+      ? `Terdeteksi ${daftarSiswaImpor.length} data siswa (${jmlValid} Valid, ${daftarSiswaImpor.length - jmlValid} Duplikat/Perlu Perbaikan).`
+      : 'Unggah file Excel (.xlsx/.xls), CSV, Word (.docx), PDF, atau TXT format bebas untuk deteksi otomatis siswa.';
+
+    if (!daftarSiswaImpor.length) {
+      wadah.innerHTML = '';
+      return;
+    }
+
+    wadah.innerHTML = `
+      <div class="dnc-ringkasan-impor">
+        <div><strong>Siap Simpan:</strong> ${daftarSiswaImpor.filter(x => x.dipilih && x.valid).length} dari ${daftarSiswaImpor.length} siswa</div>
+        <div class="dnc-flex-gap">
+          <button type="button" id="btn-terapkan-kelas-semua" class="dnc-tombol dnc-tombol-sekunder dnc-tombol-kecil">Samakan ke Kelas Bawaan</button>
+          <button type="button" id="btn-terapkan-pw-semua" class="dnc-tombol dnc-tombol-sekunder dnc-tombol-kecil">Terapkan Mode Password</button>
+        </div>
+      </div>
+      <div class="dnc-pembungkus-tabel dnc-mt-12">
+        <table class="dnc-tabel dnc-tabel-padat">
+          <thead>
+            <tr>
+              <th>Pilih</th>
+              <th>NIS / NISN</th>
+              <th>Nama Lengkap</th>
+              <th>Kelas</th>
+              <th>Email Login</th>
+              <th>Password</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${daftarSiswaImpor.map((it, idx) => `
+              <tr>
+                <td data-label="Pilih"><input type="checkbox" data-is-pilih="${idx}" ${it.dipilih && it.valid ? 'checked' : ''} ${!it.valid ? 'disabled' : ''}></td>
+                <td data-label="NIS / NISN"><input class="dnc-input" style="height:30px" data-is-nis="${idx}" value="${esc(it.nomorInduk)}"></td>
+                <td data-label="Nama Lengkap"><input class="dnc-input" style="height:30px" data-is-nama="${idx}" value="${esc(it.namaLengkap)}"></td>
+                <td data-label="Kelas">
+                  <select class="dnc-select" style="height:30px" data-is-kelas="${idx}">
+                    <option value="">-- Pilih --</option>
+                    ${stateMemori.kelas.map(k => `<option value="${esc(k.id)}" ${it.kelasId === k.id ? 'selected' : ''}>${esc(k.kodeKelas)} - ${esc(k.namaKelas)}</option>`).join('')}
+                  </select>
+                </td>
+                <td data-label="Email Login"><input class="dnc-input" style="height:30px" data-is-email="${idx}" value="${esc(it.email)}"></td>
+                <td data-label="Password"><input class="dnc-input" style="height:30px" data-is-pw="${idx}" value="${esc(it.password)}"></td>
+                <td data-label="Status">${badgeStatus(it.statusTeks)}<div class="dnc-form-bantuan">${esc(it.catatan)}</div></td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>`;
+
+    document.getElementById('btn-terapkan-kelas-semua')?.addEventListener('click', () => {
+      const kDef = document.getElementById('is-kelas-default').value;
+      daftarSiswaImpor.forEach(it => { it.kelasId = kDef; });
+      renderPratinjauSiswa();
+    });
+
+    document.getElementById('btn-terapkan-pw-semua')?.addEventListener('click', () => {
+      const modePw = document.getElementById('is-mode-pw').value;
+      const pwDef = document.getElementById('is-pw-default').value.trim() || 'siswa123';
+      daftarSiswaImpor.forEach(it => {
+        it.password = tentukanPasswordSiswa('', it.nomorInduk, modePw, pwDef);
+      });
+      renderPratinjauSiswa();
+    });
+
+    wadah.querySelectorAll('[data-is-pilih]').forEach(el => {
+      el.addEventListener('change', () => {
+        daftarSiswaImpor[Number(el.dataset.isPilih)].dipilih = el.checked;
+        renderPratinjauSiswa();
+      });
+    });
+
+    const ikat = (attr, field) => {
+      wadah.querySelectorAll(`[${attr}]`).forEach(el => {
+        el.addEventListener('change', () => {
+          const i = Number(el.getAttribute(attr));
+          daftarSiswaImpor[i][field] = el.value.trim();
+          daftarSiswaImpor = validasiDaftarSiswaImpor(daftarSiswaImpor, nisSudahAda, emailSudahAda);
+          if (daftarSiswaImpor[i].valid) daftarSiswaImpor[i].dipilih = true;
+          renderPratinjauSiswa();
+        });
+      });
+    };
+    ikat('data-is-nis', 'nomorInduk');
+    ikat('data-is-nama', 'namaLengkap');
+    ikat('data-is-kelas', 'kelasId');
+    ikat('data-is-email', 'email');
+    ikat('data-is-pw', 'password');
+  };
+
+  bukaModalFormDnc({
+    judul: 'Impor Massal Data Siswa — Bebas Template',
+    lebar: true,
+    labelSimpan: 'Simpan Massal Akun Siswa',
+    htmlKonten: `
+      <div class="dnc-form-grid">
+        <div class="dnc-form-grup">
+          <label class="dnc-label" for="is-kelas-default">Kelas Bawaan (jika tidak ada di file) *</label>
+          <select id="is-kelas-default" class="dnc-select">
+            ${stateMemori.kelas.map(k => `<option value="${esc(k.id)}">${esc(k.kodeKelas)} - ${esc(k.namaKelas)}</option>`).join('')}
+          </select>
+        </div>
+        <div class="dnc-form-grup">
+          <label class="dnc-label" for="is-mode-pw">Pengaturan Password Otomatis</label>
+          <select id="is-mode-pw" class="dnc-select">
+            <option value="file_dulu">Dari File / Password Bawaan</option>
+            <option value="nis">Gunakan NIS/NISN Masing-masing</option>
+          </select>
+        </div>
+        <div class="dnc-form-grup">
+          <label class="dnc-label" for="is-pw-default">Password Bawaan (min. 6 karakter)</label>
+          <input id="is-pw-default" class="dnc-input" type="text" value="siswa123">
+        </div>
+        <div class="dnc-form-grup">
+          <label class="dnc-label">Contoh File (Opsional)</label>
+          <div class="dnc-flex-gap">
+            <button type="button" id="btn-templat-siswa-csv" class="dnc-tombol dnc-tombol-sekunder dnc-tombol-kecil">Contoh Excel/CSV</button>
+            <button type="button" id="btn-templat-siswa-word" class="dnc-tombol dnc-tombol-sekunder dnc-tombol-kecil">Contoh Word</button>
+          </div>
+        </div>
+        <div class="dnc-form-grup dnc-form-full">
+          <label class="dnc-label" for="is-file-siswa">Unggah File Data Siswa Format Bebas (.xlsx, .xls, .csv, .docx, .pdf, .txt) *</label>
+          <div class="dnc-file-drop">
+            <input id="is-file-siswa" class="dnc-input" type="file" accept=".xlsx,.xls,.csv,.docx,.pdf,.txt" style="padding-top:7px">
+            <div id="info-impor-siswa" class="dnc-form-bantuan dnc-mt-12">Langsung unggah daftar absen, ekspor Dapodik, tabel Word/PDF, atau daftar nama biasa — sistem otomatis mendeteksi NIS/NISN, Nama, Kelas, dan membuatkan Email/Password login.</div>
+          </div>
+        </div>
+      </div>
+      <div id="wadah-pratinjau-siswa"></div>`,
+    onMount: () => {
+      document.getElementById('btn-templat-siswa-csv').addEventListener('click', () => {
+        const kelasContoh = stateMemori.kelas[0]?.kodeKelas || 'VI-A';
+        const isi = `NISN,Nama Lengkap,Kelas,Email,Password\n` +
+          `0098765431,Ahmad Pratama,${kelasContoh},ahmad@siswa.asas.id,siswa123\n` +
+          `0098765432,Siti Nurhaliza,${kelasContoh},,\n`;
+        unduhBlobFile(new Blob([isi], { type: 'text/csv;charset=utf-8' }), 'Contoh_Data_Siswa_ASAS_DNC.csv');
+      });
+
+      document.getElementById('btn-templat-siswa-word').addEventListener('click', () => {
+        const kelasContoh = stateMemori.kelas[0]?.kodeKelas || 'VI-A';
+        unduhDokumenWordSederhana([
+          `DAFTAR SISWA KELAS ${kelasContoh}`,
+          `1. 0098765431 | Ahmad Pratama | ${kelasContoh}`,
+          `2. 0098765432 | Siti Nurhaliza | ${kelasContoh}`
+        ], 'Contoh_Data_Siswa_ASAS_DNC.docx');
+      });
+
+      document.getElementById('is-file-siswa').addEventListener('change', async e => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const info = document.getElementById('info-impor-siswa');
+        const ext = teks(file.name.split('.').pop());
+        const opsi = {
+          kelasDefaultId: document.getElementById('is-kelas-default').value,
+          modePassword: document.getElementById('is-mode-pw').value,
+          passwordBawaan: document.getElementById('is-pw-default').value.trim() || 'siswa123'
+        };
+        info.textContent = `Mendeteksi otomatis daftar siswa dari ${file.name}...`;
+
+        try {
+          let mentah = [];
+          if (ext === 'csv') {
+            mentah = petakanMatriksSiswaBebas(parseCsvBaris(await file.text()), opsi);
+          } else if (ext === 'xlsx' || ext === 'xls') {
+            const XLSX = await muatSheetJs();
+            const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' });
+            const sheet = wb.Sheets[wb.SheetNames[0]];
+            const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+            mentah = petakanMatriksSiswaBebas(rows, opsi);
+          } else if (ext === 'docx') {
+            const mammothLib = await muatMammothJs();
+            const { value: html } = await mammothLib.convertToHtml({ arrayBuffer: await file.arrayBuffer() });
+            const doc = new DOMParser().parseFromString(html, 'text/html');
+            const semuaTabel = [...doc.querySelectorAll('table')];
+            semuaTabel.forEach(tbl => {
+              const rows = [...tbl.querySelectorAll('tr')].map(tr => [...tr.querySelectorAll('th,td')].map(td => td.textContent.trim()));
+              mentah.push(...petakanMatriksSiswaBebas(rows, opsi));
+            });
+            if (!mentah.length) {
+              const lines = [...doc.body.querySelectorAll('p, li')].map(p => p.textContent.trim()).filter(Boolean);
+              mentah = parseTeksBarisSiswaBebas(lines, opsi);
+            }
+          } else if (ext === 'pdf') {
+            const barisPdf = await ekstrakTeksBarisPdf(file);
+            mentah = parseTeksBarisSiswaBebas(barisPdf, opsi);
+          } else if (ext === 'txt') {
+            const lines = (await file.text()).split(/\r?\n/).map(t => t.trim()).filter(Boolean);
+            mentah = parseTeksBarisSiswaBebas(lines, opsi);
+          } else {
+            throw new Error('Format file tidak didukung. Gunakan Excel, CSV, Word (.docx), PDF, atau TXT.');
+          }
+
+          daftarSiswaImpor = mentah;
+          renderPratinjauSiswa();
+        } catch (err) {
+          info.textContent = err.message || 'Gagal membaca file data siswa.';
+          tampilkanToast(info.textContent, 'error');
+        }
+      });
+    },
+    onSubmit: async () => {
+      daftarSiswaImpor = validasiDaftarSiswaImpor(daftarSiswaImpor, nisSudahAda, emailSudahAda);
+      const terpilih = daftarSiswaImpor.filter(x => x.dipilih && x.valid);
+      if (!terpilih.length) throw new Error('Belum ada data siswa berstatus Valid yang dipilih untuk disimpan.');
+
+      let tersimpan = 0;
+      for (const s of terpilih) {
+        if (!(await cekUnik(COLLECTIONS.pengguna, 'nomorInduk', s.nomorInduk))) continue;
+        if (!(await cekUnik(COLLECTIONS.pengguna, 'email', s.email))) continue;
+        const passwordHash = await hashTeks(s.password);
+        await dbCreate(COLLECTIONS.pengguna, {
+          email: s.email.trim(),
+          namaLengkap: s.namaLengkap.trim(),
+          nomorInduk: s.nomorInduk.trim(),
+          role: 'Siswa',
+          kelasId: s.kelasId,
+          mapelIds: [],
+          statusAktif: true,
+          passwordHash
+        });
+        tersimpan++;
+      }
+
+      if (!tersimpan) throw new Error('Seluruh akun siswa terpilih sudah terdaftar di database.');
+      tutupModalFormDnc();
+      resetCacheMenu(['DNC-M1', 'DNC-M6', 'DNC-M7']);
+      await muatM7Pengguna(true);
+      tampilkanToast(`${tersimpan} akun Siswa berhasil diimpor massal.`);
+    }
+  });
+}
 // ===== AKHIR BLOK: DNC_M7_PENGGUNA =====
 
 // ===== BLOK: DNC_BOOT =====
