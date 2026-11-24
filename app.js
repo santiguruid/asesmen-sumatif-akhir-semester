@@ -2763,7 +2763,31 @@ function terapkanKunciDanBobot(s, kunciGlobal, kunciPerBagian, bobotDefaultTipe)
   return validasiItemSoalPintar(s);
 }
 
-// --- Modal Impor Pintar Bank Soal (Word .docx, PDF .pdf, Excel .xlsx/.xls) ---
+async function bacaTeksMentahFileKunci(file) {
+  const ext = teks(file.name.split('.').pop());
+  if (ext === 'txt' || ext === 'csv') return await file.text();
+  if (ext === 'docx') {
+    const mammothLib = await muatMammothJs();
+    const { value: html } = await mammothLib.convertToHtml({ arrayBuffer: await file.arrayBuffer() });
+    const sumber = ubahHtmlWordKeBarisTerstruktur(html);
+    const garisTabel = [];
+    sumber.tabel.forEach(rows => rows.forEach(r => garisTabel.push(r.map(c => c.teks).filter(Boolean).join(' '))));
+    return [...sumber.baris.map(b => b.teks), ...garisTabel].filter(Boolean).join('\n');
+  }
+  if (ext === 'pdf') {
+    return (await ekstrakTeksBarisPdf(file)).join('\n');
+  }
+  if (ext === 'xlsx' || ext === 'xls') {
+    const XLSX = await muatSheetJs();
+    const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' });
+    const sheet = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+    return rows.map(r => r.map(c => String(c ?? '').trim()).filter(Boolean).join(' ')).filter(Boolean).join('\n');
+  }
+  throw new Error('Format file kunci tidak didukung. Gunakan .docx, .pdf, .xlsx, .xls, .csv, atau .txt.');
+}
+
+// --- Modal Impor Pintar Bank Soal (Bebas Template: Word, PDF, Excel, CSV, TXT) ---
 function bukaModalImporWord() {
   const mapelList = daftarMapelDiizinkan();
   if (!mapelList.length) {
@@ -2772,6 +2796,26 @@ function bukaModalImporWord() {
   }
 
   let daftarEkstrak = [];
+
+  const terapkanKunciTambahanKeDaftar = teksKunci => {
+    if (!daftarEkstrak.length || !String(teksKunci || '').trim()) return;
+    const { kunciGlobal, kunciPerBagian, bobotDefaultTipe } = parseTeksKunciDanPenskoran(teksKunci);
+    daftarEkstrak = daftarEkstrak.map(it => {
+      const noKey = String(it.nomorAsli || it.urutanGlobal || '');
+      const urutKey = String(it.urutanGlobal || '');
+      const entri = (it.bagianAsal ? kunciPerBagian[`${it.bagianAsal}#${noKey}`] : null) || kunciGlobal[noKey] || kunciGlobal[urutKey];
+      if (entri?.kunci) {
+        it.kunciJawaban = adalahTipeBeropsi(it.tipeSoal)
+          ? selesaikanKunciOpsiDariTeks(entri.kunci, it.opsiJawaban, it.tipeSoal)
+          : entri.kunci;
+      }
+      if (entri?.bobot > 0) it.bobotNilai = entri.bobot;
+      else if (bobotDefaultTipe[it.tipeSoal] > 0) it.bobotNilai = bobotDefaultTipe[it.tipeSoal];
+      validasiItemSoalPintar(it);
+      if (it.valid) it.dipilih = true;
+      return it;
+    });
+  };
 
   const renderPratinjauWord = () => {
     const wadah = document.getElementById('wadah-pratinjau-word');
@@ -2784,7 +2828,7 @@ function bukaModalImporWord() {
 
     info.textContent = daftarEkstrak.length
       ? `Terdeteksi ${daftarEkstrak.length} butir soal (${jmlValid} Valid, ${daftarEkstrak.length - jmlValid} Perlu Perbaikan).`
-      : 'Unggah file .docx, .pdf, atau .xlsx/.xls untuk deteksi otomatis soal, jenis soal, kunci jawaban, dan penskoran.';
+      : 'Unggah file soal format bebas (.docx, .pdf, .xlsx, .xls, .csv, .txt) — tanpa wajib memakai templat baku.';
 
     if (!daftarEkstrak.length) {
       wadah.innerHTML = '';
@@ -2794,51 +2838,77 @@ function bukaModalImporWord() {
     wadah.innerHTML = `
       <div class="dnc-ringkasan-impor">
         <div>
-          <strong>Deteksi Jenis Soal:</strong>
+          <strong>Deteksi Otomatis:</strong>
           PG: ${hitungTipe('Pilihan Ganda')} | PG Kompleks: ${hitungTipe('Pilihan Ganda Kompleks')} | Isian: ${hitungTipe('Isian Singkat')} | Uraian: ${hitungTipe('Uraian')}
         </div>
-        <div><strong>Total Bobot Terpilih: ${totalBobot}</strong></div>
+        <div class="dnc-flex-gap">
+          <button type="button" id="btn-auto-bobot-100" class="dnc-tombol dnc-tombol-sekunder dnc-tombol-kecil">Bagi Bobot Total = 100</button>
+          <strong>Total Bobot Terpilih: ${totalBobot}</strong>
+        </div>
       </div>
       <div class="dnc-pembungkus-tabel dnc-mt-12">
         <table class="dnc-tabel dnc-tabel-padat">
           <thead>
             <tr>
               <th>Pilih</th>
-              <th>Kode & Tipe Soal</th>
-              <th>Pertanyaan & Opsi</th>
-              <th>Kunci Otomatis & Bobot</th>
+              <th>Kode &amp; Tipe Soal</th>
+              <th>Pertanyaan &amp; Opsi</th>
+              <th>Kunci Otomatis &amp; Bobot</th>
               <th>Status Validasi</th>
             </tr>
           </thead>
           <tbody>
-            ${daftarEkstrak.map((it, idx) => `
-              <tr>
-                <td data-label="Pilih">
-                  <input type="checkbox" data-w-pilih="${idx}" ${it.dipilih && it.valid ? 'checked' : ''} ${!it.valid ? 'disabled' : ''}>
-                </td>
-                <td data-label="Kode & Tipe">
-                  <input class="dnc-input" style="height:30px;margin-bottom:4px" data-w-kode="${idx}" value="${esc(it.kodeSoal)}">
-                  <select class="dnc-select" style="height:30px" data-w-tipe="${idx}">
-                    ${TIPE_SOAL_LIST.map(tp => `<option value="${tp}" ${it.tipeSoal === tp ? 'selected' : ''}>${tp}</option>`).join('')}
-                  </select>
-                </td>
-                <td data-label="Pertanyaan">
-                  <textarea class="dnc-textarea" style="min-height:54px" data-w-tanya="${idx}">${esc(it.pertanyaan)}</textarea>
-                  ${it.urlGambar ? '<div class="dnc-form-bantuan">Memuat gambar terkompresi dari dokumen</div>' : ''}
-                  ${adalahTipeBeropsi(it.tipeSoal) ? `<div class="dnc-form-bantuan">${esc((it.opsiJawaban || []).map(o => `${o.kode}. ${o.teks}`).join(' | '))}</div>` : ''}
-                </td>
-                <td data-label="Kunci & Bobot">
-                  <input class="dnc-input" style="height:30px;margin-bottom:4px" data-w-kunci="${idx}" placeholder="Kunci (mis. B / A, C)" value="${esc(it.kunciJawaban)}">
-                  <input class="dnc-input" style="height:30px" type="number" min="0.5" step="0.5" data-w-bobot="${idx}" value="${esc(it.bobotNilai)}">
-                </td>
-                <td data-label="Validasi">
-                  ${badgeStatus(it.valid ? 'Valid' : 'Perlu Perbaikan')}
-                  <div class="dnc-form-bantuan">${esc(it.catatanValidasi)}</div>
-                </td>
-              </tr>`).join('')}
+            ${daftarEkstrak.map((it, idx) => {
+              const petaOpsi = opsiMapToObj(it.opsiJawaban);
+              const htmlOpsiEdit = adalahTipeBeropsi(it.tipeSoal)
+                ? `<div class="dnc-opsi-edit-grid">
+                    ${['A', 'B', 'C', 'D', 'E'].map(hrf => `
+                      <div class="dnc-opsi-edit-baris">
+                        <span class="dnc-opsi-edit-kode">${hrf}.</span>
+                        <input class="dnc-input" data-w-opsi-idx="${idx}" data-w-opsi-kode="${hrf}" placeholder="Opsi ${hrf}" value="${esc(petaOpsi[hrf])}">
+                      </div>`).join('')}
+                  </div>`
+                : '';
+              return `
+                <tr>
+                  <td data-label="Pilih">
+                    <input type="checkbox" data-w-pilih="${idx}" ${it.dipilih && it.valid ? 'checked' : ''} ${!it.valid ? 'disabled' : ''}>
+                  </td>
+                  <td data-label="Kode &amp; Tipe">
+                    <input class="dnc-input" style="height:30px;margin-bottom:4px" data-w-kode="${idx}" value="${esc(it.kodeSoal)}">
+                    <select class="dnc-select" style="height:30px" data-w-tipe="${idx}">
+                      ${TIPE_SOAL_LIST.map(tp => `<option value="${tp}" ${it.tipeSoal === tp ? 'selected' : ''}>${tp}</option>`).join('')}
+                    </select>
+                  </td>
+                  <td data-label="Pertanyaan &amp; Opsi">
+                    <textarea class="dnc-textarea" style="min-height:52px" data-w-tanya="${idx}">${esc(it.pertanyaan)}</textarea>
+                    ${it.urlGambar ? '<div class="dnc-form-bantuan">Memuat gambar terkompresi dari dokumen</div>' : ''}
+                    ${htmlOpsiEdit}
+                  </td>
+                  <td data-label="Kunci &amp; Bobot">
+                    <input class="dnc-input" style="height:30px;margin-bottom:4px" data-w-kunci="${idx}" placeholder="Kunci (mis. B / A, C)" value="${esc(it.kunciJawaban)}">
+                    <input class="dnc-input" style="height:30px" type="number" min="0.5" step="0.5" data-w-bobot="${idx}" value="${esc(it.bobotNilai)}">
+                  </td>
+                  <td data-label="Validasi">
+                    ${badgeStatus(it.valid ? 'Valid' : 'Perlu Perbaikan')}
+                    <div class="dnc-form-bantuan">${esc(it.catatanValidasi)}</div>
+                  </td>
+                </tr>`;
+            }).join('')}
           </tbody>
         </table>
       </div>`;
+
+    document.getElementById('btn-auto-bobot-100')?.addEventListener('click', () => {
+      if (!daftarEkstrak.length) return;
+      const bobotRata = bulatDua(100 / daftarEkstrak.length);
+      daftarEkstrak.forEach(it => {
+        it.bobotNilai = bobotRata;
+        validasiItemSoalPintar(it);
+      });
+      renderPratinjauWord();
+      tampilkanToast(`Bobot setiap soal disesuaikan rata (${bobotRata}) dengan total ±100.`);
+    });
 
     wadah.querySelectorAll('[data-w-pilih]').forEach(el => {
       el.addEventListener('change', () => {
@@ -2851,6 +2921,9 @@ function bukaModalImporWord() {
         el.addEventListener('change', () => {
           const i = Number(el.getAttribute(attr));
           daftarEkstrak[i][field] = numerik ? Number(el.value) : el.value.trim();
+          if (field === 'kunciJawaban' && adalahTipeBeropsi(daftarEkstrak[i].tipeSoal)) {
+            daftarEkstrak[i].kunciJawaban = selesaikanKunciOpsiDariTeks(daftarEkstrak[i].kunciJawaban, daftarEkstrak[i].opsiJawaban, daftarEkstrak[i].tipeSoal);
+          }
           validasiItemSoalPintar(daftarEkstrak[i]);
           if (daftarEkstrak[i].valid) daftarEkstrak[i].dipilih = true;
           renderPratinjauWord();
@@ -2862,10 +2935,25 @@ function bukaModalImporWord() {
     ikatEdit('data-w-tanya', 'pertanyaan');
     ikatEdit('data-w-kunci', 'kunciJawaban');
     ikatEdit('data-w-bobot', 'bobotNilai', true);
+
+    wadah.querySelectorAll('[data-w-opsi-idx]').forEach(el => {
+      el.addEventListener('change', () => {
+        const i = Number(el.dataset.wOpsiIdx);
+        const kode = el.dataset.wOpsiKode;
+        const val = el.value.trim();
+        const daftar = (daftarEkstrak[i].opsiJawaban || []).filter(o => o.kode !== kode);
+        if (val) daftar.push({ kode, teks: val });
+        daftar.sort((a, b) => a.kode.localeCompare(b.kode));
+        daftarEkstrak[i].opsiJawaban = daftar;
+        validasiItemSoalPintar(daftarEkstrak[i]);
+        if (daftarEkstrak[i].valid) daftarEkstrak[i].dipilih = true;
+        renderPratinjauWord();
+      });
+    });
   };
 
   bukaModalFormDnc({
-    judul: 'Impor Pintar Bank Soal (Word, PDF, atau Excel)',
+    judul: 'Impor Pintar Bank Soal — Bebas Template (Word, PDF, Excel)',
     lebar: true,
     labelSimpan: 'Simpan Massal ke Bank Soal',
     htmlKonten: `
@@ -2880,30 +2968,77 @@ function bukaModalImporWord() {
         </div>
         <div class="dnc-form-grup dnc-form-full">
           <div class="dnc-flex-between dnc-mb-12">
-            <label class="dnc-label" for="w-file-docx">Dokumen Soal + Kunci + Penskoran (.docx, .pdf, .xlsx, .xls) *</label>
+            <label class="dnc-label" for="w-file-docx">Dokumen Soal Format Bebas (.docx, .pdf, .xlsx, .xls, .csv, .txt) *</label>
             <button type="button" id="btn-unduh-templat-word" class="dnc-tombol dnc-tombol-sekunder dnc-tombol-kecil">
               <svg class="dnc-ikon"><use href="#icon-download"></use></svg>
-              <span>Unduh Templat Word Lengkap</span>
+              <span>Contoh Word (Opsional)</span>
             </button>
           </div>
           <div class="dnc-file-drop">
-            <input id="w-file-docx" class="dnc-input" type="file" accept=".docx,.pdf,.xlsx,.xls" style="padding-top:7px">
-            <div id="info-ringkas-word" class="dnc-form-bantuan dnc-mt-12">Otomatis mendeteksi PG, PG Kompleks, Isian Singkat, Uraian, kunci jawaban (inline maupun halaman akhir), serta bobot pedoman penskoran.</div>
+            <input id="w-file-docx" class="dnc-input" type="file" accept=".docx,.pdf,.xlsx,.xls,.csv,.txt" style="padding-top:7px">
+            <div id="info-ringkas-word" class="dnc-form-bantuan dnc-mt-12">Mesin pembaca otomatis mendeteksi soal, opsi sejajar/berbaris, PG, PG Kompleks, Isian, Uraian, kunci jawaban, dan bobot penskoran dari template apa pun.</div>
           </div>
+        </div>
+        <div class="dnc-form-grup dnc-form-full">
+          <div class="dnc-flex-between">
+            <label class="dnc-label" for="w-teks-kunci-opsional">Kunci Jawaban &amp; Penskoran Tambahan (Opsional — jika file kunci terpisah)</label>
+            <div class="dnc-flex-gap">
+              <label class="dnc-tombol dnc-tombol-sekunder dnc-tombol-kecil" style="cursor:pointer">
+                <span>Unggah File Kunci</span>
+                <input id="w-file-kunci-opsional" type="file" accept=".docx,.pdf,.xlsx,.xls,.csv,.txt" style="display:none">
+              </label>
+              <button type="button" id="btn-terapkan-kunci-tambahan" class="dnc-tombol dnc-tombol-aksen dnc-tombol-kecil">Terapkan Kunci &amp; Bobot</button>
+            </div>
+          </div>
+          <textarea id="w-teks-kunci-opsional" class="dnc-textarea" style="min-height:58px" placeholder="Contoh bebas: 1. B 2. C 3. A, D (Skor 5) atau tempel isi kunci jawaban &amp; pedoman penskoran dari Word/PDF di sini..."></textarea>
         </div>
       </div>
       <div id="wadah-pratinjau-word"></div>`,
     onMount: () => {
       document.getElementById('btn-unduh-templat-word').addEventListener('click', () => {
         unduhTemplatWordDocx();
-        tampilkanToast('Templat Word lengkap (4 tipe soal + kunci + penskoran) berhasil diunduh.');
+        tampilkanToast('Contoh dokumen Word berhasil diunduh.');
       });
+
+      document.getElementById('btn-terapkan-kunci-tambahan').addEventListener('click', () => {
+        const isi = document.getElementById('w-teks-kunci-opsional').value;
+        if (!daftarEkstrak.length) {
+          tampilkanToast('Unggah file soal terlebih dahulu.', 'error');
+          return;
+        }
+        if (!isi.trim()) {
+          tampilkanToast('Tempel teks kunci jawaban atau unggah file kunci terlebih dahulu.', 'error');
+          return;
+        }
+        terapkanKunciTambahanKeDaftar(isi);
+        renderPratinjauWord();
+        tampilkanToast('Kunci jawaban dan bobot penskoran berhasil diterapkan otomatis.');
+      });
+
+      document.getElementById('w-file-kunci-opsional').addEventListener('change', async e => {
+        const fileKunci = e.target.files[0];
+        if (!fileKunci) return;
+        try {
+          const teksKunci = await bacaTeksMentahFileKunci(fileKunci);
+          document.getElementById('w-teks-kunci-opsional').value = teksKunci;
+          if (daftarEkstrak.length) {
+            terapkanKunciTambahanKeDaftar(teksKunci);
+            renderPratinjauWord();
+            tampilkanToast(`File kunci "${fileKunci.name}" berhasil dibaca dan dicocokkan.`);
+          } else {
+            tampilkanToast(`File kunci "${fileKunci.name}" siap dicocokkan setelah file soal diunggah.`);
+          }
+        } catch (err) {
+          tampilkanToast(err.message || 'Gagal membaca file kunci.', 'error');
+        }
+      });
+
       document.getElementById('w-file-docx').addEventListener('change', async e => {
         const file = e.target.files[0];
         if (!file) return;
         const info = document.getElementById('info-ringkas-word');
         const ext = teks(file.name.split('.').pop());
-        info.textContent = `Menganalisis struktur soal, kunci jawaban, dan pedoman penskoran dari ${file.name}...`;
+        info.textContent = `Menganalisis struktur soal, opsi, kunci jawaban, dan bobot penskoran dari ${file.name}...`;
         try {
           const mapelObj = cariById('mataPelajaran', document.getElementById('w-mapelId').value);
           const prefix = (mapelObj?.kodeMapel || 'SOAL').replace(/[^A-Za-z0-9]/g, '').slice(0, 8);
@@ -2934,11 +3069,24 @@ function bukaModalImporWord() {
             const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' });
             const sheet = wb.Sheets[wb.SheetNames[0]];
             const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' })
-              .map(r => r.map(c => ({ teks: String(c ?? '').trim(), img: '' })));
+              .map(r => r.map(c => ({ teks: String(c ?? '').trim(), img: '', bold: false })));
             daftarEkstrak = ekstrakSoalPintarDariSumber({ baris: [], tabel: [rows] }, prefix);
+          } else if (ext === 'csv') {
+            const rows = parseCsvBaris(await file.text())
+              .map(r => r.map(c => ({ teks: String(c ?? '').trim(), img: '', bold: false })));
+            daftarEkstrak = ekstrakSoalPintarDariSumber({ baris: [], tabel: [rows] }, prefix);
+          } else if (ext === 'txt') {
+            const lines = (await file.text()).split(/\r?\n/).map(t => t.trim()).filter(Boolean);
+            daftarEkstrak = ekstrakSoalPintarDariSumber({
+              baris: lines.map(t => ({ teks: t, img: '', bold: false })),
+              tabel: []
+            }, prefix);
           } else {
-            throw new Error('Gunakan file Word (.docx), PDF (.pdf), atau Excel (.xlsx/.xls).');
+            throw new Error('Gunakan file Word (.docx), PDF (.pdf), Excel (.xlsx/.xls), CSV, atau TXT.');
           }
+
+          const teksKunciTambahan = document.getElementById('w-teks-kunci-opsional')?.value || '';
+          if (teksKunciTambahan.trim()) terapkanKunciTambahanKeDaftar(teksKunciTambahan);
 
           renderPratinjauWord();
         } catch (err) {
