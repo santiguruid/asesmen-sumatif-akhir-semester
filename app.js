@@ -2071,8 +2071,9 @@ function bukaFormSoal(item = null) {
         throw new Error(`Kode soal "${kodeSoal}" sudah digunakan.`);
       }
 
+      const sumberPaket = (document.getElementById('f-sumberPaket')?.value || '').trim();
       const payload = {
-        kodeSoal, mapelId, tingkat, tipeSoal, pertanyaan, urlGambar,
+        kodeSoal, sumberPaket, mapelId, tingkat, tipeSoal, pertanyaan, urlGambar,
         opsiJawaban, kunciJawaban, bobotNilai, statusAktif,
         dibuatOleh: item?.dibuatOleh || penggunaAktif.id
       };
