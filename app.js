@@ -1,6 +1,6 @@
 // DigitalNetCare@copyright
 // ===== BLOK: DNC_CONFIG =====
-const IS_PREVIEW = true; // Ubah menjadi false SAAT DEPLOY PRODUKSI agar terhubung murni ke Firebase tanpa data dummy
+const IS_PREVIEW = false; // Ubah menjadi false SAAT DEPLOY PRODUKSI agar terhubung murni ke Firebase tanpa data dummy
 
 // Your web app's Firebase configuration
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
@@ -58,9 +58,9 @@ function inisialisasiPwaDnc() {
     if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
       const swKode = `self.addEventListener('install',()=>self.skipWaiting());self.addEventListener('activate',e=>e.waitUntil(self.clients.claim()));self.addEventListener('fetch',()=>{});`;
       const blobUrl = URL.createObjectURL(new Blob([swKode], { type: 'text/javascript' }));
-      navigator.serviceWorker.register(blobUrl).catch(() => {});
+      navigator.serviceWorker.register(blobUrl).catch(() => { });
     }
-  } catch (_) {}
+  } catch (_) { }
 }
 // ===== AKHIR BLOK: DNC_PWA =====
 
@@ -749,7 +749,7 @@ async function keluarAplikasi() {
   penggunaAktif = null;
   resetCacheMenu();
   if (!IS_PREVIEW && fb?.auth?.currentUser) {
-    try { await fb.authMod.signOut(fb.auth); } catch (_) {}
+    try { await fb.authMod.signOut(fb.auth); } catch (_) { }
   }
   document.getElementById('dnc-aplikasi').classList.add('dnc-disembunyikan');
   document.getElementById('dnc-halaman-login').classList.remove('dnc-disembunyikan');
@@ -949,7 +949,7 @@ async function muatM1Dashboard(paksa = false) {
         plugins: { legend: { position: 'right', labels: { boxWidth: 10, font: { size: 11 } } } }
       }
     });
-  } catch (_) {}
+  } catch (_) { }
 }
 // ===== AKHIR BLOK: DNC_M1_DASHBOARD =====
 
