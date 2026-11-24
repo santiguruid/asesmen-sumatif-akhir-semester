@@ -567,6 +567,15 @@ async function dbGetById(namaKoleksi, id) {
   return snap.exists() ? { id: snap.id, ...snap.data() } : null;
 }
 
+function formatErrorFirestoreDnc(err) {
+  const kode = String(err?.code || '').toLowerCase();
+  const pesan = String(err?.message || '');
+  if (kode.includes('permission-denied') || pesan.toLowerCase().includes('insufficient permissions')) {
+    return new Error('Izin Firestore ditolak. Pastikan firestore.rules terbaru sudah dipublikasikan dan Anda login dengan sesi Admin/Guru aktif.');
+  }
+  return err;
+}
+
 async function dbCreate(namaKoleksi, data, customId = null) {
   const sekarangIso = new Date().toISOString();
   if (IS_PREVIEW) {
@@ -575,15 +584,19 @@ async function dbCreate(namaKoleksi, data, customId = null) {
     memoriPreview[namaKoleksi].unshift(baru);
     return baru;
   }
-  const { db, fsMod } = await muatFirebaseSdk();
-  const payload = { ...data, dibuat: fsMod.serverTimestamp() };
-  if (customId) {
-    await fsMod.setDoc(fsMod.doc(db, namaKoleksi, customId), { id: customId, ...payload });
-    return { id: customId, dibuat: sekarangIso, ...data };
+  try {
+    const { db, fsMod } = await muatFirebaseSdk();
+    const payload = { ...data, dibuat: fsMod.serverTimestamp() };
+    if (customId) {
+      await fsMod.setDoc(fsMod.doc(db, namaKoleksi, customId), { id: customId, ...payload }, { merge: true });
+      return { id: customId, dibuat: sekarangIso, ...data };
+    }
+    const docRef = fsMod.doc(fsMod.collection(db, namaKoleksi));
+    await fsMod.setDoc(docRef, { id: docRef.id, ...payload });
+    return { id: docRef.id, dibuat: sekarangIso, ...data };
+  } catch (err) {
+    throw formatErrorFirestoreDnc(err);
   }
-  const docRef = fsMod.doc(fsMod.collection(db, namaKoleksi));
-  await fsMod.setDoc(docRef, { id: docRef.id, ...payload });
-  return { id: docRef.id, dibuat: sekarangIso, ...data };
 }
 
 async function dbUpdate(namaKoleksi, id, data) {
@@ -594,9 +607,13 @@ async function dbUpdate(namaKoleksi, id, data) {
     list[idx] = { ...list[idx], ...data };
     return list[idx];
   }
-  const { db, fsMod } = await muatFirebaseSdk();
-  await fsMod.updateDoc(fsMod.doc(db, namaKoleksi, id), data);
-  return { id, ...data };
+  try {
+    const { db, fsMod } = await muatFirebaseSdk();
+    await fsMod.updateDoc(fsMod.doc(db, namaKoleksi, id), data);
+    return { id, ...data };
+  } catch (err) {
+    throw formatErrorFirestoreDnc(err);
+  }
 }
 
 async function dbDelete(namaKoleksi, id) {
@@ -604,9 +621,13 @@ async function dbDelete(namaKoleksi, id) {
     memoriPreview[namaKoleksi] = (memoriPreview[namaKoleksi] || []).filter(x => x.id !== id);
     return true;
   }
-  const { db, fsMod } = await muatFirebaseSdk();
-  await fsMod.deleteDoc(fsMod.doc(db, namaKoleksi, id));
-  return true;
+  try {
+    const { db, fsMod } = await muatFirebaseSdk();
+    await fsMod.deleteDoc(fsMod.doc(db, namaKoleksi, id));
+    return true;
+  } catch (err) {
+    throw formatErrorFirestoreDnc(err);
+  }
 }
 
 async function cekUnik(namaKoleksi, field, nilai, kecualiId = null) {
