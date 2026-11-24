@@ -4103,7 +4103,9 @@ async function mulaiLembarUjian(paket, hasil) {
     daftarSoal,
     petaJawaban,
     indeks: 0,
-    batasAkhirMs
+    batasAkhirMs,
+    jumlahPelanggaran: Number(hasil.jumlahPelanggaran || 0),
+    logPelanggaran: Array.isArray(hasil.logPelanggaran) ? [...hasil.logPelanggaran] : []
   };
   sedangSubmitUjian = false;
 
@@ -4115,6 +4117,11 @@ async function mulaiLembarUjian(paket, hasil) {
   if (badgeLive) {
     badgeLive.className = 'dnc-badge dnc-badge-hijau';
     badgeLive.innerHTML = '<span class="dnc-dot-live"></span>Sesi Dibuka Guru';
+  }
+
+  perbaruiBadgeLockdownM5();
+  if (penggunaAktif?.role === 'Siswa' && !cekSedangFullscreenDnc() && dukungFullscreenDnc()) {
+    aktifkanLockdownSiswa();
   }
 
   renderSoalAktifM5();
