@@ -32,7 +32,7 @@ const MENU_DAFTAR = [
   { id: 'DNC-M7', label: 'Manajemen Pengguna', pendek: 'Pengguna', icon: 'icon-users', roles: ['Admin'] }
 ];
 
-const TINGKAT_LIST = ['VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
+const TINGKAT_LIST = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
 const TIPE_SOAL_LIST = ['Pilihan Ganda', 'Pilihan Ganda Kompleks', 'Isian Singkat', 'Uraian'];
 // ===== AKHIR BLOK: DNC_CONFIG =====
 
@@ -129,15 +129,32 @@ function acakArray(arr) {
   return salinan;
 }
 
-function normalisasiTingkat(val) {
-  const s = String(val || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
-  if (s.includes('XII') || s === '12' || /^12/.test(s)) return 'XII';
-  if (s.includes('XI') || s === '11' || /^11/.test(s)) return 'XI';
-  if (s.includes('VIII') || s === '8' || /^8/.test(s)) return 'VIII';
-  if (s.includes('VII') || s === '7' || /^7/.test(s)) return 'VII';
-  if (s.includes('IX') || s === '9' || /^9/.test(s)) return 'IX';
-  if (s.includes('X') || s === '10' || /^10/.test(s)) return 'X';
-  return 'X';
+function labelTingkat(t) {
+  if (['I', 'II', 'III', 'IV', 'V', 'VI'].includes(t)) return `Tingkat ${t} (SD)`;
+  if (['VII', 'VIII', 'IX'].includes(t)) return `Tingkat ${t} (SMP)`;
+  return `Tingkat ${t} (SMA/SMK)`;
+}
+
+function deteksiTingkat(val) {
+  const raw = String(val || '').trim().toUpperCase().replace(/^(?:KELAS|TINGKAT|KLS|ROMBEL|SD|SMP|SMA|SMK)\s*/i, '');
+  if (!raw) return '';
+  const petaAngka = {
+    '1': 'I', '2': 'II', '3': 'III', '4': 'IV', '5': 'V', '6': 'VI',
+    '7': 'VII', '8': 'VIII', '9': 'IX', '10': 'X', '11': 'XI', '12': 'XII'
+  };
+  const mRomawi = raw.match(/^(XII|XI|IX|VIII|VII|VI|IV|III|II|X|V|I)(?:\b|[\s\-_/.]|$)/);
+  if (mRomawi) return mRomawi[1];
+  const mAngka = raw.match(/^(1[0-2]|[1-9])(?:\b|[\s\-_/.A-Z]|$)/);
+  if (mAngka && petaAngka[mAngka[1]]) return petaAngka[mAngka[1]];
+  const mRomawiDalam = raw.match(/\b(XII|XI|IX|VIII|VII|VI|IV|III|II|X|V|I)\b/);
+  if (mRomawiDalam) return mRomawiDalam[1];
+  const mAngkaDalam = raw.match(/\b(1[0-2]|[1-9])\b/);
+  if (mAngkaDalam && petaAngka[mAngkaDalam[1]]) return petaAngka[mAngkaDalam[1]];
+  return '';
+}
+
+function normalisasiTingkat(tingkatRaw, kodeKelas = '', namaKelas = '') {
+  return deteksiTingkat(tingkatRaw) || deteksiTingkat(kodeKelas) || deteksiTingkat(namaKelas) || 'I';
 }
 
 function normalisasiKunciKompleks(val) {
@@ -356,9 +373,7 @@ function bolehAksesMapel(mapelId) {
 }
 
 function daftarTipeSoalDiizinkanForm() {
-  return penggunaAktif?.role === 'Admin'
-    ? TIPE_SOAL_LIST
-    : ['Pilihan Ganda', 'Pilihan Ganda Kompleks', 'Isian Singkat', 'Uraian'];
+  return TIPE_SOAL_LIST;
 }
 // ===== AKHIR BLOK: DNC_CORE =====
 
@@ -462,12 +477,12 @@ async function inisialisasiDataPreview() {
 
   memoriPreview = {
     [COLLECTIONS.kelas]: [
-      { id: 'kls_1', dibuat: sekarang.toISOString(), kodeKelas: 'X-IPA-1', namaKelas: 'Sepuluh IPA 1', tingkat: 'X', tahunAjaran: '2026/2027', waliKelas: 'Dra. Sri Wahyuni' },
-      { id: 'kls_2', dibuat: sekarang.toISOString(), kodeKelas: 'X-IPS-1', namaKelas: 'Sepuluh IPS 1', tingkat: 'X', tahunAjaran: '2026/2027', waliKelas: 'Bambang Sutrisno, S.Pd.' }
+      { id: 'kls_1', dibuat: sekarang.toISOString(), kodeKelas: 'VI-A', namaKelas: 'Kelas Enam A', tingkat: 'VI', tahunAjaran: '2026/2027', waliKelas: 'Dra. Sri Wahyuni' },
+      { id: 'kls_2', dibuat: sekarang.toISOString(), kodeKelas: 'V-A', namaKelas: 'Kelas Lima A', tingkat: 'V', tahunAjaran: '2026/2027', waliKelas: 'Bambang Sutrisno, S.Pd.' }
     ],
     [COLLECTIONS.mataPelajaran]: [
-      { id: 'mpl_1', dibuat: sekarang.toISOString(), kodeMapel: 'MTK-10', namaMapel: 'Matematika', kkm: 75 },
-      { id: 'mpl_2', dibuat: sekarang.toISOString(), kodeMapel: 'BIN-10', namaMapel: 'Bahasa Indonesia', kkm: 78 }
+      { id: 'mpl_1', dibuat: sekarang.toISOString(), kodeMapel: 'MTK-06', namaMapel: 'Matematika', kkm: 75 },
+      { id: 'mpl_2', dibuat: sekarang.toISOString(), kodeMapel: 'BIN-06', namaMapel: 'Bahasa Indonesia', kkm: 78 }
     ],
     [COLLECTIONS.pengguna]: [
       { id: 'usr_admin', dibuat: sekarang.toISOString(), email: 'admin@asas-sekolah.id', namaLengkap: 'Hendra Wijaya, S.Kom.', nomorInduk: '198801012015031001', role: 'Admin', kelasId: '', mapelIds: [], statusAktif: true },
@@ -476,15 +491,15 @@ async function inisialisasiDataPreview() {
     ],
     [COLLECTIONS.bankSoal]: [
       {
-        id: 'soal_1', dibuat: sekarang.toISOString(), kodeSoal: 'MTK10-001', mapelId: 'mpl_1', tingkat: 'X',
-        tipeSoal: 'Pilihan Ganda', pertanyaan: 'Jika f(x) = 3x - 5, maka nilai dari f(4) adalah ...', urlGambar: '',
+        id: 'soal_1', dibuat: sekarang.toISOString(), kodeSoal: 'MTK06-001', mapelId: 'mpl_1', tingkat: 'VI',
+        tipeSoal: 'Pilihan Ganda', pertanyaan: 'Hasil dari 24 x 5 adalah ...', urlGambar: '',
         opsiJawaban: [
-          { kode: 'A', teks: '5' }, { kode: 'B', teks: '7' }, { kode: 'C', teks: '9' }, { kode: 'D', teks: '12' }
+          { kode: 'A', teks: '100' }, { kode: 'B', teks: '120' }, { kode: 'C', teks: '125' }, { kode: 'D', teks: '140' }
         ],
         kunciJawaban: 'B', bobotNilai: 40, statusAktif: true, dibuatOleh: 'usr_guru'
       },
       {
-        id: 'soal_2', dibuat: sekarang.toISOString(), kodeSoal: 'MTK10-002', mapelId: 'mpl_1', tingkat: 'X',
+        id: 'soal_2', dibuat: sekarang.toISOString(), kodeSoal: 'MTK06-002', mapelId: 'mpl_1', tingkat: 'VI',
         tipeSoal: 'Pilihan Ganda Kompleks', pertanyaan: 'Pilih lebih dari satu bilangan prima berikut ini:', urlGambar: '',
         opsiJawaban: [
           { kode: 'A', teks: '2' }, { kode: 'B', teks: '9' }, { kode: 'C', teks: '11' }, { kode: 'D', teks: '15' }
@@ -494,8 +509,8 @@ async function inisialisasiDataPreview() {
     ],
     [COLLECTIONS.paketAsas]: [
       {
-        id: 'pkt_1', dibuat: sekarang.toISOString(), judulPaket: 'ASAS Ganjil Matematika Kelas X', semester: 'Ganjil',
-        tahunAjaran: '2026/2027', mapelId: 'mpl_1', kelasIds: ['kls_1', 'kls_2'], daftarSoalIds: ['soal_1', 'soal_2'],
+        id: 'pkt_1', dibuat: sekarang.toISOString(), judulPaket: 'ASAS Ganjil Matematika Kelas VI', semester: 'Ganjil',
+        tahunAjaran: '2026/2027', mapelId: 'mpl_1', kelasIds: ['kls_1'], daftarSoalIds: ['soal_1', 'soal_2'],
         waktuMulai: mulai.toISOString(), waktuSelesai: selesai.toISOString(), durasiMenit: 60,
         tokenUjian: 'MTK26A', acakSoal: true, acakOpsi: true, tampilkanNilai: true, statusPaket: 'Aktif',
         ujianDibuka: true, dibuatOleh: 'usr_guru'
@@ -625,7 +640,10 @@ async function muatDataDasar() {
     dbList(COLLECTIONS.kelas),
     dbList(COLLECTIONS.mataPelajaran)
   ]);
-  stateMemori.kelas = kelas.sort((a, b) => teks(a.kodeKelas).localeCompare(teks(b.kodeKelas)));
+  stateMemori.kelas = kelas.sort((a, b) => {
+    const ti = TINGKAT_LIST.indexOf(a.tingkat) - TINGKAT_LIST.indexOf(b.tingkat);
+    return ti !== 0 ? ti : teks(a.kodeKelas).localeCompare(teks(b.kodeKelas));
+  });
   stateMemori.mataPelajaran = mapel.sort((a, b) => teks(a.namaMapel).localeCompare(teks(b.namaMapel)));
 }
 
@@ -1060,7 +1078,7 @@ function renderTabelKelas() {
   renderTabelDnc('tbody-kelas', data, [
     { label: 'Kode Kelas', render: k => `<span class="dnc-mono">${esc(k.kodeKelas)}</span>` },
     { label: 'Nama Kelas', key: 'namaKelas' },
-    { label: 'Tingkat', render: k => `<span class="dnc-badge dnc-badge-biru">${esc(k.tingkat)}</span>` },
+    { label: 'Tingkat', render: k => `<span class="dnc-badge dnc-badge-biru">${esc(labelTingkat(k.tingkat))}</span>` },
     { label: 'Tahun Ajaran', key: 'tahunAjaran' },
     { label: 'Wali Kelas', render: k => esc(k.waliKelas || '-') },
     {
@@ -1099,16 +1117,16 @@ function bukaFormKelas(item = null) {
       <div class="dnc-form-grid">
         <div class="dnc-form-grup">
           <label class="dnc-label" for="f-kodeKelas">Kode Kelas *</label>
-          <input id="f-kodeKelas" class="dnc-input" type="text" placeholder="Contoh: X-IPA-1" value="${esc(item?.kodeKelas || '')}" required>
+          <input id="f-kodeKelas" class="dnc-input" type="text" placeholder="Contoh: I-A, VI-B, atau X-IPA-1" value="${esc(item?.kodeKelas || '')}" required>
         </div>
         <div class="dnc-form-grup">
           <label class="dnc-label" for="f-namaKelas">Nama Kelas *</label>
-          <input id="f-namaKelas" class="dnc-input" type="text" placeholder="Contoh: Sepuluh IPA 1" value="${esc(item?.namaKelas || '')}" required>
+          <input id="f-namaKelas" class="dnc-input" type="text" placeholder="Contoh: Kelas Satu A / Kelas Enam B" value="${esc(item?.namaKelas || '')}" required>
         </div>
         <div class="dnc-form-grup">
-          <label class="dnc-label" for="f-tingkat">Tingkat *</label>
+          <label class="dnc-label" for="f-tingkat">Tingkat (SD / SMP / SMA) *</label>
           <select id="f-tingkat" class="dnc-select" required>
-            ${TINGKAT_LIST.map(t => `<option value="${t}" ${item?.tingkat === t ? 'selected' : ''}>${t}</option>`).join('')}
+            ${TINGKAT_LIST.map(t => `<option value="${t}" ${(item?.tingkat || 'I') === t ? 'selected' : ''}>${esc(labelTingkat(t))}</option>`).join('')}
           </select>
         </div>
         <div class="dnc-form-grup">
@@ -1144,12 +1162,12 @@ function bukaFormKelas(item = null) {
   });
 }
 
-// --- Revisi 1: Impor Data Kelas Multi-Format (PDF, Excel .xlsx/.xls/.csv, Word .docx) ---
+// --- Impor Data Kelas Multi-Format (PDF, Excel .xlsx/.xls/.csv, Word .docx) ---
 function validasiItemKelasImpor(it, kodeSudahAdaSet) {
   const masalah = [];
   if (!it.kodeKelas) masalah.push('Kode kosong');
   if (!it.namaKelas) masalah.push('Nama kelas kosong');
-  if (!TINGKAT_LIST.includes(it.tingkat)) it.tingkat = normalisasiTingkat(it.tingkat || it.kodeKelas || it.namaKelas);
+  if (!TINGKAT_LIST.includes(it.tingkat)) it.tingkat = normalisasiTingkat(it.tingkat, it.kodeKelas, it.namaKelas);
   if (!it.tahunAjaran) it.tahunAjaran = '2026/2027';
   if (it.kodeKelas && kodeSudahAdaSet.has(teks(it.kodeKelas))) masalah.push('Duplikat di database');
   it.valid = masalah.length === 0;
@@ -1191,7 +1209,6 @@ function petakanMatriksKelas(barisMatriks, tahunDefault) {
   const hasil = [];
   for (let r = mulai; r < bersih.length; r++) {
     const row = bersih[r];
-    // Abaikan nomor urut di kolom pertama jika header bukan kode
     let offset = 0;
     if (idxHeader < 0 && /^\d+\.?$/.test(row[0]) && row.length >= 3) offset = 1;
     let kodeKelas = (row[iKode + offset] || '').trim();
@@ -1209,7 +1226,7 @@ function petakanMatriksKelas(barisMatriks, tahunDefault) {
       dipilih: true,
       kodeKelas,
       namaKelas,
-      tingkat: normalisasiTingkat(tingkatRaw || kodeKelas || namaKelas),
+      tingkat: normalisasiTingkat(tingkatRaw, kodeKelas, namaKelas),
       tahunAjaran: /\d{4}\/\d{4}/.test(tahunRaw) ? tahunRaw : (tahunRaw || tahunDefault),
       waliKelas
     });
@@ -1234,7 +1251,9 @@ function parseTeksBarisKelas(daftarBaris, tahunDefault) {
         const bersih = t.replace(/^\d+[\.\)]\s*/, '');
         const parts = bersih.split(/\s+-\s+/);
         if (parts.length >= 2) pecah = parts;
-        else if (/^(VII|VIII|IX|X|XI|XII|\d{1,2})[\s\-]/i.test(bersih)) pecah = [bersih.split(/\s+/)[0], bersih];
+        else if (/^(XII|XI|IX|VIII|VII|VI|IV|III|II|X|V|I|1[0-2]|[1-9])(?:[\s\-]|[A-Za-z])/i.test(bersih)) {
+          pecah = [bersih.split(/\s+/)[0], bersih];
+        }
       }
     }
     if (pecah.length) matriks.push(pecah);
@@ -1278,7 +1297,7 @@ function bukaModalImporKelas() {
                 <td data-label="Nama"><input class="dnc-input" style="height:30px" data-ik-nama="${idx}" value="${esc(it.namaKelas)}"></td>
                 <td data-label="Tingkat">
                   <select class="dnc-select" style="height:30px" data-ik-tingkat="${idx}">
-                    ${TINGKAT_LIST.map(t => `<option value="${t}" ${it.tingkat === t ? 'selected' : ''}>${t}</option>`).join('')}
+                    ${TINGKAT_LIST.map(t => `<option value="${t}" ${it.tingkat === t ? 'selected' : ''}>${esc(labelTingkat(t))}</option>`).join('')}
                   </select>
                 </td>
                 <td data-label="Tahun"><input class="dnc-input" style="height:30px" data-ik-tahun="${idx}" value="${esc(it.tahunAjaran)}"></td>
@@ -1331,7 +1350,7 @@ function bukaModalImporKelas() {
           <label class="dnc-label" for="ik-file">Pilih File Daftar Kelas (.pdf, .xlsx, .xls, .csv, .docx) *</label>
           <div class="dnc-file-drop">
             <input id="ik-file" class="dnc-input" type="file" accept=".pdf,.xlsx,.xls,.csv,.docx" style="padding-top:7px">
-            <div id="info-impor-kelas" class="dnc-form-bantuan dnc-mt-12">Mendukung format tabel Excel/Word/PDF maupun baris teks berpemisah (Kode | Nama Kelas | Tingkat | Tahun Ajaran | Wali Kelas).</div>
+            <div id="info-impor-kelas" class="dnc-form-bantuan dnc-mt-12">Mendukung tingkat I–VI (SD), VII–IX (SMP), dan X–XII (SMA/SMK) dalam format tabel Excel/Word/PDF maupun teks berpemisah.</div>
           </div>
         </div>
       </div>
@@ -1339,18 +1358,18 @@ function bukaModalImporKelas() {
     onMount: () => {
       document.getElementById('btn-templat-kelas-csv').addEventListener('click', () => {
         const isi = 'KodeKelas,NamaKelas,Tingkat,TahunAjaran,WaliKelas\n' +
-          'X-IPA-1,Sepuluh IPA 1,X,2026/2027,Dra. Sri Wahyuni\n' +
-          'X-IPA-2,Sepuluh IPA 2,X,2026/2027,Ahmad Fauzi S.Pd.\n' +
-          'XI-IPS-1,Sebelas IPS 1,XI,2026/2027,Rina Kusuma S.Pd.\n';
+          'I-A,Kelas Satu A,I,2026/2027,Siti Aminah S.Pd.SD\n' +
+          'IV-A,Kelas Empat A,IV,2026/2027,Budi Santoso S.Pd.\n' +
+          'VI-A,Kelas Enam A,VI,2026/2027,Dra. Sri Wahyuni\n';
         unduhBlobFile(new Blob([isi], { type: 'text/csv;charset=utf-8' }), 'Templat_Kelas_ASAS_DNC.csv');
       });
       document.getElementById('btn-templat-kelas-word').addEventListener('click', () => {
         unduhDokumenWordSederhana([
           'DAFTAR KELAS ASAS - DIGITALNETCARE',
           'KodeKelas | NamaKelas | Tingkat | TahunAjaran | WaliKelas',
-          'X-IPA-1 | Sepuluh IPA 1 | X | 2026/2027 | Dra. Sri Wahyuni',
-          'X-IPA-2 | Sepuluh IPA 2 | X | 2026/2027 | Ahmad Fauzi, S.Pd.',
-          'XI-IPS-1 | Sebelas IPS 1 | XI | 2026/2027 | Rina Kusuma, S.Pd.'
+          'I-A | Kelas Satu A | I | 2026/2027 | Siti Aminah, S.Pd.SD',
+          'IV-A | Kelas Empat A | IV | 2026/2027 | Budi Santoso, S.Pd.',
+          'VI-A | Kelas Enam A | VI | 2026/2027 | Dra. Sri Wahyuni'
         ], 'Templat_Kelas_ASAS_DNC.docx');
       });
       document.getElementById('ik-file').addEventListener('change', async e => {
@@ -1441,7 +1460,7 @@ function bukaFormMapel(item = null) {
       <div class="dnc-form-grid">
         <div class="dnc-form-grup">
           <label class="dnc-label" for="f-kodeMapel">Kode Mata Pelajaran *</label>
-          <input id="f-kodeMapel" class="dnc-input" type="text" placeholder="Contoh: MTK-10" value="${esc(item?.kodeMapel || '')}" required>
+          <input id="f-kodeMapel" class="dnc-input" type="text" placeholder="Contoh: MTK-06" value="${esc(item?.kodeMapel || '')}" required>
         </div>
         <div class="dnc-form-grup">
           <label class="dnc-label" for="f-kkm">KKM (0–100) *</label>
@@ -1606,7 +1625,7 @@ function bukaFormSoal(item = null) {
       <div class="dnc-form-grid">
         <div class="dnc-form-grup">
           <label class="dnc-label" for="f-kodeSoal">Kode Soal *</label>
-          <input id="f-kodeSoal" class="dnc-input" type="text" placeholder="Contoh: MTK10-003" value="${esc(item?.kodeSoal || '')}" required>
+          <input id="f-kodeSoal" class="dnc-input" type="text" placeholder="Contoh: MTK06-003" value="${esc(item?.kodeSoal || '')}" required>
         </div>
         <div class="dnc-form-grup">
           <label class="dnc-label" for="f-mapelId">Mata Pelajaran *</label>
@@ -1615,9 +1634,9 @@ function bukaFormSoal(item = null) {
           </select>
         </div>
         <div class="dnc-form-grup">
-          <label class="dnc-label" for="f-tingkatSoal">Tingkat *</label>
+          <label class="dnc-label" for="f-tingkatSoal">Tingkat (SD / SMP / SMA) *</label>
           <select id="f-tingkatSoal" class="dnc-select" required>
-            ${TINGKAT_LIST.map(t => `<option value="${t}" ${(item?.tingkat || 'X') === t ? 'selected' : ''}>${t}</option>`).join('')}
+            ${TINGKAT_LIST.map(t => `<option value="${t}" ${(item?.tingkat || 'I') === t ? 'selected' : ''}>${esc(labelTingkat(t))}</option>`).join('')}
           </select>
         </div>
         <div class="dnc-form-grup">
@@ -1757,7 +1776,7 @@ function bukaPratinjauSoal(id) {
     htmlKonten: `
       <div class="dnc-pratinjau-soal">
         <div class="dnc-flex-between dnc-mb-12">
-          <span class="dnc-badge dnc-badge-biru">${esc(namaMapelById(s.mapelId))} • Tingkat ${esc(s.tingkat)}</span>
+          <span class="dnc-badge dnc-badge-biru">${esc(namaMapelById(s.mapelId))} • ${esc(labelTingkat(s.tingkat))}</span>
           <div class="dnc-flex-gap">${badgeTipeSoal(s.tipeSoal)}<span class="dnc-badge dnc-badge-abu">Bobot ${esc(s.bobotNilai)}</span></div>
         </div>
         ${s.urlGambar ? `<img src="${esc(s.urlGambar)}" alt="Gambar soal" class="dnc-soal-gambar">` : ''}
@@ -1911,11 +1930,11 @@ function unduhTemplatWordDocx() {
     'TEMPLAT SOAL ASAS LENGKAP (KUNCI & PEDOMAN PENSKORAN) - DIGITALNETCARE',
     '',
     'A. PILIHAN GANDA (Skor @10)',
-    '1. Jika f(x) = 3x - 5, maka nilai dari f(4) adalah ...',
-    'A. 5',
-    'B. 7',
-    'C. 9',
-    'D. 12',
+    '1. Hasil dari 24 x 5 adalah ...',
+    'A. 100',
+    'B. 120',
+    'C. 125',
+    'D. 140',
     '',
     'B. PILIHAN GANDA KOMPLEKS (Skor @20)',
     '2. Pilih lebih dari satu bilangan prima di bawah ini:',
@@ -1925,16 +1944,16 @@ function unduhTemplatWordDocx() {
     'D. 15',
     '',
     'C. ISIAN SINGKAT (Skor @20)',
-    '3. Ibukota Negara Kesatuan Republik Indonesia yang berada di Pulau Jawa adalah ....',
+    '3. Ibukota Provinsi Daerah Istimewa Yogyakarta adalah ....',
     '',
     'D. URAIAN (Skor @50)',
-    '4. Jelaskan langkah menyelesaikan sistem persamaan linear dua variabel dengan metode eliminasi!',
+    '4. Jelaskan mengapa tumbuhan hijau memerlukan cahaya matahari dalam proses fotosintesis!',
     '',
     'KUNCI JAWABAN DAN PEDOMAN PENSKORAN',
     '1. B (Skor: 10)',
     '2. A, C (Skor: 20)',
-    '3. Jakarta (Skor: 20)',
-    '4. Samakan koefisien salah satu variabel, lalu kurangkan atau jumlahkan kedua persamaan untuk mendapatkan nilai variabel lainnya. (Skor: 50)'
+    '3. Yogyakarta (Skor: 20)',
+    '4. Cahaya matahari digunakan sebagai sumber energi untuk mengubah air dan karbon dioksida menjadi glukosa dan oksigen. (Skor: 50)'
   ], 'Templat_Soal_Lengkap_ASAS_DigitalNetCare.docx');
 }
 
@@ -1984,7 +2003,7 @@ function kompresDataGambar(dataUrl, maksLebar = 640, kualitas = 0.72) {
   });
 }
 
-// --- REVISI 2, 3, 4, 5, 8, 9: Mesin Parser Pintar Bank Soal (Word, PDF, Excel) ---
+// --- Mesin Parser Pintar Bank Soal (Word, PDF, Excel) ---
 function deteksiTipeDariTeks(teksRaw, opsiCount, kunciRaw, pertanyaanRaw) {
   const t = teks(teksRaw || '');
   const p = teks(pertanyaanRaw || '');
@@ -2002,7 +2021,6 @@ function deteksiTipeDariTeks(teksRaw, opsiCount, kunciRaw, pertanyaanRaw) {
     return 'Pilihan Ganda';
   }
 
-  // Klasifikasi otomatis cerdas berdasarkan struktur opsi, kunci, & teks pertanyaan
   if (opsiCount >= 2) {
     const setKunci = parseKunciKompleksSet(kunciRaw);
     const ciriKompleks = /(pilih(?:lah)?\s+(?:lebih\s+dari\s+satu|dua|2|tiga|3|beberapa)|jawaban\s+(?:benar\s+)?lebih\s+dari\s+satu|berilah\s+tanda\s+centang|pilihan\s+ganda\s+kompleks)/i.test(p);
@@ -2068,7 +2086,6 @@ function validasiItemSoalPintar(item) {
 }
 
 function pecahOpsiSejajar(teksBaris) {
-  // Mengurai opsi yang ditulis dalam satu baris, misal: "A. 5    B. 7    C. 9    D. 12"
   const regex = /(?:^|\s{2,}|\t)([A-Ea-e])[\.\)]\s+/g;
   const posisi = [];
   let m;
@@ -2171,7 +2188,6 @@ function ekstraksiSoalDariTabel(rows, kodeMapelPrefix, cap) {
   const idxBobot = header.findIndex(h => h.includes('bobot') || h.includes('skor') || h.includes('nilai') || h.includes('poin'));
   const idxTipe = header.findIndex(h => h.includes('tipe') || h.includes('jenis') || h.includes('bentuk'));
 
-  // Kasus A: Tabel khusus Bank Soal lengkap
   if (idxTanya >= 0) {
     const idxKode = header.findIndex(h => h.includes('kode'));
     const soal = [];
@@ -2182,7 +2198,7 @@ function ekstraksiSoalDariTabel(rows, kodeMapelPrefix, cap) {
       if (!pertanyaan) continue;
       const opsiJawaban = [];
       ['a', 'b', 'c', 'd', 'e'].forEach(hrf => {
-        const io = header.findIndex(h => h === hrf || h === `opsi ${hrf}` || h === `pilihan ${hrf}` || h === `opsi_${hrf}` || h === `opsia`.replace('a', hrf));
+        const io = header.findIndex(h => h === hrf || h === `opsi ${hrf}` || h === `pilihan ${hrf}` || h === `opsi_${hrf}` || h === `opsi${hrf}`);
         const v = ambil(io);
         if (v) opsiJawaban.push({ kode: hrf.toUpperCase(), teks: v });
       });
@@ -2204,7 +2220,6 @@ function ekstraksiSoalDariTabel(rows, kodeMapelPrefix, cap) {
     return { soal, kunciMap: {}, bobotBagian: {} };
   }
 
-  // Kasus B: Tabel Kunci Jawaban & Pedoman Penskoran terpisah di bagian bawah file
   const kunciMap = {};
   const bobotBagian = {};
   if (idxKunci >= 0 || idxBobot >= 0) {
@@ -2216,7 +2231,6 @@ function ekstraksiSoalDariTabel(rows, kodeMapelPrefix, cap) {
       const bobotVal = idxBobot >= 0 ? Number(ambil(idxBobot).replace(/[^0-9\.,]/g, '').replace(',', '.')) : null;
       const tipeRow = idxTipe >= 0 ? deteksiTipeDariTeks(ambil(idxTipe), 0, '', '') : null;
 
-      // Rentang nomor misal "1-20" pada pedoman penskoran
       const mRentang = noStr.match(/^(\d+)\s*[-–]\s*(\d+)$/);
       if (mRentang && bobotVal > 0) {
         for (let n = Number(mRentang[1]); n <= Number(mRentang[2]); n++) {
@@ -2249,7 +2263,6 @@ function ekstrakSoalPintarDariSumber({ baris, tabel }, kodeMapelPrefix) {
   const kunciPerBagian = {};
   const bobotDefaultTipe = {};
 
-  // 1. Evaluasi seluruh tabel terlebih dahulu (bisa berisi tabel soal penuh atau tabel kunci/penskoran)
   (tabel || []).forEach(rows => {
     const res = ekstraksiSoalDariTabel(rows, kodeMapelPrefix, cap);
     if (res.soal.length) daftarSoal.push(...res.soal);
@@ -2259,12 +2272,10 @@ function ekstrakSoalPintarDariSumber({ baris, tabel }, kodeMapelPrefix) {
     Object.assign(bobotDefaultTipe, res.bobotBagian);
   });
 
-  // Jika tabel sudah menyediakan seluruh soal lengkap, terapkan kunci/bobot global jika ada lalu selesai
   if (daftarSoal.length && (!baris || baris.length < 4)) {
     return daftarSoal.map(s => terapkanKunciDanBobot(s, kunciGlobal, kunciPerBagian, bobotDefaultTipe));
   }
 
-  // 2. Urai baris paragraf soal + bagian terpisah Kunci Jawaban & Pedoman Penskoran
   let modeKunci = false;
   let bagianAktif = '';
   let bagianKunciAktif = '';
@@ -2288,7 +2299,6 @@ function ekstrakSoalPintarDariSumber({ baris, tabel }, kodeMapelPrefix) {
     }
     if (!txt) return;
 
-    // Deteksi masuk ke bagian Kunci Jawaban / Pedoman Penskoran
     if (/^(?:(?:[IVX]+|[A-E])[\.\)]\s*)?(?:kunci\s+jawaban|pedoman\s+penskoran|rubrik\s+penilaian|pembahasan\s+dan\s+kunci)/i.test(txt)) {
       dorongAktif();
       modeKunci = true;
@@ -2299,7 +2309,6 @@ function ekstrakSoalPintarDariSumber({ baris, tabel }, kodeMapelPrefix) {
       return;
     }
 
-    // Jika sedang di bagian Kunci Jawaban & Pedoman Penskoran
     if (modeKunci) {
       const headBagian = deteksiHeadingBagianSoal(txt);
       if (headBagian) {
@@ -2309,7 +2318,6 @@ function ekstrakSoalPintarDariSumber({ baris, tabel }, kodeMapelPrefix) {
         return;
       }
 
-      // Cek aturan bobot umum per tipe soal (mis: "Pilihan Ganda: skor 2", "PG Kompleks = 4")
       const tipeAturan = deteksiHeadingBagianSoal(txt.replace(/^[-•*]\s*/, ''));
       const skorAturan = ekstrakAngkaSkorTeks(txt);
       if (tipeAturan && skorAturan > 0 && !/^\d+[\.\)]/.test(txt)) {
@@ -2317,7 +2325,6 @@ function ekstrakSoalPintarDariSumber({ baris, tabel }, kodeMapelPrefix) {
         return;
       }
 
-      // Cek rentang nomor penskoran (mis: "No. 1-10 skor 2")
       const mRentang = txt.match(/(?:no\.?\s*)?(\d+)\s*[-–]\s*(\d+)/i);
       if (mRentang && skorAturan > 0) {
         for (let n = Number(mRentang[1]); n <= Number(mRentang[2]); n++) {
@@ -2326,7 +2333,6 @@ function ekstrakSoalPintarDariSumber({ baris, tabel }, kodeMapelPrefix) {
         return;
       }
 
-      // Cek beberapa kunci dalam satu baris (mis: "1. A   2. B   3. A, C   4. D")
       const multiMatch = [...txt.matchAll(/(?:^|\s)(\d+)[\.\)]\s*([A-Ea-e](?:\s*(?:,|dan|&|;)\s*[A-Ea-e])*)(?=\s+\d+[\.\)]|\s*$)/g)];
       if (multiMatch.length >= 2) {
         multiMatch.forEach(mm => {
@@ -2339,7 +2345,6 @@ function ekstrakSoalPintarDariSumber({ baris, tabel }, kodeMapelPrefix) {
         return;
       }
 
-      // Cek satu baris kunci + skor opsional (mis: "1. B (Skor: 10)" atau "4. Penjelasan ... (Bobot 25)")
       const mSatu = txt.match(/^(?:no\.?\s*)?(\d+)[\.\):\-]\s*(.+)$/i);
       if (mSatu) {
         const noKey = String(Number(mSatu[1]));
@@ -2357,7 +2362,6 @@ function ekstrakSoalPintarDariSumber({ baris, tabel }, kodeMapelPrefix) {
       return;
     }
 
-    // Mode Pembacaan Butir Soal
     const headSoal = deteksiHeadingBagianSoal(txt);
     if (headSoal) {
       dorongAktif();
@@ -2367,7 +2371,6 @@ function ekstrakSoalPintarDariSumber({ baris, tabel }, kodeMapelPrefix) {
       return;
     }
 
-    // Abaikan baris judul dokumen pembuka
     if (!aktif && /^(?:templat|petunjuk|soal\s+asas|asesmen\s+sumatif|mata\s+pelajaran|kelas\s*:|waktu\s*:|semester\s*:)/i.test(txt)) {
       return;
     }
@@ -2413,7 +2416,6 @@ function ekstrakSoalPintarDariSumber({ baris, tabel }, kodeMapelPrefix) {
       } else if (mOpsiTunggal) {
         const kode = mOpsiTunggal[1].toUpperCase();
         let isiOpsi = mOpsiTunggal[2].trim();
-        // Deteksi penanda kunci langsung pada opsi, misal "(Benar)" atau tanda "*"
         const tandaBenar = /\(\s*benar\s*\)|\*\s*$/i.test(isiOpsi);
         if (tandaBenar) {
           isiOpsi = isiOpsi.replace(/\s*\(\s*benar\s*\)|\s*\*\s*$/i, '').trim();
@@ -2466,7 +2468,7 @@ function terapkanKunciDanBobot(s, kunciGlobal, kunciPerBagian, bobotDefaultTipe)
   return validasiItemSoalPintar(s);
 }
 
-// --- Modal Impor Pintar Bank Soal (Word .docx, PDF .pdf, Excel .xlsx/.xls/.csv) ---
+// --- Modal Impor Pintar Bank Soal (Word .docx, PDF .pdf, Excel .xlsx/.xls) ---
 function bukaModalImporWord() {
   const mapelList = daftarMapelDiizinkan();
   if (!mapelList.length) {
@@ -2579,7 +2581,7 @@ function bukaModalImporWord() {
         </div>
         <div class="dnc-form-grup">
           <label class="dnc-label" for="w-tingkat">Tingkat Kelas *</label>
-          <select id="w-tingkat" class="dnc-select">${TINGKAT_LIST.map(t => `<option value="${t}" ${t === 'X' ? 'selected' : ''}>${t}</option>`).join('')}</select>
+          <select id="w-tingkat" class="dnc-select">${TINGKAT_LIST.map(t => `<option value="${t}" ${t === 'VI' ? 'selected' : ''}>${esc(labelTingkat(t))}</option>`).join('')}</select>
         </div>
         <div class="dnc-form-grup dnc-form-full">
           <div class="dnc-flex-between dnc-mb-12">
@@ -2704,7 +2706,7 @@ function bukaModalImporCsvSoal() {
         </div>
         <div class="dnc-form-grup">
           <label class="dnc-label" for="csv-tingkat">Tingkat Kelas *</label>
-          <select id="csv-tingkat" class="dnc-select">${TINGKAT_LIST.map(t => `<option value="${t}" ${t === 'X' ? 'selected' : ''}>${t}</option>`).join('')}</select>
+          <select id="csv-tingkat" class="dnc-select">${TINGKAT_LIST.map(t => `<option value="${t}" ${t === 'VI' ? 'selected' : ''}>${esc(labelTingkat(t))}</option>`).join('')}</select>
         </div>
         <div class="dnc-form-grup dnc-form-full">
           <div class="dnc-flex-between">
@@ -2836,7 +2838,6 @@ function renderTabelPaket() {
   ], 'Belum ada jadwal dan paket ASAS');
 }
 
-// --- REVISI 6: Kontrol Guru / Admin untuk Mulai & Berhenti Ujian Secara Live ---
 async function mulaiSesiUjianOlehGuru(paketId) {
   const p = cariById('paketAsas', paketId);
   if (!p) return;
@@ -2914,7 +2915,7 @@ function bukaFormPaket(item = null) {
         <div style="flex:1">
           <div class="dnc-flex-between">
             <strong>${esc(s.kodeSoal)}</strong>
-            <span class="dnc-form-bantuan">${esc(s.tipeSoal)} • Tingkat ${esc(s.tingkat)} • Bobot ${esc(s.bobotNilai)}</span>
+            <span class="dnc-form-bantuan">${esc(s.tipeSoal)} • ${esc(labelTingkat(s.tingkat))} • Bobot ${esc(s.bobotNilai)}</span>
           </div>
           <div class="dnc-form-bantuan">${esc(s.pertanyaan.slice(0, 95))}${s.pertanyaan.length > 95 ? '...' : ''}</div>
         </div>
@@ -2942,7 +2943,7 @@ function bukaFormPaket(item = null) {
       <div class="dnc-form-grid">
         <div class="dnc-form-grup dnc-form-full">
           <label class="dnc-label" for="f-judulPaket">Judul Paket *</label>
-          <input id="f-judulPaket" class="dnc-input" type="text" placeholder="Contoh: ASAS Ganjil Matematika Kelas X" value="${esc(item?.judulPaket || '')}" required>
+          <input id="f-judulPaket" class="dnc-input" type="text" placeholder="Contoh: ASAS Ganjil Matematika Kelas VI" value="${esc(item?.judulPaket || '')}" required>
         </div>
         <div class="dnc-form-grup">
           <label class="dnc-label" for="f-semester">Semester *</label>
@@ -2992,7 +2993,7 @@ function bukaFormPaket(item = null) {
             ${stateMemori.kelas.map(k => `
               <label class="dnc-checklist-item">
                 <input type="checkbox" name="f-kelas-id" value="${esc(k.id)}" ${kelasTerpilih.has(k.id) ? 'checked' : ''}>
-                <span><strong>${esc(k.kodeKelas)}</strong> — ${esc(k.namaKelas)} (Tingkat ${esc(k.tingkat)})</span>
+                <span><strong>${esc(k.kodeKelas)}</strong> — ${esc(k.namaKelas)} (${esc(labelTingkat(k.tingkat))})</span>
               </label>`).join('')}
           </div>
         </div>
@@ -3022,7 +3023,6 @@ function bukaFormPaket(item = null) {
     onMount: () => {
       const selMapel = document.getElementById('f-mapelPaket');
       const selFilterTipe = document.getElementById('f-filter-tipe-paket');
-      // Jika paket lama mengandung Isian/Uraian, buka tampilan Semua Jenis Soal otomatis
       const adaNonOpsi = (item?.daftarSoalIds || []).some(sid => {
         const s = cariById('bankSoal', sid);
         return s && !adalahTipeBeropsi(s.tipeSoal);
@@ -3305,7 +3305,6 @@ function bukaModalTokenUjian(paketId) {
       </div>`,
     onSubmit: async () => {
       const tokenInput = document.getElementById('f-input-token').value.trim().toUpperCase();
-      // Cek status paket terbaru langsung dari Firestore sebelum mengizinkan siswa masuk
       const paketTerbaru = await dbGetById(COLLECTIONS.paketAsas, paket.id) || paket;
       const sekarang = Date.now();
       const tMulai = keDate(paketTerbaru.waktuMulai)?.getTime() || 0;
@@ -3325,7 +3324,6 @@ function bukaModalTokenUjian(paketId) {
         throw new Error('Anda sudah menyelesaikan paket ASAS ini.');
       }
       if (!hasil) {
-        // REVISI 7: Acak urutan soal & urutan opsi unik per siswa tanpa mengubah kunci jawaban asli
         const { urutanSoalIds, urutanOpsiMap } = buatPetaAcakSiswa(paketTerbaru);
         const jawabanAwal = urutanSoalIds.map(sid => ({ soalId: sid, jawaban: '', ragu: false, skor: 0 }));
         hasil = await dbCreate(COLLECTIONS.hasilUjian, {
@@ -3392,7 +3390,6 @@ async function mulaiLembarUjian(paket, hasil) {
       ? petaOpsiTersimpan[s.id]
       : (paket.acakOpsi ? acakArray(opsiAsli.map(o => o.kode)) : opsiAsli.map(o => o.kode));
 
-    // Tampilkan huruf urut A-E di layar siswa, tetapi simpan kodeAsli agar kunci jawaban tidak berubah
     const opsiTampil = urutanKode
       .map(kodeAsli => opsiAsli.find(o => o.kode === kodeAsli))
       .filter(Boolean)
@@ -3683,7 +3680,6 @@ async function selesaikanUjianSiswa(otomatis = false, alasan = 'manual') {
     return { soalId: s.id, jawaban: j.jawaban || '', ragu: Boolean(j.ragu), skor: skorButir };
   });
 
-  // REVISI 5: Terapkan perhitungan skor langsung dari bobot penskoran file soal
   const skorAkhir = totalBobot > 0 ? bulatDua((skorOtomatis / totalBobot) * 100) : 0;
   const mapelObj = cariById('mataPelajaran', paket.mapelId);
   const kkm = Number(mapelObj?.kkm ?? 75);
