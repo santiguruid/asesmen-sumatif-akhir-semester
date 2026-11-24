@@ -892,6 +892,236 @@ async function prosesLoginDnc(identitas, password) {
   }
 }
 
+const BATAS_PELANGGARAN_SISWA = 3;
+let lockdownSiswaAktif = false;
+let lockdownTombolTerikat = false;
+let pernahMasukFullscreen = false;
+let jedaDeteksiLockdownSampai = 0;
+
+function cekSedangFullscreenDnc() {
+  return Boolean(document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement);
+}
+
+function dukungFullscreenDnc() {
+  const el = document.documentElement;
+  return Boolean(el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen);
+}
+
+function perbaruiBadgeLockdownM5() {
+  const badge = document.getElementById('m5-status-lockdown');
+  if (!badge) return;
+  const jml = Number(sesiUjianAktif?.jumlahPelanggaran || 0);
+  badge.textContent = `Layar Terkunci (${jml}/${BATAS_PELANGGARAN_SISWA})`;
+  if (jml >= BATAS_PELANGGARAN_SISWA) badge.className = 'dnc-badge dnc-badge-merah';
+  else if (jml > 0) badge.className = 'dnc-badge dnc-badge-amber';
+  else badge.className = 'dnc-badge dnc-badge-biru';
+}
+
+function tampilkanOverlayLockdownSiswa({ judul, pesan, bahaya = false, infoCounter = '' }) {
+  const overlay = document.getElementById('dnc-lockdown-overlay');
+  if (!overlay) return;
+  const ikon = document.getElementById('dnc-lockdown-ikon');
+  const elJudul = document.getElementById('dnc-lockdown-judul');
+  const elPesan = document.getElementById('dnc-lockdown-pesan');
+  const elCounter = document.getElementById('dnc-lockdown-counter');
+  const btnAktif = document.getElementById('btn-aktif-lockdown');
+
+  ikon.classList.toggle('bahaya', Boolean(bahaya));
+  elJudul.textContent = judul || 'Mode Kunci Layar Siswa';
+  elPesan.textContent = pesan || 'Siswa wajib tetap berada pada layar penuh aplikasi ASAS dan dilarang membuka tab atau situs lain.';
+  if (infoCounter) {
+    elCounter.textContent = infoCounter;
+    elCounter.classList.remove('dnc-disembunyikan');
+  } else {
+    elCounter.classList.add('dnc-disembunyikan');
+  }
+  btnAktif.textContent = dukungFullscreenDnc() ? 'Aktifkan Layar Penuh & Lanjutkan' : 'Kembali ke Layar Aplikasi';
+  overlay.classList.remove('dnc-disembunyikan');
+}
+
+function sembunyikanOverlayLockdownSiswa() {
+  document.getElementById('dnc-lockdown-overlay')?.classList.add('dnc-disembunyikan');
+}
+
+async function mintaFullscreenSiswa() {
+  jedaDeteksiLockdownSampai = Date.now() + 1500;
+  const el = document.documentElement;
+  try {
+    if (el.requestFullscreen) await el.requestFullscreen();
+    else if (el.webkitRequestFullscreen) await el.webkitRequestFullscreen();
+    else if (el.msRequestFullscreen) await el.msRequestFullscreen();
+    pernahMasukFullscreen = true;
+    sembunyikanOverlayLockdownSiswa();
+    return true;
+  } catch (_) {
+    if (!dukungFullscreenDnc()) {
+      sembunyikanOverlayLockdownSiswa();
+      return true;
+    }
+    tampilkanToast('Izinkan Mode Layar Penuh (Fullscreen) pada browser untuk melanjutkan.', 'error');
+    return false;
+  }
+}
+
+async function catatPelanggaranLockdownSiswa(alasan) {
+  if (!lockdownSiswaAktif || penggunaAktif?.role !== 'Siswa') return;
+  if (Date.now() < jedaDeteksiLockdownSampai) return;
+  jedaDeteksiLockdownSampai = Date.now() + 1800;
+
+  const jam = new Date().toLocaleTimeString('id-ID', { hour12: false });
+  if (sesiUjianAktif && !sedangSubmitUjian) {
+    sesiUjianAktif.jumlahPelanggaran = Number(sesiUjianAktif.jumlahPelanggaran || 0) + 1;
+    sesiUjianAktif.logPelanggaran = Array.isArray(sesiUjianAktif.logPelanggaran) ? sesiUjianAktif.logPelanggaran : [];
+    sesiUjianAktif.logPelanggaran.push(`${jam} - ${alasan}`);
+    perbaruiBadgeLockdownM5();
+
+    dbUpdate(COLLECTIONS.hasilUjian, sesiUjianAktif.hasilId, {
+      jumlahPelanggaran: sesiUjianAktif.jumlahPelanggaran,
+      logPelanggaran: sesiUjianAktif.logPelanggaran
+    }).catch(() => {});
+
+    if (sesiUjianAktif.jumlahPelanggaran >= BATAS_PELANGGARAN_SISWA) {
+      tampilkanToast(`Batas pelanggaran keluar layar (${BATAS_PELANGGARAN_SISWA}/${BATAS_PELANGGARAN_SISWA}) tercapai. Ujian dikumpulkan otomatis.`, 'error');
+      sembunyikanOverlayLockdownSiswa();
+      await selesaikanUjianSiswa(true, 'pelanggaran_lockdown');
+      tampilkanOverlayLockdownSiswa({
+        judul: 'Ujian Dikumpulkan Otomatis',
+        pesan: `Anda terdeteksi meninggalkan layar ujian sebanyak ${BATAS_PELANGGARAN_SISWA} kali (${alasan}). Lembar ujian telah dikunci dan dikirim ke Guru.`,
+        bahaya: true,
+        infoCounter: `Pelanggaran Maksimal Tercapai (${BATAS_PELANGGARAN_SISWA}/${BATAS_PELANGGARAN_SISWA})`
+      });
+      return;
+    }
+
+    tampilkanOverlayLockdownSiswa({
+      judul: 'Peringatan: Dilarang Keluar Layar!',
+      pesan: `Terdeteksi: ${alasan}. Selama aplikasi ASAS dibuka, Siswa dilarang membuka tab lain, situs lain, atau keluar dari Layar Penuh.`,
+      bahaya: true,
+      infoCounter: `Pelanggaran Tercatat: ${sesiUjianAktif.jumlahPelanggaran} dari ${BATAS_PELANGGARAN_SISWA} (Mencapai ${BATAS_PELANGGARAN_SISWA}x ujian otomatis dikumpulkan)`
+    });
+    return;
+  }
+
+  tampilkanOverlayLockdownSiswa({
+    judul: 'Akses Layar Dikunci Kembali',
+    pesan: `Terdeteksi: ${alasan}. Akun Siswa wajib tetap berada pada Mode Layar Penuh aplikasi ASAS dan tidak boleh membuka situs atau tab lain.`,
+    bahaya: true
+  });
+}
+
+function handleLockdownContextMenu(e) {
+  if (!lockdownSiswaAktif) return;
+  e.preventDefault();
+}
+
+function handleLockdownClipboard(e) {
+  if (!lockdownSiswaAktif) return;
+  e.preventDefault();
+  tampilkanToast('Fitur salin dan tempel dinonaktifkan khusus untuk Siswa.', 'error');
+}
+
+function handleLockdownKeydown(e) {
+  if (!lockdownSiswaAktif) return;
+  const k = String(e.key || '').toLowerCase();
+  const ctrl = e.ctrlKey || e.metaKey;
+  const terlarang =
+    k === 'f12' || k === 'f11' || k === 'f5' || k === 'printscreen' ||
+    (ctrl && ['t', 'n', 'w', 'l', 'k', 'r', 'p', 'u', 's', 'c', 'v', 'x', 'a', 'tab'].includes(k)) ||
+    (ctrl && e.shiftKey && ['i', 'j', 'c', 'n'].includes(k)) ||
+    (e.altKey && (k === 'tab' || k === 'f4'));
+  if (terlarang) {
+    e.preventDefault();
+    e.stopPropagation();
+    tampilkanToast('Pintasan browser dan pembukaan tab baru dinonaktifkan pada Mode Siswa.', 'error');
+  }
+}
+
+function handleLockdownVisibility() {
+  if (!lockdownSiswaAktif) return;
+  if (document.hidden) {
+    catatPelanggaranLockdownSiswa('Berpindah tab atau membuka aplikasi/situs lain');
+  }
+}
+
+function handleLockdownBlur() {
+  if (!lockdownSiswaAktif) return;
+  catatPelanggaranLockdownSiswa('Fokus layar berpindah keluar dari aplikasi ASAS');
+}
+
+function handleLockdownFullscreenChange() {
+  if (!lockdownSiswaAktif) return;
+  if (cekSedangFullscreenDnc()) {
+    pernahMasukFullscreen = true;
+    sembunyikanOverlayLockdownSiswa();
+  } else if (pernahMasukFullscreen) {
+    catatPelanggaranLockdownSiswa('Keluar dari Mode Layar Penuh (Fullscreen)');
+  }
+}
+
+function aktifkanLockdownSiswa() {
+  if (penggunaAktif?.role !== 'Siswa') return;
+  if (!lockdownTombolTerikat) {
+    lockdownTombolTerikat = true;
+    document.getElementById('btn-aktif-lockdown')?.addEventListener('click', () => {
+      mintaFullscreenSiswa();
+    });
+    document.getElementById('btn-keluar-lockdown')?.addEventListener('click', () => {
+      if (sesiUjianAktif) {
+        tampilkanToast('Selesaikan ujian terlebih dahulu sebelum keluar dari aplikasi.', 'error');
+        return;
+      }
+      keluarAplikasi();
+    });
+  }
+
+  if (!lockdownSiswaAktif) {
+    lockdownSiswaAktif = true;
+    pernahMasukFullscreen = cekSedangFullscreenDnc();
+    document.body.classList.add('dnc-mode-lockdown-siswa');
+    document.addEventListener('contextmenu', handleLockdownContextMenu);
+    document.addEventListener('copy', handleLockdownClipboard);
+    document.addEventListener('cut', handleLockdownClipboard);
+    document.addEventListener('paste', handleLockdownClipboard);
+    document.addEventListener('keydown', handleLockdownKeydown, true);
+    document.addEventListener('visibilitychange', handleLockdownVisibility);
+    window.addEventListener('blur', handleLockdownBlur);
+    document.addEventListener('fullscreenchange', handleLockdownFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleLockdownFullscreenChange);
+  }
+
+  if (!cekSedangFullscreenDnc()) {
+    tampilkanOverlayLockdownSiswa({
+      judul: 'Aktifkan Mode Kunci Layar Siswa',
+      pesan: 'Khusus akun Siswa, aplikasi wajib dijalankan dalam Mode Layar Penuh (Fullscreen). Membuka tab baru, berpindah aplikasi, atau mencari referensi di situs lain akan memicu peringatan dan pengumpulan ujian otomatis.',
+      bahaya: false
+    });
+  }
+}
+
+function nonaktifkanLockdownSiswa() {
+  if (lockdownSiswaAktif) {
+    lockdownSiswaAktif = false;
+    pernahMasukFullscreen = false;
+    document.body.classList.remove('dnc-mode-lockdown-siswa');
+    document.removeEventListener('contextmenu', handleLockdownContextMenu);
+    document.removeEventListener('copy', handleLockdownClipboard);
+    document.removeEventListener('cut', handleLockdownClipboard);
+    document.removeEventListener('paste', handleLockdownClipboard);
+    document.removeEventListener('keydown', handleLockdownKeydown, true);
+    document.removeEventListener('visibilitychange', handleLockdownVisibility);
+    window.removeEventListener('blur', handleLockdownBlur);
+    document.removeEventListener('fullscreenchange', handleLockdownFullscreenChange);
+    document.removeEventListener('webkitfullscreenchange', handleLockdownFullscreenChange);
+  }
+  sembunyikanOverlayLockdownSiswa();
+  if (cekSedangFullscreenDnc()) {
+    try {
+      if (document.exitFullscreen) document.exitFullscreen().catch(() => {});
+      else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+    } catch (_) {}
+  }
+}
+
 async function masukKeAplikasi(userObj) {
   penggunaAktif = userObj;
   resetCacheMenu();
@@ -910,6 +1140,9 @@ async function masukKeAplikasi(userObj) {
   bangunNavigasiRole();
   await muatDataDasar();
 
+  if (userObj.role === 'Siswa') aktifkanLockdownSiswa();
+  else nonaktifkanLockdownSiswa();
+
   const menuAwal = userObj.role === 'Siswa' ? 'DNC-M5' : 'DNC-M1';
   await bukaMenu(menuAwal);
 }
@@ -917,6 +1150,8 @@ async function masukKeAplikasi(userObj) {
 async function keluarAplikasi() {
   if (typeof hentikanTimerUjian === 'function') hentikanTimerUjian();
   if (typeof hentikanListenerPaketSiswa === 'function') hentikanListenerPaketSiswa();
+  nonaktifkanLockdownSiswa();
+  sesiUjianAktif = null;
   penggunaAktif = null;
   resetCacheMenu();
   if (!IS_PREVIEW && fb?.auth?.currentUser) {
