@@ -1582,6 +1582,127 @@ svg.dnc-ikon {
 .dnc-toast.error { border-left-color: var(--danger); }
 .dnc-toast.info { border-left-color: var(--accent); }
 
+/* --- Mode Kunci Layar Siswa (Exam Lockdown) --- */
+body.dnc-mode-lockdown-siswa {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+body.dnc-mode-lockdown-siswa input,
+body.dnc-mode-lockdown-siswa textarea {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.dnc-lockdown-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 250;
+  background: rgba(15, 23, 42, 0.94);
+  backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.dnc-lockdown-kartu {
+  width: 100%;
+  max-width: 480px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 24px;
+  text-align: center;
+  box-shadow: var(--shadow-md);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.dnc-lockdown-ikon {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: #EFF6FF;
+  color: var(--primary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dnc-lockdown-ikon.bahaya {
+  background: #FEF2F2;
+  color: var(--danger);
+}
+
+.dnc-lockdown-ikon svg {
+  width: 26px;
+  height: 26px;
+}
+
+.dnc-lockdown-judul {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.dnc-lockdown-pesan {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.55;
+}
+
+.dnc-lockdown-counter {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  background: #FEF2F2;
+  border: 1px solid #FECACA;
+  color: #991B1B;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.dnc-lockdown-aksi {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+/* --- Editor Opsi Pratinjau Impor Soal --- */
+.dnc-opsi-edit-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.dnc-opsi-edit-baris {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.dnc-opsi-edit-kode {
+  width: 22px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.dnc-opsi-edit-baris .dnc-input {
+  height: 28px;
+  font-size: 12px;
+  padding: 0 7px;
+}
+
 /* --- Cetak Berita Acara & Rekap Nilai --- */
 @media print {
   .dnc-sidebar,
