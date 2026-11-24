@@ -4397,23 +4397,21 @@ async function inisialisasiAplikasiDnc() {
     try {
       const { auth, authMod } = await muatFirebaseSdk();
       authMod.onAuthStateChanged(auth, async fbUser => {
-        if (fbUser && !penggunaAktif) {
-          let profil = await dbGetById(COLLECTIONS.pengguna, fbUser.uid);
-          if (!profil) {
-            profil = {
-              id: fbUser.uid,
-              email: fbUser.email || '',
-              namaLengkap: fbUser.displayName || 'Administrator ASAS',
-              nomorInduk: 'ADMIN-01',
-              role: 'Admin',
-              kelasId: '',
-              mapelIds: [],
-              statusAktif: true
-            };
+        if (fbUser && !penggunaAktif && !sedangProsesLogin) {
+          let profil = null;
+          try {
+            profil = await dbGetById(COLLECTIONS.pengguna, fbUser.uid);
+          } catch (_) {}
+          if (profil && profil.statusAktif === false) {
+            await authMod.signOut(auth);
+            return;
           }
-          if (profil.role === 'Admin' && profil.statusAktif !== false) {
-            await masukKeAplikasi(profil);
+          if (profil && profil.role && normalisasiRoleDnc(profil.role) !== 'Admin') {
+            await authMod.signOut(auth);
+            return;
           }
+          const profilAdmin = await sinkronProfilAdminDnc(fbUser, profil);
+          await masukKeAplikasi(profilAdmin);
         }
       });
     } catch (err) {
