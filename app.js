@@ -4452,7 +4452,14 @@ function renderTabelHasil() {
         return `${esc(p?.judulPaket || '-')}<div class="dnc-form-bantuan">${esc(namaMapelById(h.mapelId))}</div>`;
       }
     },
-    { label: 'Status Ujian', render: h => badgeStatus(h.statusUjian) },
+    {
+      label: 'Status Ujian',
+      render: h => {
+        const jmlPel = Number(h.jumlahPelanggaran || 0);
+        const logTeks = Array.isArray(h.logPelanggaran) && h.logPelanggaran.length ? h.logPelanggaran.join(' | ') : '';
+        return `${badgeStatus(h.statusUjian)}${jmlPel > 0 ? `<div style="margin-top:4px"><span class="dnc-badge dnc-badge-merah" title="${esc(logTeks)}">Keluar Layar: ${esc(jmlPel)}x</span></div>` : ''}`;
+      }
+    },
     { label: 'Skor Otomatis / Manual', render: h => `${esc(h.skorPg ?? 0)} / ${esc(h.skorUraian ?? 0)}` },
     { label: 'Skor Akhir', render: h => `<strong style="font-size:15px">${esc(h.skorAkhir ?? 0)}</strong>` },
     { label: 'Ketuntasan', render: h => badgeStatus(h.statusKetuntasan || 'Menunggu Koreksi') },
