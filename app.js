@@ -3417,6 +3417,10 @@ function bukaModalImporCsvSoal() {
           <select id="csv-tingkat" class="dnc-select">${TINGKAT_LIST.map(t => `<option value="${t}" ${t === 'VI' ? 'selected' : ''}>${esc(labelTingkat(t))}</option>`).join('')}</select>
         </div>
         <div class="dnc-form-grup dnc-form-full">
+          <label class="dnc-label" for="csv-sumberPaket">Nama Paket / Grup Soal * (otomatis dari nama file CSV)</label>
+          <input id="csv-sumberPaket" class="dnc-input" type="text" placeholder="Contoh: Bank_Soal_ASAS_Matematika_Kelas_6_Semester_1">
+        </div>
+        <div class="dnc-form-grup dnc-form-full">
           <div class="dnc-flex-between">
             <label class="dnc-label" for="csv-file-soal">Pilih File CSV (.csv)</label>
             <button type="button" id="btn-unduh-templat-csv" class="dnc-tombol dnc-tombol-sekunder dnc-tombol-kecil">Unduh Templat CSV</button>
@@ -3434,6 +3438,11 @@ function bukaModalImporCsvSoal() {
           'SOAL-04,Uraian,"Jelaskan pengertian gagasan utama dalam paragraf!",,,,,,Ide pokok inti pembahasan paragraf.,50\n';
         unduhBlobFile(new Blob([isi], { type: 'text/csv;charset=utf-8' }), 'Templat_Bank_Soal_ASAS_DNC.csv');
       });
+      document.getElementById('csv-file-soal').addEventListener('change', e => {
+        const file = e.target.files[0];
+        const inpPaket = document.getElementById('csv-sumberPaket');
+        if (file && inpPaket) inpPaket.value = bersihkanNamaPaketSoal(file.name);
+      });
     },
     onSubmit: async () => {
       const file = document.getElementById('csv-file-soal').files[0];
@@ -3441,6 +3450,9 @@ function bukaModalImporCsvSoal() {
       const mapelId = document.getElementById('csv-mapelId').value;
       const tingkat = document.getElementById('csv-tingkat').value;
       const mapelObj = cariById('mataPelajaran', mapelId);
+      const sumberPaket = (document.getElementById('csv-sumberPaket')?.value || '').trim() ||
+        bersihkanNamaPaketSoal(file.name) ||
+        `Paket_CSV_${(mapelObj?.namaMapel || 'Mapel').replace(/\s+/g, '_')}_Tingkat_${tingkat}`;
       const baris = parseCsvBaris(await file.text());
       if (baris.length < 2) throw new Error('File CSV tidak berisi baris soal.');
 
@@ -3459,7 +3471,7 @@ function bukaModalImporCsvSoal() {
           : (tipeSoal === 'Pilihan Ganda Kompleks' ? normalisasiKunciKompleks(kunciRaw) : String(kunciRaw || '').trim());
         if (adalahTipeBeropsi(tipeSoal) && opsiJawaban.length < 2) continue;
         await dbCreate(COLLECTIONS.bankSoal, {
-          kodeSoal, mapelId, tingkat, tipeSoal, pertanyaan, urlGambar: '',
+          kodeSoal, sumberPaket, mapelId, tingkat, tipeSoal, pertanyaan, urlGambar: '',
           opsiJawaban, kunciJawaban, bobotNilai, statusAktif: true, dibuatOleh: penggunaAktif.id
         });
         tersimpan++;
@@ -3468,7 +3480,7 @@ function bukaModalImporCsvSoal() {
       tutupModalFormDnc();
       resetCacheMenu(['DNC-M1', 'DNC-M3', 'DNC-M4']);
       await muatM3BankSoal(true);
-      tampilkanToast(`${tersimpan} butir soal berhasil diimpor dari CSV.`);
+      tampilkanToast(`${tersimpan} butir soal berhasil diimpor dalam paket "${sumberPaket}".`);
     }
   });
 }
