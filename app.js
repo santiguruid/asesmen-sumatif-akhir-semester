@@ -3620,7 +3620,9 @@ function bukaFormPaket(item = null) {
   const kelasTerpilih = new Set(item?.kelasIds || []);
   const soalTerpilih = new Set(item?.daftarSoalIds || []);
 
-  const renderChecklistSoal = (mapelId, modeTipe = 'pg_pgk') => {
+  let sinkronStatusGrupPaket = () => {};
+
+  const renderChecklistSoal = (mapelId, modeTipe = 'semua') => {
     const wadah = document.getElementById('f-paket-soal-list');
     const infoBobot = document.getElementById('f-paket-info-bobot');
     if (!wadah) return;
@@ -3632,36 +3634,111 @@ function bukaFormPaket(item = null) {
     });
 
     if (!soalTersedia.length) {
-      wadah.innerHTML = '<div class="dnc-teks-muted" style="padding:8px">Belum ada butir soal aktif sesuai filter tipe untuk mata pelajaran ini.</div>';
-      infoBobot.textContent = '0 soal dipilih • Total Bobot: 0';
+      wadah.innerHTML = '<div class="dnc-teks-muted" style="padding:8px">Belum ada paket soal aktif sesuai filter tipe untuk mata pelajaran ini.</div>';
+      infoBobot.textContent = '0 paket (0 soal) • Bobot: 0';
+      sinkronStatusGrupPaket = () => {};
       return;
     }
 
-    wadah.innerHTML = soalTersedia.map(s => `
-      <label class="dnc-checklist-item">
-        <input type="checkbox" name="f-soal-id" value="${esc(s.id)}" data-bobot="${Number(s.bobotNilai || 0)}" ${soalTerpilih.has(s.id) ? 'checked' : ''}>
-        <div style="flex:1">
-          <div class="dnc-flex-between">
-            <strong>${esc(s.kodeSoal)}</strong>
-            <span class="dnc-form-bantuan">${esc(s.tipeSoal)} • ${esc(labelTingkat(s.tingkat))} • Bobot ${esc(s.bobotNilai)}</span>
-          </div>
-          <div class="dnc-form-bantuan">${esc(s.pertanyaan.slice(0, 95))}${s.pertanyaan.length > 95 ? '...' : ''}</div>
-        </div>
-      </label>`).join('');
+    const petaGrup = new Map();
+    soalTersedia.forEach(s => {
+      const namaGrup = namaSumberPaketSoal(s);
+      if (!petaGrup.has(namaGrup)) petaGrup.set(namaGrup, []);
+      petaGrup.get(namaGrup).push(s);
+    });
 
-    const perbaruiRingkasan = () => {
+    const daftarGrup = [...petaGrup.entries()].map(([namaGrup, list]) => {
+      const terurut = [...list].sort((a, b) =>
+        String(a.kodeSoal || '').localeCompare(String(b.kodeSoal || ''), undefined, { numeric: true, sensitivity: 'base' })
+      );
+      return { namaGrup, list: terurut };
+    });
+
+    wadah.innerHTML = daftarGrup.map(({ namaGrup, list }, gIdx) => {
+      const bobotGrup = bulatDua(list.reduce((acc, s) => acc + Number(s.bobotNilai || 0), 0));
+      const daftarTingkat = [...new Set(list.map(s => s.tingkat).filter(Boolean))].join(', ');
+      const daftarTipe = [...new Set(list.map(s => s.tipeSoal).filter(Boolean))].join(', ');
+      return `
+        <div class="dnc-grup-soal-kartu" data-grup-kartu="${gIdx}">
+          <div class="dnc-grup-soal-kepala" data-grup-kepala="${gIdx}">
+            <input type="checkbox" data-grup-cek="${gIdx}" aria-label="Pilih seluruh soal pada paket ${esc(namaGrup)}">
+            <button type="button" class="dnc-grup-soal-toggle" data-grup-toggle="${gIdx}" aria-expanded="false">
+              <div>
+                <div class="dnc-grup-soal-judul">${esc(namaGrup)}</div>
+                <div class="dnc-grup-soal-meta">${list.length} butir soal • Total Bobot ${bobotGrup}${daftarTingkat ? ` • Tingkat ${esc(daftarTingkat)}` : ''} • ${esc(daftarTipe)}</div>
+              </div>
+              <span class="dnc-grup-soal-panah" data-grup-panah="${gIdx}">Lihat Butir ▾</span>
+            </button>
+          </div>
+          <div class="dnc-grup-soal-isi dnc-disembunyikan" data-grup-isi="${gIdx}">
+            ${list.map((s, noIdx) => `
+              <label class="dnc-checklist-item">
+                <input type="checkbox" name="f-soal-id" data-grup-induk="${gIdx}" value="${esc(s.id)}" data-bobot="${Number(s.bobotNilai || 0)}" ${soalTerpilih.has(s.id) ? 'checked' : ''}>
+                <div style="flex:1">
+                  <div class="dnc-flex-between">
+                    <strong>${noIdx + 1}. ${esc(s.kodeSoal)}</strong>
+                    <span class="dnc-form-bantuan">${esc(s.tipeSoal)} • ${esc(labelTingkat(s.tingkat))} • Bobot ${esc(s.bobotNilai)}</span>
+                  </div>
+                  <div class="dnc-form-bantuan">${esc(s.pertanyaan.slice(0, 110))}${s.pertanyaan.length > 110 ? '...' : ''}</div>
+                </div>
+              </label>`).join('')}
+          </div>
+        </div>`;
+    }).join('');
+
+    sinkronStatusGrupPaket = () => {
+      let jmlPaketTerpilih = 0;
+      daftarGrup.forEach((_, gIdx) => {
+        const items = [...wadah.querySelectorAll(`input[name="f-soal-id"][data-grup-induk="${gIdx}"]`)];
+        const jmlCek = items.filter(el => el.checked).length;
+        const cekGrup = wadah.querySelector(`input[data-grup-cek="${gIdx}"]`);
+        const kepala = wadah.querySelector(`[data-grup-kepala="${gIdx}"]`);
+        if (cekGrup) {
+          cekGrup.checked = items.length > 0 && jmlCek === items.length;
+          cekGrup.indeterminate = jmlCek > 0 && jmlCek < items.length;
+        }
+        if (kepala) kepala.classList.toggle('terpilih', jmlCek > 0);
+        if (jmlCek > 0) jmlPaketTerpilih++;
+      });
       const checked = [...wadah.querySelectorAll('input[name="f-soal-id"]:checked')];
       const total = bulatDua(checked.reduce((acc, el) => acc + Number(el.dataset.bobot || 0), 0));
-      infoBobot.textContent = `${checked.length} soal dipilih • Total Bobot: ${total}`;
+      infoBobot.textContent = `${jmlPaketTerpilih} paket (${checked.length} soal) • Bobot: ${total}`;
     };
+
+    wadah.querySelectorAll('[data-grup-toggle]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const gIdx = btn.dataset.grupToggle;
+        const panelIsi = wadah.querySelector(`[data-grup-isi="${gIdx}"]`);
+        const panah = wadah.querySelector(`[data-grup-panah="${gIdx}"]`);
+        if (!panelIsi) return;
+        const terbuka = panelIsi.classList.toggle('dnc-disembunyikan') === false;
+        btn.setAttribute('aria-expanded', terbuka ? 'true' : 'false');
+        if (panah) panah.textContent = terbuka ? 'Tutup Butir ▴' : 'Lihat Butir ▾';
+      });
+    });
+
+    wadah.querySelectorAll('input[data-grup-cek]').forEach(cbGrup => {
+      cbGrup.addEventListener('change', () => {
+        const gIdx = cbGrup.dataset.grupCek;
+        const items = wadah.querySelectorAll(`input[name="f-soal-id"][data-grup-induk="${gIdx}"]`);
+        items.forEach(cb => {
+          cb.checked = cbGrup.checked;
+          if (cbGrup.checked) soalTerpilih.add(cb.value);
+          else soalTerpilih.delete(cb.value);
+        });
+        sinkronStatusGrupPaket();
+      });
+    });
+
     wadah.querySelectorAll('input[name="f-soal-id"]').forEach(cb => {
       cb.addEventListener('change', () => {
         if (cb.checked) soalTerpilih.add(cb.value);
         else soalTerpilih.delete(cb.value);
-        perbaruiRingkasan();
+        sinkronStatusGrupPaket();
       });
     });
-    perbaruiRingkasan();
+
+    sinkronStatusGrupPaket();
   };
 
   bukaModalFormDnc({
@@ -3727,17 +3804,17 @@ function bukaFormPaket(item = null) {
         </div>
         <div class="dnc-form-grup dnc-form-full">
           <div class="dnc-flex-between">
-            <label class="dnc-label">Daftar Butir Soal *</label>
+            <label class="dnc-label">Pilih Paket Soal * (Klik nama paket untuk lihat butirnya)</label>
             <div class="dnc-flex-gap">
               <select id="f-filter-tipe-paket" class="dnc-select" style="height:28px;font-size:11px;width:auto">
-                <option value="pg_pgk">PG & PG Kompleks (Utama)</option>
                 <option value="semua">Semua Jenis Soal (PG, PGK, Isian, Uraian)</option>
+                <option value="pg_pgk">Hanya PG &amp; PG Kompleks</option>
               </select>
               <button type="button" id="btn-pilih-semua-soal-paket" class="dnc-tombol dnc-tombol-sekunder dnc-tombol-kecil" style="height:28px">Pilih Semua</button>
-              <span id="f-paket-info-bobot" class="dnc-badge dnc-badge-biru">0 soal dipilih</span>
+              <span id="f-paket-info-bobot" class="dnc-badge dnc-badge-biru">0 paket (0 soal)</span>
             </div>
           </div>
-          <div id="f-paket-soal-list" class="dnc-checklist-box"></div>
+          <div id="f-paket-soal-list" class="dnc-checklist-box" style="max-height:290px"></div>
         </div>
         <div class="dnc-form-grup dnc-form-full">
           <div class="dnc-flex-gap" style="gap:16px">
@@ -3751,11 +3828,6 @@ function bukaFormPaket(item = null) {
     onMount: () => {
       const selMapel = document.getElementById('f-mapelPaket');
       const selFilterTipe = document.getElementById('f-filter-tipe-paket');
-      const adaNonOpsi = (item?.daftarSoalIds || []).some(sid => {
-        const s = cariById('bankSoal', sid);
-        return s && !adalahTipeBeropsi(s.tipeSoal);
-      });
-      if (adaNonOpsi) selFilterTipe.value = 'semua';
 
       renderChecklistSoal(mapelAwal, selFilterTipe.value);
       selMapel.addEventListener('change', e => {
@@ -3773,9 +3845,7 @@ function bukaFormPaket(item = null) {
           if (belumSemua) soalTerpilih.add(b.value);
           else soalTerpilih.delete(b.value);
         });
-        const checked = [...document.querySelectorAll('#f-paket-soal-list input[name="f-soal-id"]:checked')];
-        const total = bulatDua(checked.reduce((acc, el) => acc + Number(el.dataset.bobot || 0), 0));
-        document.getElementById('f-paket-info-bobot').textContent = `${checked.length} soal dipilih • Total Bobot: ${total}`;
+        sinkronStatusGrupPaket();
       });
       document.getElementById('btn-gen-token').addEventListener('click', () => {
         document.getElementById('f-tokenUjian').value = buatTokenAcak(6);
