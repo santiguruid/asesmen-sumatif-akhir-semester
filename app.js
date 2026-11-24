@@ -3221,6 +3221,11 @@ function bukaModalImporWord() {
           <select id="w-tingkat" class="dnc-select">${TINGKAT_LIST.map(t => `<option value="${t}" ${t === 'VI' ? 'selected' : ''}>${esc(labelTingkat(t))}</option>`).join('')}</select>
         </div>
         <div class="dnc-form-grup dnc-form-full">
+          <label class="dnc-label" for="w-sumberPaket">Nama Paket / Grup Soal * (otomatis dari nama file)</label>
+          <input id="w-sumberPaket" class="dnc-input" type="text" placeholder="Contoh: Bank_Soal_ASAS_Matematika_Kelas_6_Semester_1">
+          <span class="dnc-form-bantuan">Seluruh soal dari file ini akan dikelompokkan dalam satu paket agar rapi saat dipilih di Jadwal &amp; Paket ASAS.</span>
+        </div>
+        <div class="dnc-form-grup dnc-form-full">
           <div class="dnc-flex-between dnc-mb-12">
             <label class="dnc-label" for="w-file-docx">Dokumen Soal Format Bebas (.docx, .pdf, .xlsx, .xls, .csv, .txt) *</label>
             <button type="button" id="btn-unduh-templat-word" class="dnc-tombol dnc-tombol-sekunder dnc-tombol-kecil">
@@ -3290,6 +3295,8 @@ function bukaModalImporWord() {
       document.getElementById('w-file-docx').addEventListener('change', async e => {
         const file = e.target.files[0];
         if (!file) return;
+        const inpPaket = document.getElementById('w-sumberPaket');
+        if (inpPaket) inpPaket.value = bersihkanNamaPaketSoal(file.name);
         const info = document.getElementById('info-ringkas-word');
         const ext = teks(file.name.split('.').pop());
         info.textContent = `Menganalisis struktur soal, opsi, kunci jawaban, dan bobot penskoran dari ${file.name}...`;
@@ -3355,6 +3362,9 @@ function bukaModalImporWord() {
       const mapelId = document.getElementById('w-mapelId').value;
       const tingkat = document.getElementById('w-tingkat').value;
       if (!bolehAksesMapel(mapelId)) throw new Error('Anda tidak memiliki akses pada mata pelajaran tersebut.');
+      const mapelObjSimpan = cariById('mataPelajaran', mapelId);
+      const sumberPaket = (document.getElementById('w-sumberPaket')?.value || '').trim() ||
+        `Paket_Soal_${(mapelObjSimpan?.namaMapel || 'Mapel').replace(/\s+/g, '_')}_Tingkat_${tingkat}`;
 
       let tersimpan = 0;
       for (const it of terpilih) {
@@ -3364,6 +3374,7 @@ function bukaModalImporWord() {
         }
         await dbCreate(COLLECTIONS.bankSoal, {
           kodeSoal: kodeUnik,
+          sumberPaket,
           mapelId,
           tingkat,
           tipeSoal: it.tipeSoal,
@@ -3382,7 +3393,7 @@ function bukaModalImporWord() {
       tutupModalFormDnc();
       resetCacheMenu(['DNC-M1', 'DNC-M3', 'DNC-M4']);
       await muatM3BankSoal(true);
-      tampilkanToast(`${tersimpan} butir soal beserta kunci jawaban & bobotnya berhasil disimpan.`);
+      tampilkanToast(`${tersimpan} butir soal berhasil disimpan dalam paket "${sumberPaket}".`);
     }
   });
 }
