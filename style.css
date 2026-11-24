@@ -1010,6 +1010,79 @@ svg.dnc-ikon {
   flex-shrink: 0;
 }
 
+.dnc-grup-soal-kartu {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.dnc-grup-soal-kepala {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  background: var(--surface);
+}
+
+.dnc-grup-soal-kepala.terpilih {
+  background: #EFF6FF;
+}
+
+.dnc-grup-soal-kepala input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--primary);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.dnc-grup-soal-toggle {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 0;
+}
+
+.dnc-grup-soal-judul {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-main);
+  word-break: break-word;
+}
+
+.dnc-grup-soal-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.dnc-grup-soal-panah {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--primary);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.dnc-grup-soal-isi {
+  padding: 8px;
+  background: #F8FAFC;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
 .dnc-file-drop {
   border: 1.5px dashed #CBD5E1;
   border-radius: var(--radius);
