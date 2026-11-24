@@ -2,8 +2,7 @@
 // ===== BLOK: DNC_CONFIG =====
 const IS_PREVIEW = false; // Ubah menjadi false SAAT DEPLOY PRODUKSI agar terhubung murni ke Firebase tanpa data dummy
 
-// Your web app's Firebase configuration
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+// Konfigurasi Firebase Produksi Anda
 const firebaseConfig = {
   apiKey: "AIzaSyDevD5JTzphc-jdpsxJJ6a6psH0tWJyjgI",
   authDomain: "asesmen-sumatif-akhir-se-b2baa.firebaseapp.com",
@@ -34,6 +33,7 @@ const MENU_DAFTAR = [
 ];
 
 const TINGKAT_LIST = ['VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
+const TIPE_SOAL_LIST = ['Pilihan Ganda', 'Pilihan Ganda Kompleks', 'Isian Singkat', 'Uraian'];
 // ===== AKHIR BLOK: DNC_CONFIG =====
 
 // ===== BLOK: DNC_PWA =====
@@ -58,9 +58,9 @@ function inisialisasiPwaDnc() {
     if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
       const swKode = `self.addEventListener('install',()=>self.skipWaiting());self.addEventListener('activate',e=>e.waitUntil(self.clients.claim()));self.addEventListener('fetch',()=>{});`;
       const blobUrl = URL.createObjectURL(new Blob([swKode], { type: 'text/javascript' }));
-      navigator.serviceWorker.register(blobUrl).catch(() => { });
+      navigator.serviceWorker.register(blobUrl).catch(() => {});
     }
-  } catch (_) { }
+  } catch (_) {}
 }
 // ===== AKHIR BLOK: DNC_PWA =====
 
@@ -129,6 +129,30 @@ function acakArray(arr) {
   return salinan;
 }
 
+function normalisasiTingkat(val) {
+  const s = String(val || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (s.includes('XII') || s === '12' || /^12/.test(s)) return 'XII';
+  if (s.includes('XI') || s === '11' || /^11/.test(s)) return 'XI';
+  if (s.includes('VIII') || s === '8' || /^8/.test(s)) return 'VIII';
+  if (s.includes('VII') || s === '7' || /^7/.test(s)) return 'VII';
+  if (s.includes('IX') || s === '9' || /^9/.test(s)) return 'IX';
+  if (s.includes('X') || s === '10' || /^10/.test(s)) return 'X';
+  return 'X';
+}
+
+function normalisasiKunciKompleks(val) {
+  const huruf = String(val || '').toUpperCase().match(/[A-E]/g) || [];
+  return [...new Set(huruf)].sort().join(', ');
+}
+
+function parseKunciKompleksSet(val) {
+  return new Set((String(val || '').toUpperCase().match(/[A-E]/g) || []));
+}
+
+function normalisasiIsian(val) {
+  return String(val || '').toLowerCase().replace(/[\s]+/g, ' ').trim();
+}
+
 function debounceDnc(fn, jeda = 250) {
   let timer = null;
   return (...args) => {
@@ -148,7 +172,7 @@ function tampilkanToast(pesan, tipe = 'sukses') {
     el.style.opacity = '0';
     el.style.transition = 'opacity 0.25s ease';
     setTimeout(() => el.remove(), 260);
-  }, 3400);
+  }, 3600);
 }
 
 async function denganLoading(btn, teksProses, kerja) {
@@ -186,32 +210,87 @@ function tutupKonfirmasi() {
   document.getElementById('dnc-modal-konfirmasi').classList.add('dnc-disembunyikan');
 }
 
-let _chartJsPromise = null;
-function muatChartJs() {
-  if (window.Chart) return Promise.resolve(window.Chart);
-  if (_chartJsPromise) return _chartJsPromise;
-  _chartJsPromise = new Promise((resolve, reject) => {
+// --- Lazy-Load Pustaka Eksternal (Grafik, Word, Excel, PDF) ---
+const _scriptCache = {};
+function muatSkripCdn(url, cekGlobal, pesanGagal) {
+  if (cekGlobal()) return Promise.resolve(cekGlobal());
+  if (_scriptCache[url]) return _scriptCache[url];
+  _scriptCache[url] = new Promise((resolve, reject) => {
     const s = document.createElement('script');
-    s.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js';
-    s.onload = () => resolve(window.Chart);
-    s.onerror = () => reject(new Error('Gagal memuat pustaka grafik.'));
+    s.src = url;
+    s.onload = () => cekGlobal() ? resolve(cekGlobal()) : reject(new Error(pesanGagal));
+    s.onerror = () => reject(new Error(pesanGagal));
     document.head.appendChild(s);
   });
-  return _chartJsPromise;
+  return _scriptCache[url];
 }
 
-let _mammothPromise = null;
-function muatMammothJs() {
-  if (window.mammoth) return Promise.resolve(window.mammoth);
-  if (_mammothPromise) return _mammothPromise;
-  _mammothPromise = new Promise((resolve, reject) => {
-    const s = document.createElement('script');
-    s.src = 'https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js';
-    s.onload = () => resolve(window.mammoth);
-    s.onerror = () => reject(new Error('Gagal memuat pembaca dokumen Word (.docx).'));
-    document.head.appendChild(s);
-  });
-  return _mammothPromise;
+const muatChartJs = () => muatSkripCdn(
+  'https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js',
+  () => window.Chart,
+  'Gagal memuat pustaka grafik.'
+);
+
+const muatMammothJs = () => muatSkripCdn(
+  'https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js',
+  () => window.mammoth,
+  'Gagal memuat pembaca dokumen Word (.docx).'
+);
+
+const muatSheetJs = () => muatSkripCdn(
+  'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js',
+  () => window.XLSX,
+  'Gagal memuat pembaca file Excel (.xlsx/.xls).'
+);
+
+async function muatPdfJs() {
+  const lib = await muatSkripCdn(
+    'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js',
+    () => window.pdfjsLib,
+    'Gagal memuat pembaca dokumen PDF (.pdf).'
+  );
+  if (lib.GlobalWorkerOptions) {
+    lib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+  }
+  return lib;
+}
+
+async function ekstrakTeksBarisPdf(file) {
+  const pdfjsLib = await muatPdfJs();
+  const buf = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buf) }).promise;
+  const semuaBaris = [];
+  for (let hal = 1; hal <= pdf.numPages; hal++) {
+    const page = await pdf.getPage(hal);
+    const tc = await page.getTextContent();
+    const kelompokY = [];
+    tc.items.forEach(it => {
+      const str = String(it.str || '').trim();
+      if (!str) return;
+      const y = Math.round(it.transform[5] / 4) * 4;
+      const x = it.transform[4];
+      let baris = kelompokY.find(b => Math.abs(b.y - y) <= 4);
+      if (!baris) {
+        baris = { y, sel: [] };
+        kelompokY.push(baris);
+      }
+      baris.sel.push({ x, str });
+    });
+    kelompokY.sort((a, b) => b.y - a.y);
+    kelompokY.forEach(b => {
+      b.sel.sort((a, b2) => a.x - b2.x);
+      let gabung = '';
+      for (let i = 0; i < b.sel.length; i++) {
+        if (i > 0) {
+          const jarak = b.sel[i].x - b.sel[i - 1].x;
+          gabung += jarak > 45 ? '\t' : ' ';
+        }
+        gabung += b.sel[i].str;
+      }
+      if (gabung.trim()) semuaBaris.push(gabung.trim());
+    });
+  }
+  return semuaBaris;
 }
 
 const stateMemori = {
@@ -274,6 +353,12 @@ function bolehAksesMapel(mapelId) {
     return Array.isArray(penggunaAktif.mapelIds) && penggunaAktif.mapelIds.includes(mapelId);
   }
   return false;
+}
+
+function daftarTipeSoalDiizinkanForm() {
+  return penggunaAktif?.role === 'Admin'
+    ? TIPE_SOAL_LIST
+    : ['Pilihan Ganda', 'Pilihan Ganda Kompleks', 'Isian Singkat', 'Uraian'];
 }
 // ===== AKHIR BLOK: DNC_CORE =====
 
@@ -343,16 +428,23 @@ function isiSelectOpsi(idSelect, opsiList, teksSemua = 'Semua') {
 
 function badgeStatus(teksStatus) {
   const s = teks(teksStatus);
-  if (s === 'aktif' || s === 'tuntas' || s === 'selesai' || s === 'valid') {
+  if (s === 'aktif' || s === 'tuntas' || s === 'selesai' || s === 'valid' || s.includes('dibuka')) {
     return `<span class="dnc-badge dnc-badge-hijau">${esc(teksStatus)}</span>`;
   }
-  if (s === 'sedang dikerjakan' || s === 'menunggu koreksi' || s === 'perlu perbaikan') {
+  if (s === 'sedang dikerjakan' || s === 'menunggu koreksi' || s === 'perlu perbaikan' || s.includes('menunggu')) {
     return `<span class="dnc-badge dnc-badge-amber">${esc(teksStatus)}</span>`;
   }
-  if (s === 'belum tuntas' || s === 'nonaktif') {
+  if (s === 'belum tuntas' || s === 'nonaktif' || s.includes('dihentikan') || s === 'duplikat') {
     return `<span class="dnc-badge dnc-badge-merah">${esc(teksStatus)}</span>`;
   }
   return `<span class="dnc-badge dnc-badge-abu">${esc(teksStatus)}</span>`;
+}
+
+function badgeTipeSoal(tipe) {
+  if (tipe === 'Pilihan Ganda') return `<span class="dnc-badge dnc-badge-biru">Pilihan Ganda</span>`;
+  if (tipe === 'Pilihan Ganda Kompleks') return `<span class="dnc-badge dnc-badge-ungu">PG Kompleks</span>`;
+  if (tipe === 'Isian Singkat') return `<span class="dnc-badge dnc-badge-amber">Isian Singkat</span>`;
+  return `<span class="dnc-badge dnc-badge-abu">Uraian</span>`;
 }
 // ===== AKHIR BLOK: DNC_UI_HELPER =====
 
@@ -389,13 +481,15 @@ async function inisialisasiDataPreview() {
         opsiJawaban: [
           { kode: 'A', teks: '5' }, { kode: 'B', teks: '7' }, { kode: 'C', teks: '9' }, { kode: 'D', teks: '12' }
         ],
-        kunciJawaban: 'B', bobotNilai: 50, statusAktif: true, dibuatOleh: 'usr_guru'
+        kunciJawaban: 'B', bobotNilai: 40, statusAktif: true, dibuatOleh: 'usr_guru'
       },
       {
         id: 'soal_2', dibuat: sekarang.toISOString(), kodeSoal: 'MTK10-002', mapelId: 'mpl_1', tingkat: 'X',
-        tipeSoal: 'Uraian', pertanyaan: 'Jelaskan langkah menyelesaikan sistem persamaan linear dua variabel dengan metode eliminasi!', urlGambar: '',
-        opsiJawaban: [], kunciJawaban: 'Samakan koefisien salah satu variabel, lalu kurangkan atau jumlahkan kedua persamaan untuk mendapatkan nilai variabel lainnya.',
-        bobotNilai: 50, statusAktif: true, dibuatOleh: 'usr_guru'
+        tipeSoal: 'Pilihan Ganda Kompleks', pertanyaan: 'Pilih lebih dari satu bilangan prima berikut ini:', urlGambar: '',
+        opsiJawaban: [
+          { kode: 'A', teks: '2' }, { kode: 'B', teks: '9' }, { kode: 'C', teks: '11' }, { kode: 'D', teks: '15' }
+        ],
+        kunciJawaban: 'A, C', bobotNilai: 60, statusAktif: true, dibuatOleh: 'usr_guru'
       }
     ],
     [COLLECTIONS.paketAsas]: [
@@ -403,21 +497,11 @@ async function inisialisasiDataPreview() {
         id: 'pkt_1', dibuat: sekarang.toISOString(), judulPaket: 'ASAS Ganjil Matematika Kelas X', semester: 'Ganjil',
         tahunAjaran: '2026/2027', mapelId: 'mpl_1', kelasIds: ['kls_1', 'kls_2'], daftarSoalIds: ['soal_1', 'soal_2'],
         waktuMulai: mulai.toISOString(), waktuSelesai: selesai.toISOString(), durasiMenit: 60,
-        tokenUjian: 'MTK26A', acakSoal: true, acakOpsi: true, tampilkanNilai: true, statusPaket: 'Aktif', dibuatOleh: 'usr_guru'
+        tokenUjian: 'MTK26A', acakSoal: true, acakOpsi: true, tampilkanNilai: true, statusPaket: 'Aktif',
+        ujianDibuka: true, dibuatOleh: 'usr_guru'
       }
     ],
-    [COLLECTIONS.hasilUjian]: [
-      {
-        id: 'pkt_1_usr_siswa_lama', dibuat: sekarang.toISOString(), paketId: 'pkt_1', penggunaId: 'usr_siswa',
-        kelasId: 'kls_1', mapelId: 'mpl_1', waktuMulaiKerja: mulai.toISOString(), waktuSelesaiKerja: sekarang.toISOString(),
-        statusUjian: 'Menunggu Koreksi',
-        jawabanSiswa: [
-          { soalId: 'soal_1', jawaban: 'B', ragu: false, skor: 50 },
-          { soalId: 'soal_2', jawaban: 'Menyamakan koefisien x lalu mengurangkan kedua persamaan.', ragu: false, skor: 0 }
-        ],
-        skorPg: 50, skorUraian: 0, skorAkhir: 50, statusKetuntasan: 'Menunggu Koreksi', catatanKoreksi: '', dikoreksiOleh: ''
-      }
-    ]
+    [COLLECTIONS.hasilUjian]: []
   };
 }
 
@@ -550,7 +634,7 @@ async function muatDataPengguna() {
 }
 
 async function muatDataBankSoal() {
-  const semua = await dbList(COLLECTIONS.bankSoal, { urutDesc: 'dibuat', batas: 300 });
+  const semua = await dbList(COLLECTIONS.bankSoal, { urutDesc: 'dibuat', batas: 400 });
   stateMemori.bankSoal = penggunaAktif?.role === 'Guru'
     ? semua.filter(s => bolehAksesMapel(s.mapelId))
     : semua;
@@ -706,7 +790,6 @@ async function prosesLoginDnc(identitas, password) {
     };
   }
 
-  // Hybrid Auth Non-Admin (Guru & Siswa): validasi SHA-256 langsung terhadap koleksi pengguna di Firestore
   const hashInput = await hashTeks(pw);
   const semuaPengguna = await dbList(COLLECTIONS.pengguna);
   const cari = teks(idTrim);
@@ -746,10 +829,11 @@ async function masukKeAplikasi(userObj) {
 
 async function keluarAplikasi() {
   if (typeof hentikanTimerUjian === 'function') hentikanTimerUjian();
+  if (typeof hentikanListenerPaketSiswa === 'function') hentikanListenerPaketSiswa();
   penggunaAktif = null;
   resetCacheMenu();
   if (!IS_PREVIEW && fb?.auth?.currentUser) {
-    try { await fb.authMod.signOut(fb.auth); } catch (_) { }
+    try { await fb.authMod.signOut(fb.auth); } catch (_) {}
   }
   document.getElementById('dnc-aplikasi').classList.add('dnc-disembunyikan');
   document.getElementById('dnc-halaman-login').classList.remove('dnc-disembunyikan');
@@ -770,7 +854,6 @@ function bangunNavigasiRole() {
     btn.addEventListener('click', () => bukaMenu(btn.getAttribute('data-menu')));
   });
 
-  // Bottom Tab Bar HP (maksimal 5 item; jika > 5, tampilkan 4 + Lainnya)
   const tabbar = document.getElementById('dnc-tabbar-hp');
   const butuhLainnya = diizinkan.length > 5;
   const utamaHp = butuhLainnya ? diizinkan.slice(0, 4) : diizinkan;
@@ -859,7 +942,6 @@ async function muatM1Dashboard(paksa = false) {
   document.getElementById('kpi-paket-aktif').textContent = paketAktif.length;
   document.getElementById('kpi-rata-skor').textContent = rataSkor;
 
-  // Tabel jadwal ASAS aktif & daftar siswa belum selesai
   const peringatanSiswa = [];
   const barisJadwal = paketAktif.map(p => {
     const targetSiswa = siswaAktif.filter(s => Array.isArray(p.kelasIds) && p.kelasIds.includes(s.kelasId));
@@ -875,7 +957,7 @@ async function muatM1Dashboard(paksa = false) {
       kelas: (p.kelasIds || []).map(id => cariById('kelas', id)?.kodeKelas || id).join(', '),
       rentang: `${formatTanggal(p.waktuMulai, true)} – ${formatTanggal(p.waktuSelesai, true)}`,
       progres: `${selesaiIds.size} / ${targetSiswa.length} siswa selesai`,
-      status: p.statusPaket
+      ujianDibuka: Boolean(p.ujianDibuka)
     };
   });
 
@@ -885,7 +967,12 @@ async function muatM1Dashboard(paksa = false) {
     { label: 'Kelas Sasaran', key: 'kelas' },
     { label: 'Rentang Waktu', key: 'rentang' },
     { label: 'Progres Siswa', key: 'progres' },
-    { label: 'Status', render: r => badgeStatus(r.status) }
+    {
+      label: 'Status Sesi',
+      render: r => r.ujianDibuka
+        ? `<span class="dnc-badge dnc-badge-hijau"><span class="dnc-dot-live"></span>Sedang Dibuka</span>`
+        : `<span class="dnc-badge dnc-badge-amber">Menunggu Mulai</span>`
+    }
   ], 'Belum ada paket ASAS berstatus Aktif');
 
   const teksPeringatan = document.getElementById('teks-peringatan-m1');
@@ -895,7 +982,6 @@ async function muatM1Dashboard(paksa = false) {
     teksPeringatan.textContent = 'Seluruh peserta didik pada jadwal aktif telah menyelesaikan ujian atau belum ada sesi aktif berjalan.';
   }
 
-  // Grafik Analitik (Lazy-load Chart.js)
   try {
     const ChartLib = await muatChartJs();
     const mapelList = daftarMapelDiizinkan();
@@ -949,7 +1035,7 @@ async function muatM1Dashboard(paksa = false) {
         plugins: { legend: { position: 'right', labels: { boxWidth: 10, font: { size: 11 } } } }
       }
     });
-  } catch (_) { }
+  } catch (_) {}
 }
 // ===== AKHIR BLOK: DNC_M1_DASHBOARD =====
 
@@ -1054,6 +1140,296 @@ function bukaFormKelas(item = null) {
       resetCacheMenu(['DNC-M1', 'DNC-M2', 'DNC-M4', 'DNC-M6', 'DNC-M7']);
       await muatM2Master(true);
       tampilkanToast(item ? 'Data kelas berhasil diperbarui.' : 'Data kelas berhasil ditambahkan.');
+    }
+  });
+}
+
+// --- Revisi 1: Impor Data Kelas Multi-Format (PDF, Excel .xlsx/.xls/.csv, Word .docx) ---
+function validasiItemKelasImpor(it, kodeSudahAdaSet) {
+  const masalah = [];
+  if (!it.kodeKelas) masalah.push('Kode kosong');
+  if (!it.namaKelas) masalah.push('Nama kelas kosong');
+  if (!TINGKAT_LIST.includes(it.tingkat)) it.tingkat = normalisasiTingkat(it.tingkat || it.kodeKelas || it.namaKelas);
+  if (!it.tahunAjaran) it.tahunAjaran = '2026/2027';
+  if (it.kodeKelas && kodeSudahAdaSet.has(teks(it.kodeKelas))) masalah.push('Duplikat di database');
+  it.valid = masalah.length === 0;
+  it.statusTeks = masalah.length === 0 ? 'Valid' : (masalah.includes('Duplikat di database') ? 'Duplikat' : 'Perlu Perbaikan');
+  it.catatan = masalah.length ? masalah.join('; ') : 'Siap disimpan';
+  return it;
+}
+
+function petakanMatriksKelas(barisMatriks, tahunDefault) {
+  if (!barisMatriks.length) return [];
+  const bersih = barisMatriks
+    .map(r => (Array.isArray(r) ? r : [r]).map(c => String(c ?? '').trim()))
+    .filter(r => r.some(c => c !== ''));
+  if (!bersih.length) return [];
+
+  let idxHeader = -1;
+  let iKode = 0, iNama = 1, iTingkat = 2, iTahun = 3, iWali = 4;
+
+  for (let i = 0; i < Math.min(5, bersih.length); i++) {
+    const rowLower = bersih[i].map(c => teks(c));
+    if (rowLower.some(c => c.includes('kode') || c.includes('nama kelas') || c.includes('rombel') || c.includes('wali'))) {
+      idxHeader = i;
+      const cariIdx = kata => rowLower.findIndex(h => kata.some(k => h.includes(k)));
+      const ck = cariIdx(['kode']);
+      const cn = cariIdx(['nama kelas', 'nama', 'rombel', 'kelas']);
+      const ct = cariIdx(['tingkat', 'jenjang', 'level']);
+      const cta = cariIdx(['tahun', 'tapel', 'ajaran']);
+      const cw = cariIdx(['wali']);
+      if (ck >= 0) iKode = ck;
+      if (cn >= 0) iNama = cn === ck ? ck + 1 : cn;
+      if (ct >= 0) iTingkat = ct;
+      if (cta >= 0) iTahun = cta;
+      if (cw >= 0) iWali = cw;
+      break;
+    }
+  }
+
+  const mulai = idxHeader >= 0 ? idxHeader + 1 : 0;
+  const hasil = [];
+  for (let r = mulai; r < bersih.length; r++) {
+    const row = bersih[r];
+    // Abaikan nomor urut di kolom pertama jika header bukan kode
+    let offset = 0;
+    if (idxHeader < 0 && /^\d+\.?$/.test(row[0]) && row.length >= 3) offset = 1;
+    let kodeKelas = (row[iKode + offset] || '').trim();
+    let namaKelas = (row[iNama + offset] || '').trim();
+    const tingkatRaw = (row[iTingkat + offset] || '').trim();
+    const tahunRaw = (row[iTahun + offset] || '').trim();
+    const waliKelas = (row[iWali + offset] || '').trim();
+
+    if (!kodeKelas && !namaKelas) continue;
+    if (/^(daftar kelas|data kelas|no|kode)/i.test(kodeKelas)) continue;
+    if (!namaKelas) namaKelas = kodeKelas;
+    if (!kodeKelas) kodeKelas = namaKelas.replace(/\s+/g, '-').toUpperCase();
+
+    hasil.push({
+      dipilih: true,
+      kodeKelas,
+      namaKelas,
+      tingkat: normalisasiTingkat(tingkatRaw || kodeKelas || namaKelas),
+      tahunAjaran: /\d{4}\/\d{4}/.test(tahunRaw) ? tahunRaw : (tahunRaw || tahunDefault),
+      waliKelas
+    });
+  }
+  return hasil;
+}
+
+function parseTeksBarisKelas(daftarBaris, tahunDefault) {
+  const matriks = [];
+  daftarBaris.forEach(line => {
+    const t = String(line || '').trim();
+    if (!t || /^(daftar|data|templat|petunjuk|no\b)/i.test(t)) return;
+    let pecah = [];
+    if (t.includes('\t')) pecah = t.split('\t').map(x => x.trim());
+    else if (t.includes('|')) pecah = t.split('|').map(x => x.trim());
+    else if (t.includes(';')) pecah = t.split(';').map(x => x.trim());
+    else if (t.includes(',')) pecah = t.split(',').map(x => x.trim());
+    else {
+      const m = t.match(/^(?:\d+[\.\)]\s*)?([A-Za-z0-9\-/]+)\s{2,}(.+)$/);
+      if (m) pecah = [m[1], ...m[2].split(/\s{2,}/)];
+      else {
+        const bersih = t.replace(/^\d+[\.\)]\s*/, '');
+        const parts = bersih.split(/\s+-\s+/);
+        if (parts.length >= 2) pecah = parts;
+        else if (/^(VII|VIII|IX|X|XI|XII|\d{1,2})[\s\-]/i.test(bersih)) pecah = [bersih.split(/\s+/)[0], bersih];
+      }
+    }
+    if (pecah.length) matriks.push(pecah);
+  });
+  return petakanMatriksKelas(matriks, tahunDefault);
+}
+
+function bukaModalImporKelas() {
+  const kodeSudahAda = new Set(stateMemori.kelas.map(k => teks(k.kodeKelas)));
+  let daftarKelasImpor = [];
+
+  const renderPratinjauKelas = () => {
+    const wadah = document.getElementById('wadah-pratinjau-kelas');
+    const info = document.getElementById('info-impor-kelas');
+    if (!wadah) return;
+    const jmlValid = daftarKelasImpor.filter(x => x.valid).length;
+    info.textContent = daftarKelasImpor.length
+      ? `Terdeteksi ${daftarKelasImpor.length} data kelas (${jmlValid} Valid, ${daftarKelasImpor.length - jmlValid} Duplikat/Perlu Perbaikan).`
+      : 'Unggah file PDF (.pdf), Excel (.xlsx/.xls/.csv), atau Word (.docx) untuk melihat pratinjau.';
+
+    if (!daftarKelasImpor.length) { wadah.innerHTML = ''; return; }
+    wadah.innerHTML = `
+      <div class="dnc-pembungkus-tabel dnc-mt-12">
+        <table class="dnc-tabel dnc-tabel-padat">
+          <thead>
+            <tr>
+              <th>Pilih</th>
+              <th>Kode Kelas</th>
+              <th>Nama Kelas</th>
+              <th>Tingkat</th>
+              <th>Tahun Ajaran</th>
+              <th>Wali Kelas</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${daftarKelasImpor.map((it, idx) => `
+              <tr>
+                <td data-label="Pilih"><input type="checkbox" data-ik-pilih="${idx}" ${it.dipilih && it.valid ? 'checked' : ''} ${!it.valid ? 'disabled' : ''}></td>
+                <td data-label="Kode"><input class="dnc-input" style="height:30px" data-ik-kode="${idx}" value="${esc(it.kodeKelas)}"></td>
+                <td data-label="Nama"><input class="dnc-input" style="height:30px" data-ik-nama="${idx}" value="${esc(it.namaKelas)}"></td>
+                <td data-label="Tingkat">
+                  <select class="dnc-select" style="height:30px" data-ik-tingkat="${idx}">
+                    ${TINGKAT_LIST.map(t => `<option value="${t}" ${it.tingkat === t ? 'selected' : ''}>${t}</option>`).join('')}
+                  </select>
+                </td>
+                <td data-label="Tahun"><input class="dnc-input" style="height:30px" data-ik-tahun="${idx}" value="${esc(it.tahunAjaran)}"></td>
+                <td data-label="Wali"><input class="dnc-input" style="height:30px" data-ik-wali="${idx}" value="${esc(it.waliKelas)}"></td>
+                <td data-label="Status">${badgeStatus(it.statusTeks)}<div class="dnc-form-bantuan">${esc(it.catatan)}</div></td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>`;
+
+    wadah.querySelectorAll('[data-ik-pilih]').forEach(el => {
+      el.addEventListener('change', () => { daftarKelasImpor[Number(el.dataset.ikPilih)].dipilih = el.checked; });
+    });
+    const ikat = (attr, field) => {
+      wadah.querySelectorAll(`[${attr}]`).forEach(el => {
+        el.addEventListener('change', () => {
+          const i = Number(el.getAttribute(attr));
+          daftarKelasImpor[i][field] = el.value.trim();
+          validasiItemKelasImpor(daftarKelasImpor[i], kodeSudahAda);
+          if (daftarKelasImpor[i].valid) daftarKelasImpor[i].dipilih = true;
+          renderPratinjauKelas();
+        });
+      });
+    };
+    ikat('data-ik-kode', 'kodeKelas');
+    ikat('data-ik-nama', 'namaKelas');
+    ikat('data-ik-tingkat', 'tingkat');
+    ikat('data-ik-tahun', 'tahunAjaran');
+    ikat('data-ik-wali', 'waliKelas');
+  };
+
+  bukaModalFormDnc({
+    judul: 'Impor Data Kelas (PDF, Excel, atau Word)',
+    lebar: true,
+    labelSimpan: 'Simpan Massal Data Kelas',
+    htmlKonten: `
+      <div class="dnc-form-grid">
+        <div class="dnc-form-grup">
+          <label class="dnc-label" for="ik-tahun-default">Tahun Ajaran Bawaan *</label>
+          <input id="ik-tahun-default" class="dnc-input" type="text" value="2026/2027">
+        </div>
+        <div class="dnc-form-grup">
+          <label class="dnc-label">Unduh Contoh Templat</label>
+          <div class="dnc-flex-gap">
+            <button type="button" id="btn-templat-kelas-csv" class="dnc-tombol dnc-tombol-sekunder dnc-tombol-kecil">Templat Excel/CSV</button>
+            <button type="button" id="btn-templat-kelas-word" class="dnc-tombol dnc-tombol-sekunder dnc-tombol-kecil">Templat Word (.docx)</button>
+          </div>
+        </div>
+        <div class="dnc-form-grup dnc-form-full">
+          <label class="dnc-label" for="ik-file">Pilih File Daftar Kelas (.pdf, .xlsx, .xls, .csv, .docx) *</label>
+          <div class="dnc-file-drop">
+            <input id="ik-file" class="dnc-input" type="file" accept=".pdf,.xlsx,.xls,.csv,.docx" style="padding-top:7px">
+            <div id="info-impor-kelas" class="dnc-form-bantuan dnc-mt-12">Mendukung format tabel Excel/Word/PDF maupun baris teks berpemisah (Kode | Nama Kelas | Tingkat | Tahun Ajaran | Wali Kelas).</div>
+          </div>
+        </div>
+      </div>
+      <div id="wadah-pratinjau-kelas"></div>`,
+    onMount: () => {
+      document.getElementById('btn-templat-kelas-csv').addEventListener('click', () => {
+        const isi = 'KodeKelas,NamaKelas,Tingkat,TahunAjaran,WaliKelas\n' +
+          'X-IPA-1,Sepuluh IPA 1,X,2026/2027,Dra. Sri Wahyuni\n' +
+          'X-IPA-2,Sepuluh IPA 2,X,2026/2027,Ahmad Fauzi S.Pd.\n' +
+          'XI-IPS-1,Sebelas IPS 1,XI,2026/2027,Rina Kusuma S.Pd.\n';
+        unduhBlobFile(new Blob([isi], { type: 'text/csv;charset=utf-8' }), 'Templat_Kelas_ASAS_DNC.csv');
+      });
+      document.getElementById('btn-templat-kelas-word').addEventListener('click', () => {
+        unduhDokumenWordSederhana([
+          'DAFTAR KELAS ASAS - DIGITALNETCARE',
+          'KodeKelas | NamaKelas | Tingkat | TahunAjaran | WaliKelas',
+          'X-IPA-1 | Sepuluh IPA 1 | X | 2026/2027 | Dra. Sri Wahyuni',
+          'X-IPA-2 | Sepuluh IPA 2 | X | 2026/2027 | Ahmad Fauzi, S.Pd.',
+          'XI-IPS-1 | Sebelas IPS 1 | XI | 2026/2027 | Rina Kusuma, S.Pd.'
+        ], 'Templat_Kelas_ASAS_DNC.docx');
+      });
+      document.getElementById('ik-file').addEventListener('change', async e => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const info = document.getElementById('info-impor-kelas');
+        const ext = teks(file.name.split('.').pop());
+        const tahunDef = document.getElementById('ik-tahun-default').value.trim() || '2026/2027';
+        info.textContent = `Membaca file ${file.name}...`;
+
+        try {
+          let hasilMentah = [];
+          if (ext === 'csv') {
+            hasilMentah = petakanMatriksKelas(parseCsvBaris(await file.text()), tahunDef);
+          } else if (ext === 'xlsx' || ext === 'xls') {
+            const XLSX = await muatSheetJs();
+            const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' });
+            const sheet = wb.Sheets[wb.SheetNames[0]];
+            const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+            hasilMentah = petakanMatriksKelas(rows, tahunDef);
+          } else if (ext === 'docx') {
+            const mammothLib = await muatMammothJs();
+            const { value: html } = await mammothLib.convertToHtml({ arrayBuffer: await file.arrayBuffer() });
+            const doc = new DOMParser().parseFromString(html, 'text/html');
+            const tbl = doc.querySelector('table');
+            if (tbl) {
+              const rows = [...tbl.querySelectorAll('tr')].map(tr => [...tr.querySelectorAll('th,td')].map(td => td.textContent.trim()));
+              hasilMentah = petakanMatriksKelas(rows, tahunDef);
+            }
+            if (!hasilMentah.length) {
+              const lines = [...doc.body.querySelectorAll('p, li')].map(p => p.textContent.trim()).filter(Boolean);
+              hasilMentah = parseTeksBarisKelas(lines, tahunDef);
+            }
+          } else if (ext === 'pdf') {
+            const barisPdf = await ekstrakTeksBarisPdf(file);
+            hasilMentah = parseTeksBarisKelas(barisPdf, tahunDef);
+          } else {
+            throw new Error('Format file tidak didukung. Gunakan PDF, Excel (.xlsx/.xls/.csv), atau Word (.docx).');
+          }
+
+          const kodeDalamFile = new Set();
+          daftarKelasImpor = hasilMentah.map(it => {
+            const key = teks(it.kodeKelas);
+            const obj = validasiItemKelasImpor(it, kodeSudahAda);
+            if (obj.valid && kodeDalamFile.has(key)) {
+              obj.valid = false;
+              obj.statusTeks = 'Duplikat';
+              obj.catatan = 'Kode duplikat di dalam file';
+            }
+            kodeDalamFile.add(key);
+            return obj;
+          });
+          renderPratinjauKelas();
+        } catch (err) {
+          info.textContent = err.message || 'Gagal membaca file daftar kelas.';
+          tampilkanToast(info.textContent, 'error');
+        }
+      });
+    },
+    onSubmit: async () => {
+      const terpilih = daftarKelasImpor.filter(x => x.dipilih && x.valid);
+      if (!terpilih.length) throw new Error('Belum ada data kelas berstatus Valid yang dipilih untuk disimpan.');
+      let tersimpan = 0;
+      for (const k of terpilih) {
+        if (!(await cekUnik(COLLECTIONS.kelas, 'kodeKelas', k.kodeKelas))) continue;
+        await dbCreate(COLLECTIONS.kelas, {
+          kodeKelas: k.kodeKelas.trim(),
+          namaKelas: k.namaKelas.trim(),
+          tingkat: k.tingkat,
+          tahunAjaran: k.tahunAjaran.trim(),
+          waliKelas: k.waliKelas.trim()
+        });
+        tersimpan++;
+      }
+      if (!tersimpan) throw new Error('Seluruh kelas terpilih sudah terdaftar di database.');
+      tutupModalFormDnc();
+      resetCacheMenu(['DNC-M1', 'DNC-M2', 'DNC-M4', 'DNC-M6', 'DNC-M7']);
+      await muatM2Master(true);
+      tampilkanToast(`${tersimpan} data kelas berhasil diimpor.`);
     }
   });
 }
@@ -1173,7 +1549,7 @@ function renderTabelSoal() {
     if (fTipe && s.tipeSoal !== fTipe) return false;
     if (fStatus === 'aktif' && !s.statusAktif) return false;
     if (fStatus === 'nonaktif' && s.statusAktif) return false;
-    if (q && !`${teks(s.kodeSoal)} ${teks(s.pertanyaan)}`.includes(q)) return false;
+    if (q && !`${teks(s.kodeSoal)} ${teks(s.pertanyaan)} ${teks(s.kunciJawaban)}`.includes(q)) return false;
     return true;
   });
 
@@ -1181,10 +1557,15 @@ function renderTabelSoal() {
     { label: 'Kode Soal', render: s => `<span class="dnc-mono">${esc(s.kodeSoal)}</span>` },
     { label: 'Mata Pelajaran', render: s => esc(namaMapelById(s.mapelId)) },
     { label: 'Tingkat', render: s => `<span class="dnc-badge dnc-badge-biru">${esc(s.tingkat)}</span>` },
-    { label: 'Tipe', render: s => esc(s.tipeSoal) },
+    { label: 'Tipe Soal', render: s => badgeTipeSoal(s.tipeSoal) },
     { label: 'Pertanyaan', render: s => `<div class="dnc-teks-potong" title="${esc(s.pertanyaan)}">${esc(s.pertanyaan)}</div>` },
-    { label: 'Kunci', render: s => s.tipeSoal === 'Pilihan Ganda' ? `<strong>${esc(s.kunciJawaban)}</strong>` : '<span class="dnc-teks-muted">Rubrik</span>' },
-    { label: 'Bobot', render: s => esc(s.bobotNilai) },
+    {
+      label: 'Kunci Jawaban',
+      render: s => s.tipeSoal === 'Pilihan Ganda' || s.tipeSoal === 'Pilihan Ganda Kompleks'
+        ? `<strong class="dnc-mono">${esc(s.kunciJawaban || '-')}</strong>`
+        : `<div class="dnc-teks-potong" style="max-width:160px" title="${esc(s.kunciJawaban || '')}">${esc(s.kunciJawaban || 'Rubrik')}</div>`
+    },
+    { label: 'Bobot', render: s => `<strong>${esc(s.bobotNilai)}</strong>` },
     { label: 'Status', render: s => badgeStatus(s.statusAktif ? 'Aktif' : 'Nonaktif') },
     {
       label: 'Aksi', aksi: true,
@@ -1204,6 +1585,10 @@ function opsiMapToObj(list) {
   return map;
 }
 
+function adalahTipeBeropsi(tipe) {
+  return tipe === 'Pilihan Ganda' || tipe === 'Pilihan Ganda Kompleks';
+}
+
 function bukaFormSoal(item = null) {
   const mapelList = daftarMapelDiizinkan();
   if (!mapelList.length) {
@@ -1212,6 +1597,7 @@ function bukaFormSoal(item = null) {
   }
   const opsi = opsiMapToObj(item?.opsiJawaban);
   const tipeAwal = item?.tipeSoal || 'Pilihan Ganda';
+  const kunciSet = parseKunciKompleksSet(item?.kunciJawaban);
 
   bukaModalFormDnc({
     judul: item ? 'Ubah Butir Soal' : 'Tambah Butir Soal',
@@ -1237,8 +1623,7 @@ function bukaFormSoal(item = null) {
         <div class="dnc-form-grup">
           <label class="dnc-label" for="f-tipeSoal">Tipe Soal *</label>
           <select id="f-tipeSoal" class="dnc-select" required>
-            <option value="Pilihan Ganda" ${tipeAwal === 'Pilihan Ganda' ? 'selected' : ''}>Pilihan Ganda</option>
-            <option value="Uraian" ${tipeAwal === 'Uraian' ? 'selected' : ''}>Uraian</option>
+            ${daftarTipeSoalDiizinkanForm().map(t => `<option value="${t}" ${tipeAwal === t ? 'selected' : ''}>${t}</option>`).join('')}
           </select>
         </div>
         <div class="dnc-form-grup dnc-form-full">
@@ -1249,7 +1634,7 @@ function bukaFormSoal(item = null) {
           <label class="dnc-label" for="f-urlGambar">URL Gambar Pendukung (Opsional)</label>
           <input id="f-urlGambar" class="dnc-input" type="text" placeholder="https://... atau hasil ekstraksi Word" value="${esc(item?.urlGambar || '')}">
         </div>
-        <div id="wadah-opsi-pg" class="dnc-form-full ${tipeAwal === 'Uraian' ? 'dnc-disembunyikan' : ''}">
+        <div id="wadah-opsi-pg" class="dnc-form-full ${!adalahTipeBeropsi(tipeAwal) ? 'dnc-disembunyikan' : ''}">
           <div class="dnc-form-grid">
             ${['A', 'B', 'C', 'D', 'E'].map(k => `
               <div class="dnc-form-grup ${k === 'E' ? 'dnc-form-full' : ''}">
@@ -1258,13 +1643,23 @@ function bukaFormSoal(item = null) {
               </div>`).join('')}
           </div>
         </div>
-        <div class="dnc-form-grup">
+        <div id="wadah-kunci-kompleks" class="dnc-form-grup dnc-form-full ${tipeAwal !== 'Pilihan Ganda Kompleks' ? 'dnc-disembunyikan' : ''}">
+          <label class="dnc-label">Centang Kunci Jawaban Benar (PG Kompleks — pilih 2 atau lebih) *</label>
+          <div class="dnc-flex-gap">
+            ${['A', 'B', 'C', 'D', 'E'].map(k => `
+              <label class="dnc-check-label">
+                <input type="checkbox" name="f-kunci-kompleks" value="${k}" ${kunciSet.has(k) ? 'checked' : ''}>
+                <span>Opsi ${k}</span>
+              </label>`).join('')}
+          </div>
+        </div>
+        <div id="wadah-kunci-teks" class="dnc-form-grup ${tipeAwal === 'Pilihan Ganda Kompleks' ? 'dnc-disembunyikan' : ''}">
           <label class="dnc-label" for="f-kunciJawaban">Kunci Jawaban / Rubrik</label>
-          <input id="f-kunciJawaban" class="dnc-input" type="text" placeholder="A-E untuk PG, atau rubrik Uraian" value="${esc(item?.kunciJawaban || '')}">
+          <input id="f-kunciJawaban" class="dnc-input" type="text" placeholder="A-E untuk PG, teks untuk Isian (pisah | jika lebih dari 1), rubrik Uraian" value="${esc(item?.kunciJawaban || '')}">
         </div>
         <div class="dnc-form-grup">
-          <label class="dnc-label" for="f-bobotNilai">Bobot Nilai *</label>
-          <input id="f-bobotNilai" class="dnc-input" type="number" min="1" step="0.5" value="${esc(item?.bobotNilai ?? 10)}" required>
+          <label class="dnc-label" for="f-bobotNilai">Bobot / Skor Soal *</label>
+          <input id="f-bobotNilai" class="dnc-input" type="number" min="0.5" step="0.5" value="${esc(item?.bobotNilai ?? 10)}" required>
         </div>
         <div class="dnc-form-grup dnc-form-full">
           <label class="dnc-check-label">
@@ -1274,9 +1669,15 @@ function bukaFormSoal(item = null) {
         </div>
       </div>`,
     onMount: () => {
-      document.getElementById('f-tipeSoal').addEventListener('change', e => {
-        document.getElementById('wadah-opsi-pg').classList.toggle('dnc-disembunyikan', e.target.value === 'Uraian');
-      });
+      const selTipe = document.getElementById('f-tipeSoal');
+      const perbaruiTampilanTipe = () => {
+        const tp = selTipe.value;
+        document.getElementById('wadah-opsi-pg').classList.toggle('dnc-disembunyikan', !adalahTipeBeropsi(tp));
+        document.getElementById('wadah-kunci-kompleks').classList.toggle('dnc-disembunyikan', tp !== 'Pilihan Ganda Kompleks');
+        document.getElementById('wadah-kunci-teks').classList.toggle('dnc-disembunyikan', tp === 'Pilihan Ganda Kompleks');
+      };
+      selTipe.addEventListener('change', perbaruiTampilanTipe);
+      perbaruiTampilanTipe();
     },
     onSubmit: async () => {
       const tipeSoal = document.getElementById('f-tipeSoal').value;
@@ -1291,19 +1692,30 @@ function bukaFormSoal(item = null) {
 
       if (!kodeSoal || !mapelId || !pertanyaan) throw new Error('Kode soal, mata pelajaran, dan pertanyaan wajib diisi.');
       if (!bolehAksesMapel(mapelId)) throw new Error('Anda tidak memiliki akses pada mata pelajaran tersebut.');
-      if (isNaN(bobotNilai) || bobotNilai <= 0) throw new Error('Bobot nilai harus lebih besar dari 0.');
+      if (isNaN(bobotNilai) || bobotNilai <= 0) throw new Error('Bobot/skor soal harus lebih besar dari 0.');
 
       let opsiJawaban = [];
-      if (tipeSoal === 'Pilihan Ganda') {
+      if (adalahTipeBeropsi(tipeSoal)) {
         ['A', 'B', 'C', 'D', 'E'].forEach(k => {
           const val = document.getElementById(`f-opsi-${k}`).value.trim();
           if (val) opsiJawaban.push({ kode: k, teks: val });
         });
         if (opsiJawaban.length < 2) throw new Error('Soal Pilihan Ganda wajib memiliki minimal 2 opsi jawaban.');
-        kunciJawaban = kunciJawaban.toUpperCase();
-        if (!opsiJawaban.some(o => o.kode === kunciJawaban)) {
-          throw new Error('Kunci jawaban Pilihan Ganda harus cocok dengan kode opsi yang tersedia (A–E).');
+        if (tipeSoal === 'Pilihan Ganda') {
+          kunciJawaban = kunciJawaban.toUpperCase().replace(/[^A-E]/g, '').slice(0, 1);
+          if (!opsiJawaban.some(o => o.kode === kunciJawaban)) {
+            throw new Error('Kunci jawaban Pilihan Ganda harus cocok dengan kode opsi yang tersedia (A–E).');
+          }
+        } else {
+          const dipilih = [...document.querySelectorAll('input[name="f-kunci-kompleks"]:checked')].map(el => el.value);
+          const validKunci = dipilih.filter(k => opsiJawaban.some(o => o.kode === k));
+          if (validKunci.length < 2) {
+            throw new Error('Pilihan Ganda Kompleks wajib memiliki minimal 2 kunci jawaban yang cocok dengan opsi terisi.');
+          }
+          kunciJawaban = validKunci.sort().join(', ');
         }
+      } else if (tipeSoal === 'Isian Singkat' && !kunciJawaban) {
+        throw new Error('Soal Isian Singkat wajib memiliki kunci jawaban.');
       }
 
       if (!(await cekUnik(COLLECTIONS.bankSoal, 'kodeSoal', kodeSoal, item?.id))) {
@@ -1329,13 +1741,14 @@ function bukaFormSoal(item = null) {
 function bukaPratinjauSoal(id) {
   const s = cariById('bankSoal', id);
   if (!s) return;
-  const opsiHtml = s.tipeSoal === 'Pilihan Ganda'
+  const kunciSet = parseKunciKompleksSet(s.kunciJawaban);
+  const opsiHtml = adalahTipeBeropsi(s.tipeSoal)
     ? `<div class="dnc-opsi-list dnc-mt-12">${(s.opsiJawaban || []).map(o => `
-        <div class="dnc-opsi-item ${o.kode === s.kunciJawaban ? 'terpilih' : ''}">
+        <div class="dnc-opsi-item ${kunciSet.has(o.kode) ? 'terpilih' : ''}">
           <span class="dnc-opsi-kode">${esc(o.kode)}</span>
           <span>${esc(o.teks)}</span>
         </div>`).join('')}</div>`
-    : `<div class="dnc-jawaban-box dnc-mt-12"><strong>Rubrik / Kunci Uraian:</strong>\n${esc(s.kunciJawaban || 'Belum diisi')}</div>`;
+    : `<div class="dnc-jawaban-box dnc-mt-12"><strong>Kunci / Rubrik (${esc(s.tipeSoal)}):</strong>\n${esc(s.kunciJawaban || 'Belum diisi')}</div>`;
 
   bukaModalFormDnc({
     judul: `Pratinjau Soal — ${s.kodeSoal}`,
@@ -1345,7 +1758,7 @@ function bukaPratinjauSoal(id) {
       <div class="dnc-pratinjau-soal">
         <div class="dnc-flex-between dnc-mb-12">
           <span class="dnc-badge dnc-badge-biru">${esc(namaMapelById(s.mapelId))} • Tingkat ${esc(s.tingkat)}</span>
-          <span class="dnc-badge dnc-badge-abu">${esc(s.tipeSoal)} • Bobot ${esc(s.bobotNilai)}</span>
+          <div class="dnc-flex-gap">${badgeTipeSoal(s.tipeSoal)}<span class="dnc-badge dnc-badge-abu">Bobot ${esc(s.bobotNilai)}</span></div>
         </div>
         ${s.urlGambar ? `<img src="${esc(s.urlGambar)}" alt="Gambar soal" class="dnc-soal-gambar">` : ''}
         <div class="dnc-soal-teks">${esc(s.pertanyaan)}</div>
@@ -1396,109 +1809,7 @@ function hapusSoalDenganProteksi(id) {
   });
 }
 
-// --- DNC-F10: Impor Massal CSV Soal ---
-function parseCsvBaris(teksCsv) {
-  const baris = [];
-  let row = [], field = '', dalamKutip = false;
-  for (let i = 0; i < teksCsv.length; i++) {
-    const ch = teksCsv[i], next = teksCsv[i + 1];
-    if (dalamKutip) {
-      if (ch === '"' && next === '"') { field += '"'; i++; }
-      else if (ch === '"') dalamKutip = false;
-      else field += ch;
-    } else if (ch === '"') {
-      dalamKutip = true;
-    } else if (ch === ',' || ch === ';') {
-      row.push(field.trim()); field = '';
-    } else if (ch === '\n' || ch === '\r') {
-      if (ch === '\r' && next === '\n') i++;
-      row.push(field.trim());
-      if (row.some(c => c !== '')) baris.push(row);
-      row = []; field = '';
-    } else {
-      field += ch;
-    }
-  }
-  if (field.length || row.length) {
-    row.push(field.trim());
-    if (row.some(c => c !== '')) baris.push(row);
-  }
-  return baris;
-}
-
-function bukaModalImporCsvSoal() {
-  const mapelList = daftarMapelDiizinkan();
-  if (!mapelList.length) { tampilkanToast('Belum ada mata pelajaran tersedia.', 'error'); return; }
-
-  bukaModalFormDnc({
-    judul: 'Impor Bank Soal dari CSV',
-    lebar: true,
-    labelSimpan: 'Impor Soal CSV',
-    htmlKonten: `
-      <div class="dnc-form-grid">
-        <div class="dnc-form-grup">
-          <label class="dnc-label" for="csv-mapelId">Mata Pelajaran Sasaran *</label>
-          <select id="csv-mapelId" class="dnc-select">${mapelList.map(m => `<option value="${esc(m.id)}">${esc(m.kodeMapel)} - ${esc(m.namaMapel)}</option>`).join('')}</select>
-        </div>
-        <div class="dnc-form-grup">
-          <label class="dnc-label" for="csv-tingkat">Tingkat Kelas *</label>
-          <select id="csv-tingkat" class="dnc-select">${TINGKAT_LIST.map(t => `<option value="${t}" ${t === 'X' ? 'selected' : ''}>${t}</option>`).join('')}</select>
-        </div>
-        <div class="dnc-form-grup dnc-form-full">
-          <div class="dnc-flex-between">
-            <label class="dnc-label" for="csv-file-soal">Pilih File CSV (.csv)</label>
-            <button type="button" id="btn-unduh-templat-csv" class="dnc-tombol dnc-tombol-sekunder dnc-tombol-kecil">Unduh Templat CSV</button>
-          </div>
-          <input id="csv-file-soal" class="dnc-input" type="file" accept=".csv,text/csv" style="padding-top:7px">
-          <span class="dnc-form-bantuan">Header kolom: kodeSoal,tipeSoal,pertanyaan,opsiA,opsiB,opsiC,opsiD,opsiE,kunciJawaban,bobotNilai</span>
-        </div>
-      </div>`,
-    onMount: () => {
-      document.getElementById('btn-unduh-templat-csv').addEventListener('click', () => {
-        const isi = 'kodeSoal,tipeSoal,pertanyaan,opsiA,opsiB,opsiC,opsiD,opsiE,kunciJawaban,bobotNilai\n' +
-          'SOAL-01,Pilihan Ganda,"Hasil dari 12 x 5 adalah ...",50,55,60,65,,C,10\n' +
-          'SOAL-02,Uraian,"Jelaskan pengertian gagasan utama dalam paragraf!",,,,,,Ide pokok yang menjadi inti pembahasan paragraf.,20\n';
-        unduhBlobFile(new Blob([isi], { type: 'text/csv;charset=utf-8' }), 'Templat_Bank_Soal_ASAS_DNC.csv');
-      });
-    },
-    onSubmit: async () => {
-      const file = document.getElementById('csv-file-soal').files[0];
-      if (!file) throw new Error('Pilih file CSV terlebih dahulu.');
-      const mapelId = document.getElementById('csv-mapelId').value;
-      const tingkat = document.getElementById('csv-tingkat').value;
-      const mapelObj = cariById('mataPelajaran', mapelId);
-      const baris = parseCsvBaris(await file.text());
-      if (baris.length < 2) throw new Error('File CSV tidak berisi baris soal.');
-
-      let tersimpan = 0;
-      const waktuTag = Date.now().toString().slice(-4);
-      for (let i = 1; i < baris.length; i++) {
-        const [kodeRaw, tipeRaw, pertanyaan, a, b, c, d, e, kunciRaw, bobotRaw] = baris[i];
-        if (!pertanyaan) continue;
-        const tipeSoal = teks(tipeRaw).includes('urai') ? 'Uraian' : 'Pilihan Ganda';
-        const opsiJawaban = tipeSoal === 'Pilihan Ganda'
-          ? [['A', a], ['B', b], ['C', c], ['D', d], ['E', e]].filter(([, v]) => v).map(([kode, teksOpsi]) => ({ kode, teks: teksOpsi }))
-          : [];
-        const kodeSoal = kodeRaw || `${(mapelObj?.kodeMapel || 'SL')}-${waktuTag}-${String(i).padStart(2, '0')}`;
-        const bobotNilai = Number(bobotRaw) > 0 ? Number(bobotRaw) : 10;
-        const kunciJawaban = tipeSoal === 'Pilihan Ganda' ? String(kunciRaw || 'A').trim().toUpperCase() : String(kunciRaw || '').trim();
-        if (tipeSoal === 'Pilihan Ganda' && opsiJawaban.length < 2) continue;
-        await dbCreate(COLLECTIONS.bankSoal, {
-          kodeSoal, mapelId, tingkat, tipeSoal, pertanyaan, urlGambar: '',
-          opsiJawaban, kunciJawaban, bobotNilai, statusAktif: true, dibuatOleh: penggunaAktif.id
-        });
-        tersimpan++;
-      }
-      if (!tersimpan) throw new Error('Tidak ada baris soal yang valid untuk diimpor.');
-      tutupModalFormDnc();
-      resetCacheMenu(['DNC-M1', 'DNC-M3', 'DNC-M4']);
-      await muatM3BankSoal(true);
-      tampilkanToast(`${tersimpan} butir soal berhasil diimpor dari CSV.`);
-    }
-  });
-}
-
-// --- DNC-F27: Unggah & Impor Soal dari Dokumen Word (.docx) ---
+// --- Utilitas File & Pembuat Dokumen Word (.docx) ---
 function unduhBlobFile(blob, namaFile) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -1572,26 +1883,8 @@ function buatZipStoreBlob(entriFiles) {
   });
 }
 
-function unduhTemplatWordDocx() {
-  const barisTemplat = [
-    'TEMPLAT BANK SOAL ASAS - DIGITALNETCARE',
-    'Petunjuk: Tulis soal bernomor (1., 2., dst.). Gunakan A. sampai E. untuk opsi Pilihan Ganda, lalu lengkapi Kunci:, Tipe:, dan Bobot:. Gambar dapat ditempel langsung di bawah pertanyaan.',
-    '',
-    '1. Nilai dari 2x + 6 = 18 adalah ...',
-    'A. 4',
-    'B. 6',
-    'C. 8',
-    'D. 12',
-    'Kunci: B',
-    'Tipe: Pilihan Ganda',
-    'Bobot: 25',
-    '',
-    '2. Jelaskan perbedaan antara teks eksposisi dan teks argumentasi secara ringkas!',
-    'Tipe: Uraian',
-    'Kunci: Teks eksposisi bertujuan memaparkan informasi secara objektif, sedangkan teks argumentasi bertujuan meyakinkan pembaca dengan bukti dan alasan.',
-    'Bobot: 50'
-  ];
-  const xmlParagraf = barisTemplat.map(t => `<w:p><w:r><w:t xml:space="preserve">${esc(t)}</w:t></w:r></w:p>`).join('');
+function unduhDokumenWordSederhana(barisTeks, namaFile) {
+  const xmlParagraf = barisTeks.map(t => `<w:p><w:r><w:t xml:space="preserve">${esc(t)}</w:t></w:r></w:p>`).join('');
   const entri = [
     {
       nama: '[Content_Types].xml',
@@ -1610,7 +1903,68 @@ function unduhTemplatWordDocx() {
       isi: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${xmlParagraf}<w:sectPr/></w:body></w:document>`
     }
   ];
-  unduhBlobFile(buatZipStoreBlob(entri), 'Templat_Soal_ASAS_DigitalNetCare.docx');
+  unduhBlobFile(buatZipStoreBlob(entri), namaFile);
+}
+
+function unduhTemplatWordDocx() {
+  unduhDokumenWordSederhana([
+    'TEMPLAT SOAL ASAS LENGKAP (KUNCI & PEDOMAN PENSKORAN) - DIGITALNETCARE',
+    '',
+    'A. PILIHAN GANDA (Skor @10)',
+    '1. Jika f(x) = 3x - 5, maka nilai dari f(4) adalah ...',
+    'A. 5',
+    'B. 7',
+    'C. 9',
+    'D. 12',
+    '',
+    'B. PILIHAN GANDA KOMPLEKS (Skor @20)',
+    '2. Pilih lebih dari satu bilangan prima di bawah ini:',
+    'A. 2',
+    'B. 9',
+    'C. 11',
+    'D. 15',
+    '',
+    'C. ISIAN SINGKAT (Skor @20)',
+    '3. Ibukota Negara Kesatuan Republik Indonesia yang berada di Pulau Jawa adalah ....',
+    '',
+    'D. URAIAN (Skor @50)',
+    '4. Jelaskan langkah menyelesaikan sistem persamaan linear dua variabel dengan metode eliminasi!',
+    '',
+    'KUNCI JAWABAN DAN PEDOMAN PENSKORAN',
+    '1. B (Skor: 10)',
+    '2. A, C (Skor: 20)',
+    '3. Jakarta (Skor: 20)',
+    '4. Samakan koefisien salah satu variabel, lalu kurangkan atau jumlahkan kedua persamaan untuk mendapatkan nilai variabel lainnya. (Skor: 50)'
+  ], 'Templat_Soal_Lengkap_ASAS_DigitalNetCare.docx');
+}
+
+function parseCsvBaris(teksCsv) {
+  const baris = [];
+  let row = [], field = '', dalamKutip = false;
+  for (let i = 0; i < teksCsv.length; i++) {
+    const ch = teksCsv[i], next = teksCsv[i + 1];
+    if (dalamKutip) {
+      if (ch === '"' && next === '"') { field += '"'; i++; }
+      else if (ch === '"') dalamKutip = false;
+      else field += ch;
+    } else if (ch === '"') {
+      dalamKutip = true;
+    } else if (ch === ',' || ch === ';') {
+      row.push(field.trim()); field = '';
+    } else if (ch === '\n' || ch === '\r') {
+      if (ch === '\r' && next === '\n') i++;
+      row.push(field.trim());
+      if (row.some(c => c !== '')) baris.push(row);
+      row = []; field = '';
+    } else {
+      field += ch;
+    }
+  }
+  if (field.length || row.length) {
+    row.push(field.trim());
+    if (row.some(c => c !== '')) baris.push(row);
+  }
+  return baris;
 }
 
 function kompresDataGambar(dataUrl, maksLebar = 640, kualitas = 0.72) {
@@ -1630,118 +1984,456 @@ function kompresDataGambar(dataUrl, maksLebar = 640, kualitas = 0.72) {
   });
 }
 
-function validasiItemWord(item) {
+// --- REVISI 2, 3, 4, 5, 8, 9: Mesin Parser Pintar Bank Soal (Word, PDF, Excel) ---
+function deteksiTipeDariTeks(teksRaw, opsiCount, kunciRaw, pertanyaanRaw) {
+  const t = teks(teksRaw || '');
+  const p = teks(pertanyaanRaw || '');
+  if (t.includes('kompleks') || t.includes('pgk') || t.includes('multi') || t.includes('lebih dari satu')) {
+    return 'Pilihan Ganda Kompleks';
+  }
+  if (t.includes('isian') || t.includes('singkat') || t.includes('melengkapi')) {
+    return 'Isian Singkat';
+  }
+  if (t.includes('urai') || t.includes('esai') || t.includes('essay')) {
+    return 'Uraian';
+  }
+  if (t.includes('pilihan ganda') || t === 'pg') {
+    if (opsiCount >= 2 && parseKunciKompleksSet(kunciRaw).size > 1) return 'Pilihan Ganda Kompleks';
+    return 'Pilihan Ganda';
+  }
+
+  // Klasifikasi otomatis cerdas berdasarkan struktur opsi, kunci, & teks pertanyaan
+  if (opsiCount >= 2) {
+    const setKunci = parseKunciKompleksSet(kunciRaw);
+    const ciriKompleks = /(pilih(?:lah)?\s+(?:lebih\s+dari\s+satu|dua|2|tiga|3|beberapa)|jawaban\s+(?:benar\s+)?lebih\s+dari\s+satu|berilah\s+tanda\s+centang|pilihan\s+ganda\s+kompleks)/i.test(p);
+    if (setKunci.size > 1 || ciriKompleks) return 'Pilihan Ganda Kompleks';
+    return 'Pilihan Ganda';
+  }
+
+  const kunciBersih = String(kunciRaw || '').trim();
+  const ciriIsian = /(?:_{3,}|\.{4,}|isilah\s+titik|lengkapi\s+kalimat)/i.test(p);
+  if (ciriIsian || (kunciBersih && kunciBersih.length <= 55 && kunciBersih.split(/\s+/).length <= 5)) {
+    return 'Isian Singkat';
+  }
+  return 'Uraian';
+}
+
+function deteksiHeadingBagianSoal(teksBaris) {
+  const b = String(teksBaris || '').trim();
+  if (!b || b.length > 130) return null;
+  if (/^(?:(?:[IVX]+|[A-E]|\d+)[\.\)]\s*)?(?:soal\s+)?(?:pilihan\s+ganda\s+kompleks|pg\s+kompleks|pgk)\b/i.test(b)) {
+    return 'Pilihan Ganda Kompleks';
+  }
+  if (/^(?:(?:[IVX]+|[A-E]|\d+)[\.\)]\s*)?(?:soal\s+)?(?:pilihan\s+ganda|pg)\b/i.test(b)) {
+    return 'Pilihan Ganda';
+  }
+  if (/^(?:(?:[IVX]+|[A-E]|\d+)[\.\)]\s*)?(?:soal\s+)?(?:isian\s+singkat|isian|melengkapi)\b/i.test(b)) {
+    return 'Isian Singkat';
+  }
+  if (/^(?:(?:[IVX]+|[A-E]|\d+)[\.\)]\s*)?(?:soal\s+)?(?:uraian|essay|esai)\b/i.test(b)) {
+    return 'Uraian';
+  }
+  return null;
+}
+
+function ekstrakAngkaSkorTeks(teksBaris) {
+  const m = String(teksBaris || '').match(/(?:bobot|skor|poin|nilai)\s*(?:maks(?:imal)?|per\s*soal|masing-masing|@)?\s*[:=@]?\s*(\d+(?:[\.,]\d+)?)/i) ||
+    String(teksBaris || '').match(/@\s*(\d+(?:[\.,]\d+)?)/);
+  return m ? Number(m[1].replace(',', '.')) : null;
+}
+
+function validasiItemSoalPintar(item) {
   const masalah = [];
   if (!item.pertanyaan || !item.pertanyaan.trim()) masalah.push('Pertanyaan kosong');
-  if (!Number(item.bobotNilai) || Number(item.bobotNilai) <= 0) masalah.push('Bobot tidak valid');
+  if (!Number(item.bobotNilai) || Number(item.bobotNilai) <= 0) masalah.push('Bobot/skor tidak valid');
+
   if (item.tipeSoal === 'Pilihan Ganda') {
     if (!item.opsiJawaban || item.opsiJawaban.length < 2) masalah.push('Opsi PG kurang dari 2');
-    const k = String(item.kunciJawaban || '').trim().toUpperCase();
-    if (!k || !(item.opsiJawaban || []).some(o => o.kode === k)) masalah.push('Kunci tidak cocok dengan opsi');
+    const k = String(item.kunciJawaban || '').trim().toUpperCase().replace(/[^A-E]/g, '').slice(0, 1);
+    item.kunciJawaban = k;
+    if (!k || !(item.opsiJawaban || []).some(o => o.kode === k)) masalah.push('Kunci PG belum terdeteksi / tidak cocok opsi');
+  } else if (item.tipeSoal === 'Pilihan Ganda Kompleks') {
+    if (!item.opsiJawaban || item.opsiJawaban.length < 2) masalah.push('Opsi PGK kurang dari 2');
+    item.kunciJawaban = normalisasiKunciKompleks(item.kunciJawaban);
+    const setK = parseKunciKompleksSet(item.kunciJawaban);
+    const cocokSemua = [...setK].every(k => (item.opsiJawaban || []).some(o => o.kode === k));
+    if (setK.size < 2 || !cocokSemua) masalah.push('Kunci PG Kompleks minimal 2 opsi valid (mis. A, C)');
+  } else if (item.tipeSoal === 'Isian Singkat') {
+    if (!String(item.kunciJawaban || '').trim()) masalah.push('Kunci Isian Singkat kosong');
   }
+
   item.valid = masalah.length === 0;
-  item.catatanValidasi = masalah.length ? masalah.join('; ') : 'Siap disimpan';
+  item.catatanValidasi = masalah.length ? masalah.join('; ') : 'Terdeteksi otomatis & siap disimpan';
   return item;
 }
 
-function ekstraksiSoalDariHtmlWord(htmlStr, kodeMapelPrefix) {
-  const doc = new DOMParser().parseFromString(htmlStr, 'text/html');
+function pecahOpsiSejajar(teksBaris) {
+  // Mengurai opsi yang ditulis dalam satu baris, misal: "A. 5    B. 7    C. 9    D. 12"
+  const regex = /(?:^|\s{2,}|\t)([A-Ea-e])[\.\)]\s+/g;
+  const posisi = [];
+  let m;
+  while ((m = regex.exec(teksBaris)) !== null) {
+    const startHuruf = m.index + m[0].search(/[A-Ea-e]/);
+    posisi.push({ kode: m[1].toUpperCase(), start: startHuruf, isiMulai: regex.lastIndex });
+  }
+  if (posisi.length < 2) return null;
   const hasil = [];
-  const cap = Date.now().toString().slice(-4);
+  for (let i = 0; i < posisi.length; i++) {
+    const akhir = i + 1 < posisi.length ? posisi[i + 1].start : teksBaris.length;
+    const isi = teksBaris.slice(posisi[i].isiMulai, akhir).trim();
+    if (isi) hasil.push({ kode: posisi[i].kode, teks: isi });
+  }
+  return hasil.length >= 2 ? hasil : null;
+}
 
-  // Mode 1: Deteksi format Tabel standar Word (jika terdapat tabel >= 5 kolom)
-  const tabelList = [...doc.querySelectorAll('table')];
-  if (tabelList.length) {
-    tabelList.forEach(tbl => {
-      const trList = [...tbl.querySelectorAll('tr')];
-      if (trList.length < 2) return;
-      const headerSel = [...trList[0].querySelectorAll('th,td')].map(c => teks(c.textContent.trim()));
-      const idxTanya = headerSel.findIndex(h => h.includes('pertanyaan') || h.includes('soal'));
-      if (idxTanya < 0) return;
-      for (let r = 1; r < trList.length; r++) {
-        const sel = [...trList[r].querySelectorAll('th,td')];
-        const ambil = idx => idx >= 0 && sel[idx] ? sel[idx].textContent.trim() : '';
-        const pertanyaan = ambil(idxTanya);
-        if (!pertanyaan) continue;
-        const imgEl = sel[idxTanya]?.querySelector('img');
-        const idxTipe = headerSel.findIndex(h => h.includes('tipe'));
-        const idxKunci = headerSel.findIndex(h => h.includes('kunci'));
-        const idxBobot = headerSel.findIndex(h => h.includes('bobot'));
-        const idxKode = headerSel.findIndex(h => h.includes('kode'));
-        const tipeSoal = teks(ambil(idxTipe)).includes('urai') ? 'Uraian' : 'Pilihan Ganda';
-        const opsiJawaban = [];
-        ['a', 'b', 'c', 'd', 'e'].forEach(hrf => {
-          const iO = headerSel.findIndex(h => h === hrf || h === `opsi ${hrf}` || h === `pilihan ${hrf}`);
-          const val = ambil(iO);
-          if (val) opsiJawaban.push({ kode: hrf.toUpperCase(), teks: val });
-        });
-        hasil.push(validasiItemWord({
-          dipilih: true,
-          kodeSoal: ambil(idxKode) || `${kodeMapelPrefix}-W${cap}-${String(hasil.length + 1).padStart(2, '0')}`,
-          tipeSoal,
-          pertanyaan,
-          urlGambar: imgEl ? imgEl.getAttribute('src') || '' : '',
-          opsiJawaban: tipeSoal === 'Pilihan Ganda' ? opsiJawaban : [],
-          kunciJawaban: tipeSoal === 'Pilihan Ganda' ? ambil(idxKunci).toUpperCase() : ambil(idxKunci),
-          bobotNilai: Number(ambil(idxBobot)) > 0 ? Number(ambil(idxBobot)) : 10
-        }));
+function ubahHtmlWordKeBarisTerstruktur(htmlStr) {
+  const doc = new DOMParser().parseFromString(htmlStr, 'text/html');
+  const hasilBaris = [];
+  const tabelTerpisah = [];
+  const hurufOpsi = ['A', 'B', 'C', 'D', 'E'];
+
+  const teksLangsungLi = li => {
+    const klon = li.cloneNode(true);
+    klon.querySelectorAll('ol, ul').forEach(sub => sub.remove());
+    return klon.textContent.replace(/\s+/g, ' ').trim();
+  };
+
+  const prosesDaftar = (listEl, level) => {
+    let nomor = Number(listEl.getAttribute('start') || 1);
+    const tipeList = listEl.getAttribute('type') || '';
+    const isHuruf = tipeList === 'a' || tipeList === 'A' || level > 0;
+    let idxHuruf = 0;
+
+    [...listEl.children].forEach(child => {
+      if (child.tagName !== 'LI') return;
+      const imgEl = child.querySelector(':scope > img, :scope > p > img');
+      const imgSrc = imgEl ? imgEl.getAttribute('src') || '' : '';
+      const boldKuat = Boolean(child.querySelector(':scope > strong, :scope > b, :scope > p > strong, :scope > p > b'));
+      const txt = teksLangsungLi(child);
+
+      if (txt) {
+        const sudahBernomor = /^\d+[\.\)]\s/.test(txt);
+        const sudahBerhuruf = /^[A-Ea-e][\.\)]\s/.test(txt);
+        const adalahMeta = /^(?:kunci|jawaban|tipe|jenis|bobot|skor|nilai|kode)/i.test(txt);
+        if (sudahBernomor || sudahBerhuruf || adalahMeta) {
+          hasilBaris.push({ teks: txt, img: imgSrc, bold: boldKuat });
+        } else if (isHuruf && idxHuruf < hurufOpsi.length) {
+          hasilBaris.push({ teks: `${hurufOpsi[idxHuruf]}. ${txt}`, img: imgSrc, bold: boldKuat });
+          idxHuruf++;
+        } else {
+          hasilBaris.push({ teks: `${nomor}. ${txt}`, img: imgSrc, bold: boldKuat });
+          nomor++;
+        }
+      } else if (imgSrc) {
+        hasilBaris.push({ teks: '', img: imgSrc, bold: false });
       }
+
+      [...child.children].forEach(sub => {
+        if (sub.tagName === 'OL' || sub.tagName === 'UL') {
+          prosesDaftar(sub, level + 1);
+        }
+      });
     });
-    if (hasil.length) return hasil;
+  };
+
+  [...doc.body.children].forEach(el => {
+    const tag = el.tagName;
+    if (tag === 'TABLE') {
+      const rows = [...el.querySelectorAll('tr')].map(tr =>
+        [...tr.querySelectorAll('th,td')].map(td => ({
+          teks: td.textContent.replace(/\s+/g, ' ').trim(),
+          img: td.querySelector('img')?.getAttribute('src') || ''
+        }))
+      );
+      tabelTerpisah.push(rows);
+    } else if (tag === 'OL' || tag === 'UL') {
+      prosesDaftar(el, 0);
+    } else {
+      const imgEl = el.querySelector('img');
+      const imgSrc = imgEl ? imgEl.getAttribute('src') || '' : '';
+      const txt = el.textContent.replace(/\s+/g, ' ').trim();
+      const boldKuat = Boolean(el.querySelector('strong, b')) && el.textContent.trim().length < 90;
+      if (txt || imgSrc) {
+        hasilBaris.push({ teks: txt, img: imgSrc, bold: boldKuat });
+      }
+    }
+  });
+
+  return { baris: hasilBaris, tabel: tabelTerpisah };
+}
+
+function ekstraksiSoalDariTabel(rows, kodeMapelPrefix, cap) {
+  if (!rows || rows.length < 2) return { soal: [], kunciMap: {}, bobotBagian: {} };
+  const header = rows[0].map(c => teks(c.teks));
+  const idxTanya = header.findIndex(h => h.includes('pertanyaan') || h.includes('butir soal') || h === 'soal');
+  const idxKunci = header.findIndex(h => h.includes('kunci') || h.includes('jawaban'));
+  const idxNo = header.findIndex(h => h === 'no' || h === 'no.' || h.includes('nomor'));
+  const idxBobot = header.findIndex(h => h.includes('bobot') || h.includes('skor') || h.includes('nilai') || h.includes('poin'));
+  const idxTipe = header.findIndex(h => h.includes('tipe') || h.includes('jenis') || h.includes('bentuk'));
+
+  // Kasus A: Tabel khusus Bank Soal lengkap
+  if (idxTanya >= 0) {
+    const idxKode = header.findIndex(h => h.includes('kode'));
+    const soal = [];
+    for (let r = 1; r < rows.length; r++) {
+      const sel = rows[r];
+      const ambil = i => (i >= 0 && sel[i] ? sel[i].teks.trim() : '');
+      const pertanyaan = ambil(idxTanya);
+      if (!pertanyaan) continue;
+      const opsiJawaban = [];
+      ['a', 'b', 'c', 'd', 'e'].forEach(hrf => {
+        const io = header.findIndex(h => h === hrf || h === `opsi ${hrf}` || h === `pilihan ${hrf}` || h === `opsi_${hrf}` || h === `opsia`.replace('a', hrf));
+        const v = ambil(io);
+        if (v) opsiJawaban.push({ kode: hrf.toUpperCase(), teks: v });
+      });
+      const kunciRaw = ambil(idxKunci);
+      const tipeSoal = deteksiTipeDariTeks(ambil(idxTipe), opsiJawaban.length, kunciRaw, pertanyaan);
+      const bobotNilai = Number(ambil(idxBobot).replace(',', '.')) || 10;
+      soal.push(validasiItemSoalPintar({
+        dipilih: true,
+        nomorAsli: Number(ambil(idxNo)) || (soal.length + 1),
+        kodeSoal: ambil(idxKode) || `${kodeMapelPrefix}-S${cap}-${String(soal.length + 1).padStart(2, '0')}`,
+        tipeSoal,
+        pertanyaan,
+        urlGambar: sel[idxTanya]?.img || '',
+        opsiJawaban: adalahTipeBeropsi(tipeSoal) ? opsiJawaban : [],
+        kunciJawaban: kunciRaw,
+        bobotNilai
+      }));
+    }
+    return { soal, kunciMap: {}, bobotBagian: {} };
   }
 
-  // Mode 2: Deteksi format Paragraf Bernomor (1., A.-E., Kunci:, Tipe:, Bobot:)
-  const blokNodes = [...doc.body.querySelectorAll('p, li')];
+  // Kasus B: Tabel Kunci Jawaban & Pedoman Penskoran terpisah di bagian bawah file
+  const kunciMap = {};
+  const bobotBagian = {};
+  if (idxKunci >= 0 || idxBobot >= 0) {
+    for (let r = 1; r < rows.length; r++) {
+      const sel = rows[r];
+      const ambil = i => (i >= 0 && sel[i] ? sel[i].teks.trim() : '');
+      const noStr = ambil(idxNo >= 0 ? idxNo : 0);
+      const kunciVal = idxKunci >= 0 ? ambil(idxKunci) : '';
+      const bobotVal = idxBobot >= 0 ? Number(ambil(idxBobot).replace(/[^0-9\.,]/g, '').replace(',', '.')) : null;
+      const tipeRow = idxTipe >= 0 ? deteksiTipeDariTeks(ambil(idxTipe), 0, '', '') : null;
+
+      // Rentang nomor misal "1-20" pada pedoman penskoran
+      const mRentang = noStr.match(/^(\d+)\s*[-–]\s*(\d+)$/);
+      if (mRentang && bobotVal > 0) {
+        for (let n = Number(mRentang[1]); n <= Number(mRentang[2]); n++) {
+          kunciMap[String(n)] = { ...(kunciMap[String(n)] || {}), bobot: bobotVal, tipe: tipeRow || kunciMap[String(n)]?.tipe };
+        }
+        continue;
+      }
+
+      const mNo = noStr.match(/\d+/);
+      if (mNo) {
+        const keyNo = String(Number(mNo[0]));
+        kunciMap[keyNo] = {
+          ...(kunciMap[keyNo] || {}),
+          ...(kunciVal ? { kunci: kunciVal } : {}),
+          ...(bobotVal > 0 ? { bobot: bobotVal } : {}),
+          ...(tipeRow ? { tipe: tipeRow } : {})
+        };
+      } else if (tipeRow && bobotVal > 0) {
+        bobotBagian[tipeRow] = bobotVal;
+      }
+    }
+  }
+  return { soal: [], kunciMap, bobotBagian };
+}
+
+function ekstrakSoalPintarDariSumber({ baris, tabel }, kodeMapelPrefix) {
+  const cap = Date.now().toString().slice(-4);
+  let daftarSoal = [];
+  const kunciGlobal = {};
+  const kunciPerBagian = {};
+  const bobotDefaultTipe = {};
+
+  // 1. Evaluasi seluruh tabel terlebih dahulu (bisa berisi tabel soal penuh atau tabel kunci/penskoran)
+  (tabel || []).forEach(rows => {
+    const res = ekstraksiSoalDariTabel(rows, kodeMapelPrefix, cap);
+    if (res.soal.length) daftarSoal.push(...res.soal);
+    Object.entries(res.kunciMap).forEach(([k, v]) => {
+      kunciGlobal[k] = { ...(kunciGlobal[k] || {}), ...v };
+    });
+    Object.assign(bobotDefaultTipe, res.bobotBagian);
+  });
+
+  // Jika tabel sudah menyediakan seluruh soal lengkap, terapkan kunci/bobot global jika ada lalu selesai
+  if (daftarSoal.length && (!baris || baris.length < 4)) {
+    return daftarSoal.map(s => terapkanKunciDanBobot(s, kunciGlobal, kunciPerBagian, bobotDefaultTipe));
+  }
+
+  // 2. Urai baris paragraf soal + bagian terpisah Kunci Jawaban & Pedoman Penskoran
+  let modeKunci = false;
+  let bagianAktif = '';
+  let bagianKunciAktif = '';
   let aktif = null;
+  let nomorUrut = 0;
+
   const dorongAktif = () => {
     if (!aktif) return;
-    if (!aktif.tipeSoal) aktif.tipeSoal = aktif.opsiJawaban.length >= 2 ? 'Pilihan Ganda' : 'Uraian';
-    if (aktif.tipeSoal === 'Pilihan Ganda') aktif.kunciJawaban = String(aktif.kunciJawaban || '').trim().toUpperCase();
-    hasil.push(validasiItemWord(aktif));
+    if (!aktif.pertanyaan.trim()) { aktif = null; return; }
+    daftarSoal.push(aktif);
     aktif = null;
   };
 
-  blokNodes.forEach(node => {
-    const imgEl = node.querySelector('img');
-    const txt = node.textContent.replace(/\s+/g, ' ').trim();
-    if (!txt && imgEl && aktif && !aktif.urlGambar) {
-      aktif.urlGambar = imgEl.getAttribute('src') || '';
+  (baris || []).forEach(item => {
+    const txt = String(item.teks || '').replace(/\s+/g, ' ').trim();
+    const imgSrc = item.img || '';
+
+    if (!txt && imgSrc && aktif && !aktif.urlGambar) {
+      aktif.urlGambar = imgSrc;
       return;
     }
     if (!txt) return;
 
-    const mNomor = txt.match(/^(\d+)[\.\)]\s*(.+)$/);
-    const mOpsi = txt.match(/^([A-Ea-e])[\.\)]\s*(.+)$/);
-    const mKunci = txt.match(/^(?:kunci|jawaban|kunci\s+jawaban)\s*[:=]\s*(.+)$/i);
-    const mTipe = txt.match(/^(?:tipe|jenis|tipe\s+soal)\s*[:=]\s*(.+)$/i);
-    const mBobot = txt.match(/^(?:bobot|skor|nilai)\s*[:=]\s*(\d+(?:[\.,]\d+)?)/i);
-    const mKode = txt.match(/^(?:kode|kode\s+soal)\s*[:=]\s*([A-Za-z0-9_-]+)/i);
-
-    if (mNomor && !/^templat/i.test(txt)) {
+    // Deteksi masuk ke bagian Kunci Jawaban / Pedoman Penskoran
+    if (/^(?:(?:[IVX]+|[A-E])[\.\)]\s*)?(?:kunci\s+jawaban|pedoman\s+penskoran|rubrik\s+penilaian|pembahasan\s+dan\s+kunci)/i.test(txt)) {
       dorongAktif();
+      modeKunci = true;
+      bagianKunciAktif = '';
+      const skorHead = ekstrakAngkaSkorTeks(txt);
+      const tipeHead = deteksiHeadingBagianSoal(txt);
+      if (tipeHead && skorHead) bobotDefaultTipe[tipeHead] = skorHead;
+      return;
+    }
+
+    // Jika sedang di bagian Kunci Jawaban & Pedoman Penskoran
+    if (modeKunci) {
+      const headBagian = deteksiHeadingBagianSoal(txt);
+      if (headBagian) {
+        bagianKunciAktif = headBagian;
+        const skorHead = ekstrakAngkaSkorTeks(txt);
+        if (skorHead > 0) bobotDefaultTipe[headBagian] = skorHead;
+        return;
+      }
+
+      // Cek aturan bobot umum per tipe soal (mis: "Pilihan Ganda: skor 2", "PG Kompleks = 4")
+      const tipeAturan = deteksiHeadingBagianSoal(txt.replace(/^[-•*]\s*/, ''));
+      const skorAturan = ekstrakAngkaSkorTeks(txt);
+      if (tipeAturan && skorAturan > 0 && !/^\d+[\.\)]/.test(txt)) {
+        bobotDefaultTipe[tipeAturan] = skorAturan;
+        return;
+      }
+
+      // Cek rentang nomor penskoran (mis: "No. 1-10 skor 2")
+      const mRentang = txt.match(/(?:no\.?\s*)?(\d+)\s*[-–]\s*(\d+)/i);
+      if (mRentang && skorAturan > 0) {
+        for (let n = Number(mRentang[1]); n <= Number(mRentang[2]); n++) {
+          kunciGlobal[String(n)] = { ...(kunciGlobal[String(n)] || {}), bobot: skorAturan };
+        }
+        return;
+      }
+
+      // Cek beberapa kunci dalam satu baris (mis: "1. A   2. B   3. A, C   4. D")
+      const multiMatch = [...txt.matchAll(/(?:^|\s)(\d+)[\.\)]\s*([A-Ea-e](?:\s*(?:,|dan|&|;)\s*[A-Ea-e])*)(?=\s+\d+[\.\)]|\s*$)/g)];
+      if (multiMatch.length >= 2) {
+        multiMatch.forEach(mm => {
+          const noKey = String(Number(mm[1]));
+          const val = mm[2].trim();
+          const targetObj = { ...(kunciGlobal[noKey] || {}), kunci: val };
+          kunciGlobal[noKey] = targetObj;
+          if (bagianKunciAktif) kunciPerBagian[`${bagianKunciAktif}#${noKey}`] = targetObj;
+        });
+        return;
+      }
+
+      // Cek satu baris kunci + skor opsional (mis: "1. B (Skor: 10)" atau "4. Penjelasan ... (Bobot 25)")
+      const mSatu = txt.match(/^(?:no\.?\s*)?(\d+)[\.\):\-]\s*(.+)$/i);
+      if (mSatu) {
+        const noKey = String(Number(mSatu[1]));
+        let isiKunci = mSatu[2].trim();
+        const skorInline = ekstrakAngkaSkorTeks(isiKunci);
+        isiKunci = isiKunci.replace(/\s*[\(\[]?\s*(?:bobot|skor|poin|nilai)\s*(?:maks(?:imal)?)?\s*[:=@]?\s*\d+(?:[\.,]\d+)?\s*(?:poin|skor)?\s*[\)\]]?$/i, '').trim();
+        const entri = {
+          ...(kunciGlobal[noKey] || {}),
+          ...(isiKunci ? { kunci: isiKunci } : {}),
+          ...(skorInline > 0 ? { bobot: skorInline } : {})
+        };
+        kunciGlobal[noKey] = entri;
+        if (bagianKunciAktif) kunciPerBagian[`${bagianKunciAktif}#${noKey}`] = entri;
+      }
+      return;
+    }
+
+    // Mode Pembacaan Butir Soal
+    const headSoal = deteksiHeadingBagianSoal(txt);
+    if (headSoal) {
+      dorongAktif();
+      bagianAktif = headSoal;
+      const skorHead = ekstrakAngkaSkorTeks(txt);
+      if (skorHead > 0) bobotDefaultTipe[headSoal] = skorHead;
+      return;
+    }
+
+    // Abaikan baris judul dokumen pembuka
+    if (!aktif && /^(?:templat|petunjuk|soal\s+asas|asesmen\s+sumatif|mata\s+pelajaran|kelas\s*:|waktu\s*:|semester\s*:)/i.test(txt)) {
+      return;
+    }
+
+    const mNomor = txt.match(/^(\d+)[\.\)]\s*(.+)$/);
+    const mOpsiTunggal = txt.match(/^([A-Ea-e])[\.\)]\s*(.+)$/);
+    const opsiSejajar = pecahOpsiSejajar(txt);
+    const mKunci = txt.match(/^(?:kunci\s+jawaban|kunci|jawaban\s+benar|jawaban)\s*[:=]\s*(.+)$/i);
+    const mTipe = txt.match(/^(?:tipe\s+soal|jenis\s+soal|tipe|jenis)\s*[:=]\s*(.+)$/i);
+    const mBobot = txt.match(/^(?:bobot\s+nilai|bobot|skor\s+maks(?:imal)?|skor|poin|nilai)\s*[:=]\s*(\d+(?:[\.,]\d+)?)/i);
+    const mKode = txt.match(/^(?:kode\s+soal|kode)\s*[:=]\s*([A-Za-z0-9_\-]+)/i);
+
+    if (mNomor) {
+      dorongAktif();
+      nomorUrut++;
+      const noAsli = Number(mNomor[1]);
+      let teksPertanyaan = mNomor[2].trim();
+      const skorDiSoal = ekstrakAngkaSkorTeks(teksPertanyaan);
+      if (skorDiSoal > 0) {
+        teksPertanyaan = teksPertanyaan.replace(/\s*[\(\[]\s*(?:bobot|skor|poin|nilai)\s*[:=@]?\s*\d+(?:[\.,]\d+)?\s*[\)\]]/i, '').trim();
+      }
       aktif = {
         dipilih: true,
-        kodeSoal: `${kodeMapelPrefix}-W${cap}-${String(hasil.length + 1).padStart(2, '0')}`,
-        tipeSoal: '',
-        pertanyaan: mNomor[2].trim(),
-        urlGambar: imgEl ? imgEl.getAttribute('src') || '' : '',
+        nomorAsli: noAsli,
+        urutanGlobal: nomorUrut,
+        bagianAsal: bagianAktif,
+        kodeSoal: `${kodeMapelPrefix}-W${cap}-${String(nomorUrut).padStart(2, '0')}`,
+        tipeSoal: bagianAktif || '',
+        pertanyaan: teksPertanyaan,
+        urlGambar: imgSrc,
         opsiJawaban: [],
         kunciJawaban: '',
-        bobotNilai: 10
+        bobotNilai: skorDiSoal || 0
       };
     } else if (aktif) {
-      if (imgEl && !aktif.urlGambar) aktif.urlGambar = imgEl.getAttribute('src') || '';
-      if (mOpsi) {
-        const kode = mOpsi[1].toUpperCase();
-        const ada = aktif.opsiJawaban.find(o => o.kode === kode);
-        if (ada) ada.teks = mOpsi[2].trim();
-        else aktif.opsiJawaban.push({ kode, teks: mOpsi[2].trim() });
+      if (imgSrc && !aktif.urlGambar) aktif.urlGambar = imgSrc;
+      if (opsiSejajar) {
+        opsiSejajar.forEach(o => {
+          const ada = aktif.opsiJawaban.find(x => x.kode === o.kode);
+          if (ada) ada.teks = o.teks;
+          else aktif.opsiJawaban.push(o);
+        });
+      } else if (mOpsiTunggal) {
+        const kode = mOpsiTunggal[1].toUpperCase();
+        let isiOpsi = mOpsiTunggal[2].trim();
+        // Deteksi penanda kunci langsung pada opsi, misal "(Benar)" atau tanda "*"
+        const tandaBenar = /\(\s*benar\s*\)|\*\s*$/i.test(isiOpsi);
+        if (tandaBenar) {
+          isiOpsi = isiOpsi.replace(/\s*\(\s*benar\s*\)|\s*\*\s*$/i, '').trim();
+          aktif.kunciJawaban = aktif.kunciJawaban ? `${aktif.kunciJawaban}, ${kode}` : kode;
+        }
+        const ada = aktif.opsiJawaban.find(x => x.kode === kode);
+        if (ada) ada.teks = isiOpsi;
+        else aktif.opsiJawaban.push({ kode, teks: isiOpsi });
       } else if (mKunci) {
-        aktif.kunciJawaban = mKunci[1].trim();
+        let kVal = mKunci[1].trim();
+        const sk = ekstrakAngkaSkorTeks(kVal);
+        if (sk > 0 && !aktif.bobotNilai) {
+          aktif.bobotNilai = sk;
+          kVal = kVal.replace(/\s*[\(\[]?\s*(?:bobot|skor|poin|nilai)\s*[:=@]?\s*\d+(?:[\.,]\d+)?\s*[\)\]]?$/i, '').trim();
+        }
+        aktif.kunciJawaban = kVal;
       } else if (mTipe) {
-        aktif.tipeSoal = teks(mTipe[1]).includes('urai') ? 'Uraian' : 'Pilihan Ganda';
+        aktif.tipeSoal = deteksiTipeDariTeks(mTipe[1], aktif.opsiJawaban.length, aktif.kunciJawaban, aktif.pertanyaan);
       } else if (mBobot) {
-        aktif.bobotNilai = Number(mBobot[1].replace(',', '.')) || 10;
+        aktif.bobotNilai = Number(mBobot[1].replace(',', '.')) || aktif.bobotNilai;
       } else if (mKode) {
         aktif.kodeSoal = mKode[1].trim();
       } else if (!aktif.opsiJawaban.length && !aktif.kunciJawaban) {
@@ -1750,13 +2442,35 @@ function ekstraksiSoalDariHtmlWord(htmlStr, kodeMapelPrefix) {
     }
   });
   dorongAktif();
-  return hasil;
+
+  return daftarSoal.map(s => terapkanKunciDanBobot(s, kunciGlobal, kunciPerBagian, bobotDefaultTipe));
 }
 
+function terapkanKunciDanBobot(s, kunciGlobal, kunciPerBagian, bobotDefaultTipe) {
+  const noKey = String(s.nomorAsli || s.urutanGlobal || '');
+  const urutKey = String(s.urutanGlobal || '');
+  const entriBagian = s.bagianAsal ? kunciPerBagian[`${s.bagianAsal}#${noKey}`] : null;
+  const entriGlobal = kunciGlobal[noKey] || kunciGlobal[urutKey] || null;
+  const sumberKunci = entriBagian || entriGlobal;
+
+  if (!s.kunciJawaban && sumberKunci?.kunci) s.kunciJawaban = sumberKunci.kunci;
+  if (!s.tipeSoal && sumberKunci?.tipe) s.tipeSoal = sumberKunci.tipe;
+
+  s.tipeSoal = deteksiTipeDariTeks(s.tipeSoal || s.bagianAsal, (s.opsiJawaban || []).length, s.kunciJawaban, s.pertanyaan);
+
+  if (!s.bobotNilai || s.bobotNilai <= 0) {
+    s.bobotNilai = sumberKunci?.bobot || bobotDefaultTipe[s.tipeSoal] || (s.tipeSoal === 'Uraian' ? 20 : (s.tipeSoal === 'Pilihan Ganda Kompleks' ? 15 : 10));
+  }
+
+  if (!adalahTipeBeropsi(s.tipeSoal)) s.opsiJawaban = [];
+  return validasiItemSoalPintar(s);
+}
+
+// --- Modal Impor Pintar Bank Soal (Word .docx, PDF .pdf, Excel .xlsx/.xls/.csv) ---
 function bukaModalImporWord() {
   const mapelList = daftarMapelDiizinkan();
   if (!mapelList.length) {
-    tampilkanToast('Tambahkan mata pelajaran terlebih dahulu sebelum mengimpor soal Word.', 'error');
+    tampilkanToast('Tambahkan mata pelajaran terlebih dahulu sebelum mengimpor soal.', 'error');
     return;
   }
 
@@ -1766,24 +2480,36 @@ function bukaModalImporWord() {
     const wadah = document.getElementById('wadah-pratinjau-word');
     const info = document.getElementById('info-ringkas-word');
     if (!wadah) return;
+
     const jmlValid = daftarEkstrak.filter(x => x.valid).length;
+    const totalBobot = bulatDua(daftarEkstrak.filter(x => x.dipilih && x.valid).reduce((acc, x) => acc + Number(x.bobotNilai || 0), 0));
+    const hitungTipe = tp => daftarEkstrak.filter(x => x.tipeSoal === tp).length;
+
     info.textContent = daftarEkstrak.length
       ? `Terdeteksi ${daftarEkstrak.length} butir soal (${jmlValid} Valid, ${daftarEkstrak.length - jmlValid} Perlu Perbaikan).`
-      : 'Unggah file .docx untuk melihat pratinjau hasil ekstraksi.';
+      : 'Unggah file .docx, .pdf, atau .xlsx/.xls untuk deteksi otomatis soal, jenis soal, kunci jawaban, dan penskoran.';
 
     if (!daftarEkstrak.length) {
       wadah.innerHTML = '';
       return;
     }
+
     wadah.innerHTML = `
+      <div class="dnc-ringkasan-impor">
+        <div>
+          <strong>Deteksi Jenis Soal:</strong>
+          PG: ${hitungTipe('Pilihan Ganda')} | PG Kompleks: ${hitungTipe('Pilihan Ganda Kompleks')} | Isian: ${hitungTipe('Isian Singkat')} | Uraian: ${hitungTipe('Uraian')}
+        </div>
+        <div><strong>Total Bobot Terpilih: ${totalBobot}</strong></div>
+      </div>
       <div class="dnc-pembungkus-tabel dnc-mt-12">
         <table class="dnc-tabel dnc-tabel-padat">
           <thead>
             <tr>
               <th>Pilih</th>
-              <th>Kode & Tipe</th>
+              <th>Kode & Tipe Soal</th>
               <th>Pertanyaan & Opsi</th>
-              <th>Kunci & Bobot</th>
+              <th>Kunci Otomatis & Bobot</th>
               <th>Status Validasi</th>
             </tr>
           </thead>
@@ -1796,18 +2522,17 @@ function bukaModalImporWord() {
                 <td data-label="Kode & Tipe">
                   <input class="dnc-input" style="height:30px;margin-bottom:4px" data-w-kode="${idx}" value="${esc(it.kodeSoal)}">
                   <select class="dnc-select" style="height:30px" data-w-tipe="${idx}">
-                    <option value="Pilihan Ganda" ${it.tipeSoal === 'Pilihan Ganda' ? 'selected' : ''}>Pilihan Ganda</option>
-                    <option value="Uraian" ${it.tipeSoal === 'Uraian' ? 'selected' : ''}>Uraian</option>
+                    ${TIPE_SOAL_LIST.map(tp => `<option value="${tp}" ${it.tipeSoal === tp ? 'selected' : ''}>${tp}</option>`).join('')}
                   </select>
                 </td>
                 <td data-label="Pertanyaan">
                   <textarea class="dnc-textarea" style="min-height:54px" data-w-tanya="${idx}">${esc(it.pertanyaan)}</textarea>
-                  ${it.urlGambar ? '<div class="dnc-form-bantuan">Memuat gambar terkompresi dari dokumen Word</div>' : ''}
-                  ${it.tipeSoal === 'Pilihan Ganda' ? `<div class="dnc-form-bantuan">${esc(it.opsiJawaban.map(o => `${o.kode}. ${o.teks}`).join(' | '))}</div>` : ''}
+                  ${it.urlGambar ? '<div class="dnc-form-bantuan">Memuat gambar terkompresi dari dokumen</div>' : ''}
+                  ${adalahTipeBeropsi(it.tipeSoal) ? `<div class="dnc-form-bantuan">${esc((it.opsiJawaban || []).map(o => `${o.kode}. ${o.teks}`).join(' | '))}</div>` : ''}
                 </td>
                 <td data-label="Kunci & Bobot">
-                  <input class="dnc-input" style="height:30px;margin-bottom:4px" data-w-kunci="${idx}" placeholder="Kunci" value="${esc(it.kunciJawaban)}">
-                  <input class="dnc-input" style="height:30px" type="number" min="1" data-w-bobot="${idx}" value="${esc(it.bobotNilai)}">
+                  <input class="dnc-input" style="height:30px;margin-bottom:4px" data-w-kunci="${idx}" placeholder="Kunci (mis. B / A, C)" value="${esc(it.kunciJawaban)}">
+                  <input class="dnc-input" style="height:30px" type="number" min="0.5" step="0.5" data-w-bobot="${idx}" value="${esc(it.bobotNilai)}">
                 </td>
                 <td data-label="Validasi">
                   ${badgeStatus(it.valid ? 'Valid' : 'Perlu Perbaikan')}
@@ -1819,14 +2544,17 @@ function bukaModalImporWord() {
       </div>`;
 
     wadah.querySelectorAll('[data-w-pilih]').forEach(el => {
-      el.addEventListener('change', () => { daftarEkstrak[Number(el.dataset.wPilih)].dipilih = el.checked; });
+      el.addEventListener('change', () => {
+        daftarEkstrak[Number(el.dataset.wPilih)].dipilih = el.checked;
+        renderPratinjauWord();
+      });
     });
     const ikatEdit = (attr, field, numerik = false) => {
       wadah.querySelectorAll(`[${attr}]`).forEach(el => {
         el.addEventListener('change', () => {
           const i = Number(el.getAttribute(attr));
           daftarEkstrak[i][field] = numerik ? Number(el.value) : el.value.trim();
-          validasiItemWord(daftarEkstrak[i]);
+          validasiItemSoalPintar(daftarEkstrak[i]);
           if (daftarEkstrak[i].valid) daftarEkstrak[i].dipilih = true;
           renderPratinjauWord();
         });
@@ -1840,7 +2568,7 @@ function bukaModalImporWord() {
   };
 
   bukaModalFormDnc({
-    judul: 'Impor Bank Soal dari Microsoft Word (.docx)',
+    judul: 'Impor Pintar Bank Soal (Word, PDF, atau Excel)',
     lebar: true,
     labelSimpan: 'Simpan Massal ke Bank Soal',
     htmlKonten: `
@@ -1855,15 +2583,15 @@ function bukaModalImporWord() {
         </div>
         <div class="dnc-form-grup dnc-form-full">
           <div class="dnc-flex-between dnc-mb-12">
-            <label class="dnc-label" for="w-file-docx">Dokumen Word (.docx) *</label>
+            <label class="dnc-label" for="w-file-docx">Dokumen Soal + Kunci + Penskoran (.docx, .pdf, .xlsx, .xls) *</label>
             <button type="button" id="btn-unduh-templat-word" class="dnc-tombol dnc-tombol-sekunder dnc-tombol-kecil">
               <svg class="dnc-ikon"><use href="#icon-download"></use></svg>
-              <span>Unduh Templat Word (.docx)</span>
+              <span>Unduh Templat Word Lengkap</span>
             </button>
           </div>
           <div class="dnc-file-drop">
-            <input id="w-file-docx" class="dnc-input" type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" style="padding-top:7px">
-            <div id="info-ringkas-word" class="dnc-form-bantuan dnc-mt-12">Unggah file .docx untuk melihat pratinjau hasil ekstraksi otomatis.</div>
+            <input id="w-file-docx" class="dnc-input" type="file" accept=".docx,.pdf,.xlsx,.xls" style="padding-top:7px">
+            <div id="info-ringkas-word" class="dnc-form-bantuan dnc-mt-12">Otomatis mendeteksi PG, PG Kompleks, Isian Singkat, Uraian, kunci jawaban (inline maupun halaman akhir), serta bobot pedoman penskoran.</div>
           </div>
         </div>
       </div>
@@ -1871,34 +2599,54 @@ function bukaModalImporWord() {
     onMount: () => {
       document.getElementById('btn-unduh-templat-word').addEventListener('click', () => {
         unduhTemplatWordDocx();
-        tampilkanToast('Templat Word (.docx) berhasil diunduh.');
+        tampilkanToast('Templat Word lengkap (4 tipe soal + kunci + penskoran) berhasil diunduh.');
       });
       document.getElementById('w-file-docx').addEventListener('change', async e => {
         const file = e.target.files[0];
         if (!file) return;
         const info = document.getElementById('info-ringkas-word');
-        info.textContent = 'Membaca dokumen Word dan mengompresi gambar pendukung...';
+        const ext = teks(file.name.split('.').pop());
+        info.textContent = `Menganalisis struktur soal, kunci jawaban, dan pedoman penskoran dari ${file.name}...`;
         try {
-          const mammothLib = await muatMammothJs();
-          const buf = await file.arrayBuffer();
-          const hasilHtml = await mammothLib.convertToHtml(
-            { arrayBuffer: buf },
-            {
-              convertImage: mammothLib.images.imgElement(async image => {
-                const b64 = await image.read('base64');
-                const dataUrl = `data:${image.contentType};base64,${b64}`;
-                const terkompres = await kompresDataGambar(dataUrl);
-                return { src: terkompres };
-              })
-            }
-          );
           const mapelObj = cariById('mataPelajaran', document.getElementById('w-mapelId').value);
           const prefix = (mapelObj?.kodeMapel || 'SOAL').replace(/[^A-Za-z0-9]/g, '').slice(0, 8);
-          daftarEkstrak = ekstraksiSoalDariHtmlWord(hasilHtml.value, prefix);
+
+          if (ext === 'docx') {
+            const mammothLib = await muatMammothJs();
+            const hasilHtml = await mammothLib.convertToHtml(
+              { arrayBuffer: await file.arrayBuffer() },
+              {
+                convertImage: mammothLib.images.imgElement(async image => {
+                  const b64 = await image.read('base64');
+                  const dataUrl = `data:${image.contentType};base64,${b64}`;
+                  const terkompres = await kompresDataGambar(dataUrl);
+                  return { src: terkompres };
+                })
+              }
+            );
+            const sumber = ubahHtmlWordKeBarisTerstruktur(hasilHtml.value);
+            daftarEkstrak = ekstrakSoalPintarDariSumber(sumber, prefix);
+          } else if (ext === 'pdf') {
+            const barisPdf = await ekstrakTeksBarisPdf(file);
+            daftarEkstrak = ekstrakSoalPintarDariSumber({
+              baris: barisPdf.map(t => ({ teks: t, img: '', bold: false })),
+              tabel: []
+            }, prefix);
+          } else if (ext === 'xlsx' || ext === 'xls') {
+            const XLSX = await muatSheetJs();
+            const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' });
+            const sheet = wb.Sheets[wb.SheetNames[0]];
+            const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' })
+              .map(r => r.map(c => ({ teks: String(c ?? '').trim(), img: '' })));
+            daftarEkstrak = ekstrakSoalPintarDariSumber({ baris: [], tabel: [rows] }, prefix);
+          } else {
+            throw new Error('Gunakan file Word (.docx), PDF (.pdf), atau Excel (.xlsx/.xls).');
+          }
+
           renderPratinjauWord();
         } catch (err) {
-          info.textContent = 'Gagal membaca file .docx. Pastikan format dokumen valid.';
-          tampilkanToast(err.message || 'Gagal memproses dokumen Word.', 'error');
+          info.textContent = err.message || 'Gagal membaca dokumen soal.';
+          tampilkanToast(info.textContent, 'error');
         }
       });
     },
@@ -1922,8 +2670,10 @@ function bukaModalImporWord() {
           tipeSoal: it.tipeSoal,
           pertanyaan: it.pertanyaan.trim(),
           urlGambar: it.urlGambar || '',
-          opsiJawaban: it.tipeSoal === 'Pilihan Ganda' ? it.opsiJawaban : [],
-          kunciJawaban: it.tipeSoal === 'Pilihan Ganda' ? String(it.kunciJawaban).toUpperCase() : it.kunciJawaban,
+          opsiJawaban: adalahTipeBeropsi(it.tipeSoal) ? it.opsiJawaban : [],
+          kunciJawaban: it.tipeSoal === 'Pilihan Ganda'
+            ? String(it.kunciJawaban).toUpperCase().slice(0, 1)
+            : (it.tipeSoal === 'Pilihan Ganda Kompleks' ? normalisasiKunciKompleks(it.kunciJawaban) : it.kunciJawaban),
           bobotNilai: Number(it.bobotNilai),
           statusAktif: true,
           dibuatOleh: penggunaAktif.id
@@ -1933,7 +2683,82 @@ function bukaModalImporWord() {
       tutupModalFormDnc();
       resetCacheMenu(['DNC-M1', 'DNC-M3', 'DNC-M4']);
       await muatM3BankSoal(true);
-      tampilkanToast(`${tersimpan} butir soal dari Word (.docx) berhasil disimpan ke Bank Soal.`);
+      tampilkanToast(`${tersimpan} butir soal beserta kunci jawaban & bobotnya berhasil disimpan.`);
+    }
+  });
+}
+
+function bukaModalImporCsvSoal() {
+  const mapelList = daftarMapelDiizinkan();
+  if (!mapelList.length) { tampilkanToast('Belum ada mata pelajaran tersedia.', 'error'); return; }
+
+  bukaModalFormDnc({
+    judul: 'Impor Bank Soal dari CSV',
+    lebar: true,
+    labelSimpan: 'Impor Soal CSV',
+    htmlKonten: `
+      <div class="dnc-form-grid">
+        <div class="dnc-form-grup">
+          <label class="dnc-label" for="csv-mapelId">Mata Pelajaran Sasaran *</label>
+          <select id="csv-mapelId" class="dnc-select">${mapelList.map(m => `<option value="${esc(m.id)}">${esc(m.kodeMapel)} - ${esc(m.namaMapel)}</option>`).join('')}</select>
+        </div>
+        <div class="dnc-form-grup">
+          <label class="dnc-label" for="csv-tingkat">Tingkat Kelas *</label>
+          <select id="csv-tingkat" class="dnc-select">${TINGKAT_LIST.map(t => `<option value="${t}" ${t === 'X' ? 'selected' : ''}>${t}</option>`).join('')}</select>
+        </div>
+        <div class="dnc-form-grup dnc-form-full">
+          <div class="dnc-flex-between">
+            <label class="dnc-label" for="csv-file-soal">Pilih File CSV (.csv)</label>
+            <button type="button" id="btn-unduh-templat-csv" class="dnc-tombol dnc-tombol-sekunder dnc-tombol-kecil">Unduh Templat CSV</button>
+          </div>
+          <input id="csv-file-soal" class="dnc-input" type="file" accept=".csv,text/csv" style="padding-top:7px">
+          <span class="dnc-form-bantuan">Header kolom: kodeSoal,tipeSoal,pertanyaan,opsiA,opsiB,opsiC,opsiD,opsiE,kunciJawaban,bobotNilai</span>
+        </div>
+      </div>`,
+    onMount: () => {
+      document.getElementById('btn-unduh-templat-csv').addEventListener('click', () => {
+        const isi = 'kodeSoal,tipeSoal,pertanyaan,opsiA,opsiB,opsiC,opsiD,opsiE,kunciJawaban,bobotNilai\n' +
+          'SOAL-01,Pilihan Ganda,"Hasil dari 12 x 5 adalah ...",50,55,60,65,,C,10\n' +
+          'SOAL-02,Pilihan Ganda Kompleks,"Pilih bilangan prima berikut:",2,9,11,15,,"A, C",20\n' +
+          'SOAL-03,Isian Singkat,"Ibukota Provinsi DIY adalah ....",,,,,,Yogyakarta,20\n' +
+          'SOAL-04,Uraian,"Jelaskan pengertian gagasan utama dalam paragraf!",,,,,,Ide pokok inti pembahasan paragraf.,50\n';
+        unduhBlobFile(new Blob([isi], { type: 'text/csv;charset=utf-8' }), 'Templat_Bank_Soal_ASAS_DNC.csv');
+      });
+    },
+    onSubmit: async () => {
+      const file = document.getElementById('csv-file-soal').files[0];
+      if (!file) throw new Error('Pilih file CSV terlebih dahulu.');
+      const mapelId = document.getElementById('csv-mapelId').value;
+      const tingkat = document.getElementById('csv-tingkat').value;
+      const mapelObj = cariById('mataPelajaran', mapelId);
+      const baris = parseCsvBaris(await file.text());
+      if (baris.length < 2) throw new Error('File CSV tidak berisi baris soal.');
+
+      let tersimpan = 0;
+      const waktuTag = Date.now().toString().slice(-4);
+      for (let i = 1; i < baris.length; i++) {
+        const [kodeRaw, tipeRaw, pertanyaan, a, b, c, d, e, kunciRaw, bobotRaw] = baris[i];
+        if (!pertanyaan) continue;
+        const opsiTemp = [['A', a], ['B', b], ['C', c], ['D', d], ['E', e]].filter(([, v]) => v).map(([kode, teksOpsi]) => ({ kode, teks: teksOpsi }));
+        const tipeSoal = deteksiTipeDariTeks(tipeRaw, opsiTemp.length, kunciRaw, pertanyaan);
+        const opsiJawaban = adalahTipeBeropsi(tipeSoal) ? opsiTemp : [];
+        const kodeSoal = kodeRaw || `${(mapelObj?.kodeMapel || 'SL')}-${waktuTag}-${String(i).padStart(2, '0')}`;
+        const bobotNilai = Number(bobotRaw) > 0 ? Number(bobotRaw) : 10;
+        const kunciJawaban = tipeSoal === 'Pilihan Ganda'
+          ? String(kunciRaw || 'A').trim().toUpperCase().slice(0, 1)
+          : (tipeSoal === 'Pilihan Ganda Kompleks' ? normalisasiKunciKompleks(kunciRaw) : String(kunciRaw || '').trim());
+        if (adalahTipeBeropsi(tipeSoal) && opsiJawaban.length < 2) continue;
+        await dbCreate(COLLECTIONS.bankSoal, {
+          kodeSoal, mapelId, tingkat, tipeSoal, pertanyaan, urlGambar: '',
+          opsiJawaban, kunciJawaban, bobotNilai, statusAktif: true, dibuatOleh: penggunaAktif.id
+        });
+        tersimpan++;
+      }
+      if (!tersimpan) throw new Error('Tidak ada baris soal yang valid untuk diimpor.');
+      tutupModalFormDnc();
+      resetCacheMenu(['DNC-M1', 'DNC-M3', 'DNC-M4']);
+      await muatM3BankSoal(true);
+      tampilkanToast(`${tersimpan} butir soal berhasil diimpor dari CSV.`);
     }
   });
 }
@@ -1950,10 +2775,10 @@ async function muatM4PaketAsas(paksa = false) {
 }
 
 function hitungTotalBobotPaket(daftarSoalIds) {
-  return (daftarSoalIds || []).reduce((total, sid) => {
+  return bulatDua((daftarSoalIds || []).reduce((total, sid) => {
     const s = cariById('bankSoal', sid);
     return total + Number(s?.bobotNilai || 0);
-  }, 0);
+  }, 0));
 }
 
 function renderTabelPaket() {
@@ -1979,7 +2804,27 @@ function renderTabelPaket() {
     { label: 'Jadwal & Durasi', render: p => `${formatTanggal(p.waktuMulai, true)}<div class="dnc-form-bantuan">s.d. ${formatTanggal(p.waktuSelesai, true)} (${esc(p.durasiMenit)} mnt)</div>` },
     { label: 'Soal & Bobot', render: p => `${(p.daftarSoalIds || []).length} soal<div class="dnc-form-bantuan">Total Bobot: ${hitungTotalBobotPaket(p.daftarSoalIds)}</div>` },
     { label: 'Token', render: p => `<span class="dnc-mono">${esc(p.tokenUjian)}</span>` },
-    { label: 'Status', render: p => badgeStatus(p.statusPaket) },
+    {
+      label: 'Status & Kontrol Sesi',
+      render: p => {
+        const dibuka = Boolean(p.ujianDibuka) && p.statusPaket === 'Aktif';
+        const badgeLive = dibuka
+          ? `<span class="dnc-badge dnc-badge-hijau"><span class="dnc-dot-live"></span>Ujian Dibuka</span>`
+          : (p.statusPaket === 'Selesai'
+            ? badgeStatus('Selesai')
+            : `<span class="dnc-badge dnc-badge-amber">${p.dihentikanPada ? 'Dihentikan Guru' : 'Belum Dimulai'}</span>`);
+        const tombolKontrol = dibuka
+          ? `<button type="button" class="dnc-tombol dnc-tombol-bahaya-solid dnc-tombol-kecil" data-berhenti-sesi="${esc(p.id)}">
+               <svg class="dnc-ikon" style="width:13px;height:13px"><use href="#icon-stop"></use></svg>
+               <span>Berhenti Ujian</span>
+             </button>`
+          : `<button type="button" class="dnc-tombol dnc-tombol-sukses dnc-tombol-kecil" data-mulai-sesi="${esc(p.id)}">
+               <svg class="dnc-ikon" style="width:13px;height:13px"><use href="#icon-play"></use></svg>
+               <span>Mulai Ujian</span>
+             </button>`;
+        return `<div style="display:flex;flex-direction:column;gap:6px;align-items:flex-start">${badgeLive}${tombolKontrol}</div>`;
+      }
+    },
     {
       label: 'Aksi', aksi: true,
       render: p => `<div class="dnc-aksi-baris">
@@ -1989,6 +2834,50 @@ function renderTabelPaket() {
       </div>`
     }
   ], 'Belum ada jadwal dan paket ASAS');
+}
+
+// --- REVISI 6: Kontrol Guru / Admin untuk Mulai & Berhenti Ujian Secara Live ---
+async function mulaiSesiUjianOlehGuru(paketId) {
+  const p = cariById('paketAsas', paketId);
+  if (!p) return;
+  bukaKonfirmasi({
+    judul: 'Mulai Sesi Ujian ASAS',
+    pesan: `Aktifkan dan buka akses pengerjaan untuk paket "${p.judulPaket}" sekarang? Siswa pada kelas sasaran akan langsung dapat masuk memakai token ${p.tokenUjian}.`,
+    labelYa: 'Ya, Mulai Ujian',
+    kelasTombol: 'dnc-tombol-sukses',
+    onYa: async () => {
+      await dbUpdate(COLLECTIONS.paketAsas, paketId, {
+        statusPaket: 'Aktif',
+        ujianDibuka: true,
+        dibukaPada: new Date().toISOString(),
+        diubahOleh: penggunaAktif.id
+      });
+      resetCacheMenu(['DNC-M1', 'DNC-M4', 'DNC-M5']);
+      await muatM4PaketAsas(true);
+      tampilkanToast(`Ujian "${p.judulPaket}" telah DIMULAI. Siswa kini dapat mengerjakan soal.`);
+    }
+  });
+}
+
+async function hentikanSesiUjianOlehGuru(paketId) {
+  const p = cariById('paketAsas', paketId);
+  if (!p) return;
+  bukaKonfirmasi({
+    judul: 'Berhenti & Kunci Sesi Ujian',
+    pesan: `Menghentikan ujian "${p.judulPaket}" akan langsung menutup akses siswa dan mengumpulkan otomatis lembar ujian siswa yang masih berlangsung. Lanjutkan?`,
+    labelYa: 'Ya, Berhenti Ujian',
+    kelasTombol: 'dnc-tombol-bahaya-solid',
+    onYa: async () => {
+      await dbUpdate(COLLECTIONS.paketAsas, paketId, {
+        ujianDibuka: false,
+        dihentikanPada: new Date().toISOString(),
+        diubahOleh: penggunaAktif.id
+      });
+      resetCacheMenu(['DNC-M1', 'DNC-M4', 'DNC-M5']);
+      await muatM4PaketAsas(true);
+      tampilkanToast(`Ujian "${p.judulPaket}" telah DIHENTIKAN. Siswa tidak dapat mengerjakan soal lagi.`, 'info');
+    }
+  });
 }
 
 function bukaFormPaket(item = null) {
@@ -2002,29 +2891,39 @@ function bukaFormPaket(item = null) {
   const kelasTerpilih = new Set(item?.kelasIds || []);
   const soalTerpilih = new Set(item?.daftarSoalIds || []);
 
-  const renderChecklistSoal = mapelId => {
+  const renderChecklistSoal = (mapelId, modeTipe = 'pg_pgk') => {
     const wadah = document.getElementById('f-paket-soal-list');
     const infoBobot = document.getElementById('f-paket-info-bobot');
     if (!wadah) return;
-    const soalTersedia = stateMemori.bankSoal.filter(s => s.mapelId === mapelId && s.statusAktif !== false);
+
+    const soalTersedia = stateMemori.bankSoal.filter(s => {
+      if (s.mapelId !== mapelId || s.statusAktif === false) return false;
+      if (modeTipe === 'pg_pgk') return adalahTipeBeropsi(s.tipeSoal);
+      return true;
+    });
+
     if (!soalTersedia.length) {
-      wadah.innerHTML = '<div class="dnc-teks-muted" style="padding:8px">Belum ada butir soal aktif untuk mata pelajaran ini.</div>';
+      wadah.innerHTML = '<div class="dnc-teks-muted" style="padding:8px">Belum ada butir soal aktif sesuai filter tipe untuk mata pelajaran ini.</div>';
       infoBobot.textContent = '0 soal dipilih • Total Bobot: 0';
       return;
     }
+
     wadah.innerHTML = soalTersedia.map(s => `
       <label class="dnc-checklist-item">
         <input type="checkbox" name="f-soal-id" value="${esc(s.id)}" data-bobot="${Number(s.bobotNilai || 0)}" ${soalTerpilih.has(s.id) ? 'checked' : ''}>
-        <div>
-          <strong>${esc(s.kodeSoal)}</strong> (${esc(s.tipeSoal)}, Tingkat ${esc(s.tingkat)}, Bobot ${esc(s.bobotNilai)})
+        <div style="flex:1">
+          <div class="dnc-flex-between">
+            <strong>${esc(s.kodeSoal)}</strong>
+            <span class="dnc-form-bantuan">${esc(s.tipeSoal)} • Tingkat ${esc(s.tingkat)} • Bobot ${esc(s.bobotNilai)}</span>
+          </div>
           <div class="dnc-form-bantuan">${esc(s.pertanyaan.slice(0, 95))}${s.pertanyaan.length > 95 ? '...' : ''}</div>
         </div>
       </label>`).join('');
 
     const perbaruiRingkasan = () => {
       const checked = [...wadah.querySelectorAll('input[name="f-soal-id"]:checked')];
-      const total = checked.reduce((acc, el) => acc + Number(el.dataset.bobot || 0), 0);
-      infoBobot.textContent = `${checked.length} soal dipilih • Total Bobot Paket: ${total}`;
+      const total = bulatDua(checked.reduce((acc, el) => acc + Number(el.dataset.bobot || 0), 0));
+      infoBobot.textContent = `${checked.length} soal dipilih • Total Bobot: ${total}`;
     };
     wadah.querySelectorAll('input[name="f-soal-id"]').forEach(cb => {
       cb.addEventListener('change', () => {
@@ -2065,7 +2964,7 @@ function bukaFormPaket(item = null) {
         <div class="dnc-form-grup">
           <label class="dnc-label" for="f-statusPaket">Status Paket *</label>
           <select id="f-statusPaket" class="dnc-select">
-            ${['Draft', 'Aktif', 'Selesai'].map(st => `<option value="${st}" ${(item?.statusPaket || 'Draft') === st ? 'selected' : ''}>${st}</option>`).join('')}
+            ${['Draft', 'Aktif', 'Selesai'].map(st => `<option value="${st}" ${(item?.statusPaket || 'Aktif') === st ? 'selected' : ''}>${st}</option>`).join('')}
           </select>
         </div>
         <div class="dnc-form-grup">
@@ -2089,7 +2988,7 @@ function bukaFormPaket(item = null) {
         </div>
         <div class="dnc-form-grup dnc-form-full">
           <label class="dnc-label">Kelas Sasaran * (pilih minimal satu)</label>
-          <div class="dnc-checklist-box" style="max-height:120px">
+          <div class="dnc-checklist-box" style="max-height:115px">
             ${stateMemori.kelas.map(k => `
               <label class="dnc-checklist-item">
                 <input type="checkbox" name="f-kelas-id" value="${esc(k.id)}" ${kelasTerpilih.has(k.id) ? 'checked' : ''}>
@@ -2100,23 +2999,55 @@ function bukaFormPaket(item = null) {
         <div class="dnc-form-grup dnc-form-full">
           <div class="dnc-flex-between">
             <label class="dnc-label">Daftar Butir Soal *</label>
-            <span id="f-paket-info-bobot" class="dnc-badge dnc-badge-biru">0 soal dipilih</span>
+            <div class="dnc-flex-gap">
+              <select id="f-filter-tipe-paket" class="dnc-select" style="height:28px;font-size:11px;width:auto">
+                <option value="pg_pgk">PG & PG Kompleks (Utama)</option>
+                <option value="semua">Semua Jenis Soal (PG, PGK, Isian, Uraian)</option>
+              </select>
+              <button type="button" id="btn-pilih-semua-soal-paket" class="dnc-tombol dnc-tombol-sekunder dnc-tombol-kecil" style="height:28px">Pilih Semua</button>
+              <span id="f-paket-info-bobot" class="dnc-badge dnc-badge-biru">0 soal dipilih</span>
+            </div>
           </div>
           <div id="f-paket-soal-list" class="dnc-checklist-box"></div>
         </div>
         <div class="dnc-form-grup dnc-form-full">
           <div class="dnc-flex-gap" style="gap:16px">
-            <label class="dnc-check-label"><input id="f-acakSoal" type="checkbox" ${(item ? item.acakSoal : true) ? 'checked' : ''}><span>Acak Urutan Soal</span></label>
-            <label class="dnc-check-label"><input id="f-acakOpsi" type="checkbox" ${(item ? item.acakOpsi : true) ? 'checked' : ''}><span>Acak Opsi Jawaban</span></label>
+            <label class="dnc-check-label"><input id="f-acakSoal" type="checkbox" ${(item ? item.acakSoal : true) ? 'checked' : ''}><span>Acak Urutan Soal Per Siswa</span></label>
+            <label class="dnc-check-label"><input id="f-acakOpsi" type="checkbox" ${(item ? item.acakOpsi : true) ? 'checked' : ''}><span>Acak Opsi Jawaban Per Siswa</span></label>
             <label class="dnc-check-label"><input id="f-tampilkanNilai" type="checkbox" ${item?.tampilkanNilai ? 'checked' : ''}><span>Tampilkan Nilai ke Siswa</span></label>
           </div>
+          <span class="dnc-form-bantuan">Setelah disimpan, tekan tombol <strong>Mulai Ujian</strong> pada tabel paket agar siswa dapat membuka lembar soal.</span>
         </div>
       </div>`,
     onMount: () => {
-      renderChecklistSoal(mapelAwal);
-      document.getElementById('f-mapelPaket').addEventListener('change', e => {
+      const selMapel = document.getElementById('f-mapelPaket');
+      const selFilterTipe = document.getElementById('f-filter-tipe-paket');
+      // Jika paket lama mengandung Isian/Uraian, buka tampilan Semua Jenis Soal otomatis
+      const adaNonOpsi = (item?.daftarSoalIds || []).some(sid => {
+        const s = cariById('bankSoal', sid);
+        return s && !adalahTipeBeropsi(s.tipeSoal);
+      });
+      if (adaNonOpsi) selFilterTipe.value = 'semua';
+
+      renderChecklistSoal(mapelAwal, selFilterTipe.value);
+      selMapel.addEventListener('change', e => {
         soalTerpilih.clear();
-        renderChecklistSoal(e.target.value);
+        renderChecklistSoal(e.target.value, selFilterTipe.value);
+      });
+      selFilterTipe.addEventListener('change', () => {
+        renderChecklistSoal(selMapel.value, selFilterTipe.value);
+      });
+      document.getElementById('btn-pilih-semua-soal-paket').addEventListener('click', () => {
+        const boxes = document.querySelectorAll('#f-paket-soal-list input[name="f-soal-id"]');
+        const belumSemua = [...boxes].some(b => !b.checked);
+        boxes.forEach(b => {
+          b.checked = belumSemua;
+          if (belumSemua) soalTerpilih.add(b.value);
+          else soalTerpilih.delete(b.value);
+        });
+        const checked = [...document.querySelectorAll('#f-paket-soal-list input[name="f-soal-id"]:checked')];
+        const total = bulatDua(checked.reduce((acc, el) => acc + Number(el.dataset.bobot || 0), 0));
+        document.getElementById('f-paket-info-bobot').textContent = `${checked.length} soal dipilih • Total Bobot: ${total}`;
       });
       document.getElementById('btn-gen-token').addEventListener('click', () => {
         document.getElementById('f-tokenUjian').value = buatTokenAcak(6);
@@ -2158,7 +3089,9 @@ function bukaFormPaket(item = null) {
         acakOpsi: document.getElementById('f-acakOpsi').checked,
         tampilkanNilai: document.getElementById('f-tampilkanNilai').checked,
         statusPaket,
-        dibuatOleh: item?.dibuatOleh || penggunaAktif.id
+        ujianDibuka: statusPaket === 'Aktif' ? Boolean(item?.ujianDibuka) : false,
+        dibuatOleh: item?.dibuatOleh || penggunaAktif.id,
+        diubahOleh: penggunaAktif.id
       };
       if (item) await dbUpdate(COLLECTIONS.paketAsas, item.id, payload);
       else await dbCreate(COLLECTIONS.paketAsas, payload);
@@ -2176,7 +3109,7 @@ async function perbaruiTokenPaket(id) {
   while (!(await cekUnik(COLLECTIONS.paketAsas, 'tokenUjian', tokenBaru, id))) {
     tokenBaru = buatTokenAcak(6);
   }
-  await dbUpdate(COLLECTIONS.paketAsas, id, { tokenUjian: tokenBaru });
+  await dbUpdate(COLLECTIONS.paketAsas, id, { tokenUjian: tokenBaru, diubahOleh: penggunaAktif.id });
   resetCacheMenu(['DNC-M4', 'DNC-M5']);
   await muatM4PaketAsas(true);
   tampilkanToast(`Token ujian diperbarui menjadi ${tokenBaru}.`);
@@ -2207,12 +3140,65 @@ function hapusPaketDenganProteksi(id) {
 let sesiUjianAktif = null;
 let timerUjianInterval = null;
 let sedangSubmitUjian = false;
+let unsubPaketSiswa = null;
+let unsubPaketAktif = null;
 
 function hentikanTimerUjian() {
   if (timerUjianInterval) {
     clearInterval(timerUjianInterval);
     timerUjianInterval = null;
   }
+}
+
+function hentikanListenerPaketSiswa() {
+  if (typeof unsubPaketSiswa === 'function') {
+    unsubPaketSiswa();
+    unsubPaketSiswa = null;
+  }
+  if (typeof unsubPaketAktif === 'function') {
+    unsubPaketAktif();
+    unsubPaketAktif = null;
+  }
+}
+
+async function pasangListenerDaftarPaketSiswa() {
+  if (IS_PREVIEW || penggunaAktif?.role !== 'Siswa') return;
+  if (typeof unsubPaketSiswa === 'function') return;
+  try {
+    const { db, fsMod } = await muatFirebaseSdk();
+    unsubPaketSiswa = fsMod.onSnapshot(fsMod.collection(db, COLLECTIONS.paketAsas), snap => {
+      if (!penggunaAktif || penggunaAktif.role !== 'Siswa') return;
+      const semua = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      stateMemori.paketAsas = semua.filter(p => Array.isArray(p.kelasIds) && p.kelasIds.includes(penggunaAktif.kelasId));
+      if (!sesiUjianAktif && menuAktif === 'DNC-M5') {
+        renderGridUjianSiswa();
+      }
+    });
+  } catch (_) {}
+}
+
+async function pasangListenerPaketUjianBerjalan(paketId) {
+  if (typeof unsubPaketAktif === 'function') {
+    unsubPaketAktif();
+    unsubPaketAktif = null;
+  }
+  if (IS_PREVIEW) return;
+  try {
+    const { db, fsMod } = await muatFirebaseSdk();
+    unsubPaketAktif = fsMod.onSnapshot(fsMod.doc(db, COLLECTIONS.paketAsas, paketId), snap => {
+      if (!sesiUjianAktif || sesiUjianAktif.paket.id !== paketId || sedangSubmitUjian) return;
+      const data = snap.exists() ? snap.data() : null;
+      if (!data || data.statusPaket !== 'Aktif' || data.ujianDibuka !== true) {
+        const badgeLive = document.getElementById('m5-status-live');
+        if (badgeLive) {
+          badgeLive.className = 'dnc-badge dnc-badge-merah';
+          badgeLive.textContent = 'Dihentikan Guru';
+        }
+        tampilkanToast('Guru telah menekan Berhenti Ujian. Lembar jawaban Anda dikunci dan dikumpulkan otomatis.', 'info');
+        selesaikanUjianSiswa(true, 'dihentikan_guru');
+      }
+    });
+  } catch (_) {}
 }
 
 async function muatM5RuangUjian(paksa = false) {
@@ -2223,9 +3209,15 @@ async function muatM5RuangUjian(paksa = false) {
   }
   document.getElementById('m5-daftar-view').classList.remove('dnc-disembunyikan');
   document.getElementById('m5-lembar-view').classList.add('dnc-disembunyikan');
-  document.getElementById('subjudul-m5').textContent = `Kelas Anda: ${namaKelasById(penggunaAktif.kelasId)}. Masukkan token dari pengawas untuk memulai sesi.`;
+  document.getElementById('subjudul-m5').textContent = `Kelas Anda: ${namaKelasById(penggunaAktif.kelasId)}. Ujian hanya bisa dimulai ketika Guru menekan tombol Mulai Ujian.`;
 
+  renderGridUjianSiswa();
+  pasangListenerDaftarPaketSiswa();
+}
+
+function renderGridUjianSiswa() {
   const grid = document.getElementById('grid-ujian-siswa');
+  if (!grid) return;
   const paketAktif = stateMemori.paketAsas.filter(p => p.statusPaket === 'Aktif');
   if (!paketAktif.length) {
     grid.innerHTML = `<div class="dnc-kartu dnc-teks-tengah dnc-teks-muted" style="grid-column:1/-1">Belum ada jadwal ASAS aktif untuk kelas Anda saat ini.</div>`;
@@ -2235,18 +3227,32 @@ async function muatM5RuangUjian(paksa = false) {
   grid.innerHTML = paketAktif.map(p => {
     const hasilId = `${p.id}_${penggunaAktif.id}`;
     const hasil = stateMemori.hasilUjian.find(h => h.id === hasilId || (h.paketId === p.id && h.penggunaId === penggunaAktif.id));
-    const statusLabel = !hasil ? 'Belum Dikerjakan' : (hasil.statusUjian === 'Sedang Dikerjakan' ? 'Sedang Dikerjakan' : 'Selesai');
-    const tombolAksi = !hasil
-      ? `<button type="button" class="dnc-tombol dnc-tombol-primer dnc-tombol-penuh" data-mulai-ujian="${esc(p.id)}">Mulai Ujian (Masukkan Token)</button>`
-      : (hasil.statusUjian === 'Sedang Dikerjakan'
-        ? `<button type="button" class="dnc-tombol dnc-tombol-aksen dnc-tombol-penuh" data-lanjut-ujian="${esc(p.id)}">Lanjutkan Sesi Ujian</button>`
-        : `<button type="button" class="dnc-tombol dnc-tombol-sekunder dnc-tombol-penuh" disabled>Sudah Diselesaikan (${esc(hasil.statusUjian)})</button>`);
+    const dibukaGuru = Boolean(p.ujianDibuka);
+
+    let statusBadgeHtml = '';
+    let tombolAksi = '';
+
+    if (hasil && hasil.statusUjian !== 'Sedang Dikerjakan') {
+      statusBadgeHtml = badgeStatus('Selesai');
+      tombolAksi = `<button type="button" class="dnc-tombol dnc-tombol-sekunder dnc-tombol-penuh" disabled>Sudah Diselesaikan (${esc(hasil.statusUjian)})</button>`;
+    } else if (!dibukaGuru) {
+      statusBadgeHtml = p.dihentikanPada
+        ? `<span class="dnc-badge dnc-badge-merah">Dihentikan Guru</span>`
+        : `<span class="dnc-badge dnc-badge-amber">Menunggu Mulai Guru</span>`;
+      tombolAksi = `<button type="button" class="dnc-tombol dnc-tombol-sekunder dnc-tombol-penuh" disabled>${p.dihentikanPada ? 'Ujian Telah Dihentikan Guru' : 'Menunggu Guru Klik Mulai Ujian'}</button>`;
+    } else if (hasil && hasil.statusUjian === 'Sedang Dikerjakan') {
+      statusBadgeHtml = `<span class="dnc-badge dnc-badge-hijau"><span class="dnc-dot-live"></span>Sedang Dikerjakan</span>`;
+      tombolAksi = `<button type="button" class="dnc-tombol dnc-tombol-aksen dnc-tombol-penuh" data-lanjut-ujian="${esc(p.id)}">Lanjutkan Sesi Ujian</button>`;
+    } else {
+      statusBadgeHtml = `<span class="dnc-badge dnc-badge-hijau"><span class="dnc-dot-live"></span>Ujian Dibuka</span>`;
+      tombolAksi = `<button type="button" class="dnc-tombol dnc-tombol-primer dnc-tombol-penuh" data-mulai-ujian="${esc(p.id)}">Mulai Ujian (Masukkan Token)</button>`;
+    }
 
     return `
       <article class="dnc-kartu-ujian">
         <div class="dnc-flex-between">
           <span class="dnc-badge dnc-badge-biru">${esc(namaMapelById(p.mapelId))}</span>
-          ${badgeStatus(statusLabel)}
+          ${statusBadgeHtml}
         </div>
         <h3 style="font-size:15px;font-weight:700">${esc(p.judulPaket)}</h3>
         <div class="dnc-ujian-meta">
@@ -2267,6 +3273,20 @@ async function muatM5RuangUjian(paksa = false) {
   });
 }
 
+function buatPetaAcakSiswa(paket) {
+  const soalIdsAsli = [...(paket.daftarSoalIds || [])];
+  const urutanSoalIds = paket.acakSoal ? acakArray(soalIdsAsli) : soalIdsAsli;
+  const urutanOpsiMap = {};
+  urutanSoalIds.forEach(sid => {
+    const s = cariById('bankSoal', sid);
+    if (s && adalahTipeBeropsi(s.tipeSoal)) {
+      const daftarKodeAsli = (s.opsiJawaban || []).map(o => o.kode);
+      urutanOpsiMap[sid] = paket.acakOpsi ? acakArray(daftarKodeAsli) : daftarKodeAsli;
+    }
+  });
+  return { urutanSoalIds, urutanOpsiMap };
+}
+
 function bukaModalTokenUjian(paketId) {
   const paket = cariById('paketAsas', paketId);
   if (!paket) return;
@@ -2285,30 +3305,39 @@ function bukaModalTokenUjian(paketId) {
       </div>`,
     onSubmit: async () => {
       const tokenInput = document.getElementById('f-input-token').value.trim().toUpperCase();
+      // Cek status paket terbaru langsung dari Firestore sebelum mengizinkan siswa masuk
+      const paketTerbaru = await dbGetById(COLLECTIONS.paketAsas, paket.id) || paket;
       const sekarang = Date.now();
-      const tMulai = keDate(paket.waktuMulai)?.getTime() || 0;
-      const tSelesai = keDate(paket.waktuSelesai)?.getTime() || 0;
+      const tMulai = keDate(paketTerbaru.waktuMulai)?.getTime() || 0;
+      const tSelesai = keDate(paketTerbaru.waktuSelesai)?.getTime() || 0;
 
-      if (paket.statusPaket !== 'Aktif') throw new Error('Paket ASAS ini tidak berstatus Aktif.');
-      if (sekarang < tMulai) throw new Error(`Jadwal ujian belum dimulai. Mulai pada ${formatTanggal(paket.waktuMulai, true)}.`);
+      if (paketTerbaru.statusPaket !== 'Aktif') throw new Error('Paket ASAS ini tidak berstatus Aktif.');
+      if (!paketTerbaru.ujianDibuka) throw new Error('Guru belum menekan tombol Mulai Ujian atau sesi telah dihentikan.');
+      if (sekarang < tMulai) throw new Error(`Jadwal ujian belum dimulai. Mulai pada ${formatTanggal(paketTerbaru.waktuMulai, true)}.`);
       if (sekarang > tSelesai) throw new Error('Rentang jadwal ujian untuk paket ini telah berakhir.');
-      if (tokenInput !== String(paket.tokenUjian || '').toUpperCase()) throw new Error('Token ujian tidak cocok. Periksa kembali token dari pengawas.');
+      if (tokenInput !== String(paketTerbaru.tokenUjian || '').toUpperCase()) throw new Error('Token ujian tidak cocok. Periksa kembali token dari pengawas.');
 
-      const hasilId = `${paket.id}_${penggunaAktif.id}`;
+      if (!stateMemori.bankSoal.length) await muatDataBankSoal();
+
+      const hasilId = `${paketTerbaru.id}_${penggunaAktif.id}`;
       let hasil = await dbGetById(COLLECTIONS.hasilUjian, hasilId);
       if (hasil && hasil.statusUjian !== 'Sedang Dikerjakan') {
         throw new Error('Anda sudah menyelesaikan paket ASAS ini.');
       }
       if (!hasil) {
-        const jawabanAwal = (paket.daftarSoalIds || []).map(sid => ({ soalId: sid, jawaban: '', ragu: false, skor: 0 }));
+        // REVISI 7: Acak urutan soal & urutan opsi unik per siswa tanpa mengubah kunci jawaban asli
+        const { urutanSoalIds, urutanOpsiMap } = buatPetaAcakSiswa(paketTerbaru);
+        const jawabanAwal = urutanSoalIds.map(sid => ({ soalId: sid, jawaban: '', ragu: false, skor: 0 }));
         hasil = await dbCreate(COLLECTIONS.hasilUjian, {
-          paketId: paket.id,
+          paketId: paketTerbaru.id,
           penggunaId: penggunaAktif.id,
           kelasId: penggunaAktif.kelasId,
-          mapelId: paket.mapelId,
+          mapelId: paketTerbaru.mapelId,
           waktuMulaiKerja: new Date().toISOString(),
           waktuSelesaiKerja: null,
           statusUjian: 'Sedang Dikerjakan',
+          urutanSoalIds,
+          urutanOpsiMap,
           jawabanSiswa: jawabanAwal,
           skorPg: 0,
           skorUraian: 0,
@@ -2320,15 +3349,19 @@ function bukaModalTokenUjian(paketId) {
       }
 
       tutupModalFormDnc();
-      await mulaiLembarUjian(paket, hasil);
+      await mulaiLembarUjian(paketTerbaru, hasil);
     }
   });
 }
 
 async function lanjutkanSesiUjianSiswa(paketId) {
-  const paket = cariById('paketAsas', paketId);
-  if (!paket) return;
-  const hasilId = `${paket.id}_${penggunaAktif.id}`;
+  const paketTerbaru = await dbGetById(COLLECTIONS.paketAsas, paketId) || cariById('paketAsas', paketId);
+  if (!paketTerbaru || paketTerbaru.statusPaket !== 'Aktif' || !paketTerbaru.ujianDibuka) {
+    tampilkanToast('Sesi ujian sedang ditutup atau telah dihentikan oleh Guru.', 'error');
+    await muatM5RuangUjian(true);
+    return;
+  }
+  const hasilId = `${paketTerbaru.id}_${penggunaAktif.id}`;
   const hasil = await dbGetById(COLLECTIONS.hasilUjian, hasilId) ||
     stateMemori.hasilUjian.find(h => h.paketId === paketId && h.penggunaId === penggunaAktif.id);
   if (!hasil || hasil.statusUjian !== 'Sedang Dikerjakan') {
@@ -2336,24 +3369,46 @@ async function lanjutkanSesiUjianSiswa(paketId) {
     await muatM5RuangUjian(true);
     return;
   }
-  await mulaiLembarUjian(paket, hasil);
+  await mulaiLembarUjian(paketTerbaru, hasil);
 }
 
 async function mulaiLembarUjian(paket, hasil) {
   if (!stateMemori.bankSoal.length) await muatDataBankSoal();
-  let daftarSoal = (paket.daftarSoalIds || []).map(id => cariById('bankSoal', id)).filter(Boolean);
+  const labelVisual = ['A', 'B', 'C', 'D', 'E'];
+
+  const urutanIds = Array.isArray(hasil.urutanSoalIds) && hasil.urutanSoalIds.length
+    ? hasil.urutanSoalIds
+    : (paket.acakSoal ? acakArray(paket.daftarSoalIds || []) : [...(paket.daftarSoalIds || [])]);
+
+  const petaOpsiTersimpan = hasil.urutanOpsiMap || {};
+
+  const daftarSoal = urutanIds.map(id => {
+    const s = cariById('bankSoal', id);
+    if (!s) return null;
+    if (!adalahTipeBeropsi(s.tipeSoal)) return { ...s, opsiTampil: [] };
+
+    const opsiAsli = s.opsiJawaban || [];
+    const urutanKode = Array.isArray(petaOpsiTersimpan[s.id]) && petaOpsiTersimpan[s.id].length
+      ? petaOpsiTersimpan[s.id]
+      : (paket.acakOpsi ? acakArray(opsiAsli.map(o => o.kode)) : opsiAsli.map(o => o.kode));
+
+    // Tampilkan huruf urut A-E di layar siswa, tetapi simpan kodeAsli agar kunci jawaban tidak berubah
+    const opsiTampil = urutanKode
+      .map(kodeAsli => opsiAsli.find(o => o.kode === kodeAsli))
+      .filter(Boolean)
+      .map((o, idx) => ({
+        labelTampil: labelVisual[idx] || o.kode,
+        kodeAsli: o.kode,
+        teks: o.teks
+      }));
+
+    return { ...s, opsiTampil };
+  }).filter(Boolean);
+
   if (!daftarSoal.length) {
     tampilkanToast('Butir soal pada paket ini tidak ditemukan.', 'error');
     return;
   }
-
-  daftarSoal = daftarSoal.map(s => ({
-    ...s,
-    opsiTampil: s.tipeSoal === 'Pilihan Ganda'
-      ? (paket.acakOpsi ? acakArray(s.opsiJawaban || []) : [...(s.opsiJawaban || [])])
-      : []
-  }));
-  if (paket.acakSoal) daftarSoal = acakArray(daftarSoal);
 
   const petaJawaban = {};
   (hasil.jawabanSiswa || []).forEach(j => {
@@ -2381,9 +3436,15 @@ async function mulaiLembarUjian(paket, hasil) {
   document.getElementById('m5-lembar-view').classList.remove('dnc-disembunyikan');
   document.getElementById('m5-judul-ujian').textContent = paket.judulPaket;
   document.getElementById('m5-info-mapel').textContent = `${namaMapelById(paket.mapelId)} • ${daftarSoal.length} soal`;
+  const badgeLive = document.getElementById('m5-status-live');
+  if (badgeLive) {
+    badgeLive.className = 'dnc-badge dnc-badge-hijau';
+    badgeLive.innerHTML = '<span class="dnc-dot-live"></span>Sesi Dibuka Guru';
+  }
 
   renderSoalAktifM5();
   mulaiCountdownUjian();
+  pasangListenerPaketUjianBerjalan(paket.id);
 }
 
 function mulaiCountdownUjian() {
@@ -2399,7 +3460,7 @@ function mulaiCountdownUjian() {
     if (sisaDetik <= 0 && !sedangSubmitUjian) {
       hentikanTimerUjian();
       tampilkanToast('Waktu ujian telah habis. Jawaban dikirim otomatis.', 'info');
-      selesaikanUjianSiswa(true);
+      selesaikanUjianSiswa(true, 'waktu_habis');
     }
   };
   updateTimer();
@@ -2422,7 +3483,7 @@ async function autosaveJawabanUjian() {
   }
 }
 
-const autosaveUraianDebounced = debounceDnc(() => autosaveJawabanUjian(), 500);
+const autosaveTeksDebounced = debounceDnc(() => autosaveJawabanUjian(), 500);
 
 function renderNavigasiNomorM5() {
   if (!sesiUjianAktif) return;
@@ -2456,7 +3517,9 @@ function renderSoalAktifM5() {
   const jwb = petaJawaban[soal.id];
 
   document.getElementById('m5-nomor-label').textContent = `Soal ${indeks + 1} dari ${daftarSoal.length} (Bobot ${soal.bobotNilai})`;
-  document.getElementById('m5-tipe-badge').textContent = soal.tipeSoal;
+  const tipeEl = document.getElementById('m5-tipe-badge');
+  tipeEl.outerHTML = badgeTipeSoal(soal.tipeSoal).replace('<span ', '<span id="m5-tipe-badge" ');
+
   document.getElementById('m5-btn-prev').disabled = indeks === 0;
   document.getElementById('m5-btn-next').textContent = indeks === daftarSoal.length - 1 ? 'Selesai & Kumpulkan' : 'Selanjutnya';
 
@@ -2467,12 +3530,13 @@ function renderSoalAktifM5() {
   const konten = document.getElementById('m5-soal-konten');
   if (soal.tipeSoal === 'Pilihan Ganda') {
     konten.innerHTML = `
+      <div class="dnc-opsi-petunjuk">Pilihan Ganda — Pilih satu jawaban yang paling tepat.</div>
       ${soal.urlGambar ? `<img src="${esc(soal.urlGambar)}" alt="Gambar soal" class="dnc-soal-gambar">` : ''}
       <div class="dnc-soal-teks">${esc(soal.pertanyaan)}</div>
       <div class="dnc-opsi-list">
         ${soal.opsiTampil.map(o => `
-          <button type="button" class="dnc-opsi-item ${jwb.jawaban === o.kode ? 'terpilih' : ''}" data-pilih-opsi="${esc(o.kode)}">
-            <span class="dnc-opsi-kode">${esc(o.kode)}</span>
+          <button type="button" class="dnc-opsi-item ${jwb.jawaban === o.kodeAsli ? 'terpilih' : ''}" data-pilih-opsi="${esc(o.kodeAsli)}">
+            <span class="dnc-opsi-kode">${esc(o.labelTampil)}</span>
             <span>${esc(o.teks)}</span>
           </button>`).join('')}
       </div>`;
@@ -2483,8 +3547,51 @@ function renderSoalAktifM5() {
         await autosaveJawabanUjian();
       });
     });
+  } else if (soal.tipeSoal === 'Pilihan Ganda Kompleks') {
+    const dipilihSet = parseKunciKompleksSet(jwb.jawaban);
+    konten.innerHTML = `
+      <div class="dnc-opsi-petunjuk kompleks">Pilihan Ganda Kompleks — Centang lebih dari satu jawaban yang benar.</div>
+      ${soal.urlGambar ? `<img src="${esc(soal.urlGambar)}" alt="Gambar soal" class="dnc-soal-gambar">` : ''}
+      <div class="dnc-soal-teks">${esc(soal.pertanyaan)}</div>
+      <div class="dnc-opsi-list">
+        ${soal.opsiTampil.map(o => {
+          const aktif = dipilihSet.has(o.kodeAsli);
+          return `
+            <button type="button" class="dnc-opsi-item ${aktif ? 'terpilih' : ''}" data-toggle-kompleks="${esc(o.kodeAsli)}">
+              <span class="dnc-opsi-cek">${aktif ? '✓' : ''}</span>
+              <span class="dnc-opsi-kode">${esc(o.labelTampil)}</span>
+              <span>${esc(o.teks)}</span>
+            </button>`;
+        }).join('')}
+      </div>`;
+    konten.querySelectorAll('[data-toggle-kompleks]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const kode = btn.dataset.toggleKompleks;
+        const setBaru = parseKunciKompleksSet(jwb.jawaban);
+        if (setBaru.has(kode)) setBaru.delete(kode);
+        else setBaru.add(kode);
+        jwb.jawaban = [...setBaru].sort().join(', ');
+        renderSoalAktifM5();
+        await autosaveJawabanUjian();
+      });
+    });
+  } else if (soal.tipeSoal === 'Isian Singkat') {
+    konten.innerHTML = `
+      <div class="dnc-opsi-petunjuk">Isian Singkat — Tuliskan jawaban singkat dan tepat pada kolom di bawah.</div>
+      ${soal.urlGambar ? `<img src="${esc(soal.urlGambar)}" alt="Gambar soal" class="dnc-soal-gambar">` : ''}
+      <div class="dnc-soal-teks">${esc(soal.pertanyaan)}</div>
+      <div class="dnc-form-grup">
+        <label class="dnc-label" for="m5-input-isian">Jawaban Isian Singkat</label>
+        <input id="m5-input-isian" class="dnc-input" type="text" placeholder="Ketik jawaban singkat Anda..." value="${esc(jwb.jawaban)}">
+      </div>`;
+    document.getElementById('m5-input-isian').addEventListener('input', e => {
+      jwb.jawaban = e.target.value;
+      renderNavigasiNomorM5();
+      autosaveTeksDebounced();
+    });
   } else {
     konten.innerHTML = `
+      <div class="dnc-opsi-petunjuk">Uraian — Tuliskan penjelasan jawaban secara lengkap.</div>
       ${soal.urlGambar ? `<img src="${esc(soal.urlGambar)}" alt="Gambar soal" class="dnc-soal-gambar">` : ''}
       <div class="dnc-soal-teks">${esc(soal.pertanyaan)}</div>
       <div class="dnc-form-grup">
@@ -2494,11 +3601,45 @@ function renderSoalAktifM5() {
     document.getElementById('m5-input-uraian').addEventListener('input', e => {
       jwb.jawaban = e.target.value;
       renderNavigasiNomorM5();
-      autosaveUraianDebounced();
+      autosaveTeksDebounced();
     });
   }
 
   renderNavigasiNomorM5();
+}
+
+function hitungSkorButirOtomatis(soal, jawabanSiswaRaw) {
+  const bobot = Number(soal.bobotNilai || 0);
+  if (bobot <= 0) return 0;
+
+  if (soal.tipeSoal === 'Pilihan Ganda') {
+    const j = String(jawabanSiswaRaw || '').trim().toUpperCase();
+    const k = String(soal.kunciJawaban || '').trim().toUpperCase();
+    return j && j === k ? bobot : 0;
+  }
+
+  if (soal.tipeSoal === 'Pilihan Ganda Kompleks') {
+    const kunciSet = parseKunciKompleksSet(soal.kunciJawaban);
+    const jwbSet = parseKunciKompleksSet(jawabanSiswaRaw);
+    if (!kunciSet.size || !jwbSet.size) return 0;
+    let benar = 0;
+    let salah = 0;
+    jwbSet.forEach(k => {
+      if (kunciSet.has(k)) benar++;
+      else salah++;
+    });
+    const rasio = Math.max(0, (benar - salah) / kunciSet.size);
+    return bulatDua(rasio * bobot);
+  }
+
+  if (soal.tipeSoal === 'Isian Singkat') {
+    const jNorm = normalisasiIsian(jawabanSiswaRaw);
+    if (!jNorm) return 0;
+    const alternatifKunci = String(soal.kunciJawaban || '').split(/[|;]/).map(normalisasiIsian).filter(Boolean);
+    return alternatifKunci.includes(jNorm) ? bobot : 0;
+  }
+
+  return 0;
 }
 
 function konfirmasiKumpulUjian() {
@@ -2511,17 +3652,21 @@ function konfirmasiKumpulUjian() {
     pesan: `Ringkasan: ${terjawab} dari ${total} soal terjawab (${total - terjawab} belum dijawab, ${ragu} ditandai ragu-ragu). Setelah dikumpulkan, jawaban tidak dapat diubah lagi. Lanjutkan?`,
     labelYa: 'Ya, Kumpulkan Ujian',
     kelasTombol: 'dnc-tombol-sukses',
-    onYa: () => selesaikanUjianSiswa(false)
+    onYa: () => selesaikanUjianSiswa(false, 'manual')
   });
 }
 
-async function selesaikanUjianSiswa(otomatis = false) {
+async function selesaikanUjianSiswa(otomatis = false, alasan = 'manual') {
   if (!sesiUjianAktif || sedangSubmitUjian) return;
   sedangSubmitUjian = true;
   hentikanTimerUjian();
+  if (typeof unsubPaketAktif === 'function') {
+    unsubPaketAktif();
+    unsubPaketAktif = null;
+  }
 
   const { paket, hasilId, daftarSoal, petaJawaban } = sesiUjianAktif;
-  let skorPg = 0;
+  let skorOtomatis = 0;
   let totalBobot = 0;
   let adaUraian = false;
 
@@ -2529,17 +3674,17 @@ async function selesaikanUjianSiswa(otomatis = false) {
     const j = petaJawaban[s.id] || { soalId: s.id, jawaban: '', ragu: false, skor: 0 };
     const bobot = Number(s.bobotNilai || 0);
     totalBobot += bobot;
-    if (s.tipeSoal === 'Pilihan Ganda') {
-      const benar = String(j.jawaban || '').trim().toUpperCase() === String(s.kunciJawaban || '').trim().toUpperCase();
-      const skorButir = benar ? bobot : 0;
-      skorPg += skorButir;
-      return { soalId: s.id, jawaban: j.jawaban || '', ragu: Boolean(j.ragu), skor: skorButir };
+    if (s.tipeSoal === 'Uraian') {
+      adaUraian = true;
+      return { soalId: s.id, jawaban: j.jawaban || '', ragu: Boolean(j.ragu), skor: 0 };
     }
-    adaUraian = true;
-    return { soalId: s.id, jawaban: j.jawaban || '', ragu: Boolean(j.ragu), skor: 0 };
+    const skorButir = hitungSkorButirOtomatis(s, j.jawaban);
+    skorOtomatis = bulatDua(skorOtomatis + skorButir);
+    return { soalId: s.id, jawaban: j.jawaban || '', ragu: Boolean(j.ragu), skor: skorButir };
   });
 
-  const skorAkhir = totalBobot > 0 ? bulatDua((skorPg / totalBobot) * 100) : 0;
+  // REVISI 5: Terapkan perhitungan skor langsung dari bobot penskoran file soal
+  const skorAkhir = totalBobot > 0 ? bulatDua((skorOtomatis / totalBobot) * 100) : 0;
   const mapelObj = cariById('mataPelajaran', paket.mapelId);
   const kkm = Number(mapelObj?.kkm ?? 75);
   const statusUjian = adaUraian ? 'Menunggu Koreksi' : 'Selesai';
@@ -2549,7 +3694,7 @@ async function selesaikanUjianSiswa(otomatis = false) {
     waktuSelesaiKerja: new Date().toISOString(),
     statusUjian,
     jawabanSiswa: jawabanFinal,
-    skorPg,
+    skorPg: skorOtomatis,
     skorUraian: 0,
     skorAkhir,
     statusKetuntasan
@@ -2559,7 +3704,8 @@ async function selesaikanUjianSiswa(otomatis = false) {
   sedangSubmitUjian = false;
   resetCacheMenu(['DNC-M1', 'DNC-M5', 'DNC-M6']);
   await muatM5RuangUjian(true);
-  tampilkanToast(otomatis ? 'Ujian selesai otomatis karena waktu habis.' : 'Lembar ujian ASAS berhasil dikumpulkan.');
+  if (alasan === 'manual') tampilkanToast('Lembar ujian ASAS berhasil dikumpulkan.');
+  else if (alasan === 'waktu_habis') tampilkanToast('Ujian selesai otomatis karena waktu habis.');
 }
 // ===== AKHIR BLOK: DNC_M5_RUANG_UJIAN =====
 
@@ -2578,7 +3724,7 @@ async function muatM6HasilNilai(paksa = false) {
   document.getElementById('filter-kelas-hasil').classList.toggle('dnc-disembunyikan', adalahSiswa);
   document.getElementById('subjudul-m6').textContent = adalahSiswa
     ? 'Riwayat nilai pribadi untuk paket ASAS yang mengaktifkan penampilan nilai.'
-    : 'Pantau pengerjaan ujian, koreksi jawaban uraian, reset sesi bermasalah, dan ekspor daftar nilai ASAS.';
+    : 'Pantau pengerjaan ujian, koreksi jawaban, perhitungan skor otomatis dari bobot file soal, dan ekspor daftar nilai ASAS.';
 
   isiSelectOpsi('filter-paket-hasil', stateMemori.paketAsas.map(p => ({ value: p.id, label: p.judulPaket })), 'Semua Paket');
   isiSelectOpsi('filter-mapel-hasil', daftarMapelDiizinkan().map(m => ({ value: m.id, label: m.namaMapel })), 'Semua Mapel');
@@ -2626,7 +3772,7 @@ function renderTabelHasil() {
       }
     },
     { label: 'Status Ujian', render: h => badgeStatus(h.statusUjian) },
-    { label: 'PG / Uraian', render: h => `${esc(h.skorPg ?? 0)} / ${esc(h.skorUraian ?? 0)}` },
+    { label: 'Skor Otomatis / Manual', render: h => `${esc(h.skorPg ?? 0)} / ${esc(h.skorUraian ?? 0)}` },
     { label: 'Skor Akhir', render: h => `<strong style="font-size:15px">${esc(h.skorAkhir ?? 0)}</strong>` },
     { label: 'Ketuntasan', render: h => badgeStatus(h.statusKetuntasan || 'Menunggu Koreksi') },
     {
@@ -2650,23 +3796,47 @@ function bukaModalKoreksiHasil(hasilId, hanyaBaca = false) {
   const kkm = Number(mapel?.kkm ?? 75);
 
   const daftarSoalPaket = (paket?.daftarSoalIds || []).map(id => cariById('bankSoal', id)).filter(Boolean);
-  const totalBobotPaket = daftarSoalPaket.reduce((s, x) => s + Number(x.bobotNilai || 0), 0);
+  const totalBobotPaket = bulatDua(daftarSoalPaket.reduce((s, x) => s + Number(x.bobotNilai || 0), 0));
 
   const itemsHtml = (hasil.jawabanSiswa || []).map((j, idx) => {
     const soal = cariById('bankSoal', j.soalId);
     if (!soal) return '';
-    if (soal.tipeSoal === 'Pilihan Ganda') {
-      const benar = String(j.jawaban || '').toUpperCase() === String(soal.kunciJawaban || '').toUpperCase();
+
+    if (soal.tipeSoal === 'Pilihan Ganda' || soal.tipeSoal === 'Pilihan Ganda Kompleks') {
+      const skorButir = Number(j.skor ?? hitungSkorButirOtomatis(soal, j.jawaban));
+      const badgeNilai = skorButir >= soal.bobotNilai
+        ? badgeStatus(`Benar (+${skorButir}/${soal.bobotNilai})`)
+        : (skorButir > 0 ? `<span class="dnc-badge dnc-badge-amber">Parsial (+${skorButir}/${soal.bobotNilai})</span>` : badgeStatus('Salah (0)'));
       return `
         <div class="dnc-koreksi-item">
           <div class="dnc-koreksi-header">
-            <strong>Soal #${idx + 1} (${esc(soal.kodeSoal)}) — Pilihan Ganda</strong>
-            ${badgeStatus(benar ? `Benar (+${soal.bobotNilai})` : 'Salah (0)')}
+            <strong>Soal #${idx + 1} (${esc(soal.kodeSoal)}) — ${esc(soal.tipeSoal)}</strong>
+            ${badgeNilai}
           </div>
           <div style="font-size:13px;margin-bottom:6px">${esc(soal.pertanyaan)}</div>
-          <div class="dnc-form-bantuan">Jawaban Siswa: <strong>${esc(j.jawaban || '-')}</strong> | Kunci: <strong>${esc(soal.kunciJawaban)}</strong></div>
+          <div class="dnc-form-bantuan">Jawaban Siswa (kode asli): <strong>${esc(j.jawaban || '-')}</strong> | Kunci: <strong>${esc(soal.kunciJawaban)}</strong></div>
         </div>`;
     }
+
+    if (soal.tipeSoal === 'Isian Singkat') {
+      const skorButir = Number(j.skor ?? hitungSkorButirOtomatis(soal, j.jawaban));
+      return `
+        <div class="dnc-koreksi-item">
+          <div class="dnc-koreksi-header">
+            <strong>Soal #${idx + 1} (${esc(soal.kodeSoal)}) — Isian Singkat (Bobot ${esc(soal.bobotNilai)})</strong>
+            ${badgeStatus(skorButir > 0 ? `Terpenuhi (+${skorButir})` : 'Perlu Cek (0)')}
+          </div>
+          <div style="font-size:13px">${esc(soal.pertanyaan)}</div>
+          <div class="dnc-jawaban-box"><strong>Jawaban Siswa:</strong> ${esc(j.jawaban || '(Tidak dijawab)')}</div>
+          <div class="dnc-form-bantuan dnc-mb-12"><strong>Kunci Isian:</strong> ${esc(soal.kunciJawaban || '-')}</div>
+          ${!hanyaBaca ? `
+            <div class="dnc-form-grup" style="margin-bottom:0">
+              <label class="dnc-label" for="skor-manual-${esc(soal.id)}">Penyesuaian Skor Isian (0 – ${esc(soal.bobotNilai)})</label>
+              <input id="skor-manual-${esc(soal.id)}" data-koreksi-soal="${esc(soal.id)}" data-tipe="Isian Singkat" data-maks="${esc(soal.bobotNilai)}" class="dnc-input" type="number" min="0" max="${esc(soal.bobotNilai)}" step="0.5" value="${esc(skorButir)}">
+            </div>` : ''}
+        </div>`;
+    }
+
     return `
       <div class="dnc-koreksi-item">
         <div class="dnc-koreksi-header">
@@ -2677,8 +3847,8 @@ function bukaModalKoreksiHasil(hasilId, hanyaBaca = false) {
         <div class="dnc-jawaban-box"><strong>Jawaban Siswa:</strong>\n${esc(j.jawaban || '(Tidak dijawab)')}</div>
         ${!hanyaBaca ? `<div class="dnc-form-bantuan dnc-mb-12"><strong>Rubrik/Kunci:</strong> ${esc(soal.kunciJawaban || '-')}</div>` : ''}
         <div class="dnc-form-grup" style="margin-bottom:0">
-          <label class="dnc-label" for="skor-uraian-${esc(soal.id)}">Skor Uraian (0 – ${esc(soal.bobotNilai)})</label>
-          <input id="skor-uraian-${esc(soal.id)}" data-uraian-soal="${esc(soal.id)}" data-maks="${esc(soal.bobotNilai)}" class="dnc-input" type="number" min="0" max="${esc(soal.bobotNilai)}" step="0.5" value="${esc(j.skor ?? 0)}" ${hanyaBaca ? 'disabled' : ''}>
+          <label class="dnc-label" for="skor-manual-${esc(soal.id)}">Skor Uraian (0 – ${esc(soal.bobotNilai)})</label>
+          <input id="skor-manual-${esc(soal.id)}" data-koreksi-soal="${esc(soal.id)}" data-tipe="Uraian" data-maks="${esc(soal.bobotNilai)}" class="dnc-input" type="number" min="0" max="${esc(soal.bobotNilai)}" step="0.5" value="${esc(j.skor ?? 0)}" ${hanyaBaca ? 'disabled' : ''}>
         </div>
       </div>`;
   }).join('');
@@ -2693,7 +3863,7 @@ function bukaModalKoreksiHasil(hasilId, hanyaBaca = false) {
       <div class="dnc-pratinjau-soal dnc-mb-12">
         <strong>${esc(siswa?.namaLengkap || '-')} (${esc(siswa?.nomorInduk || '-')})</strong>
         <div class="dnc-form-bantuan">${esc(paket?.judulPaket || '-')} • ${esc(mapel?.namaMapel || '-')} (KKM: ${kkm}) • Total Bobot Paket: ${totalBobotPaket}</div>
-        <div class="dnc-form-bantuan">Skor PG: ${esc(hasil.skorPg)} | Skor Uraian: ${esc(hasil.skorUraian)} | Skor Akhir: <strong>${esc(hasil.skorAkhir)}</strong> (${esc(hasil.statusKetuntasan)})</div>
+        <div class="dnc-form-bantuan">Skor Otomatis (PG/PGK/Isian): ${esc(hasil.skorPg)} | Skor Uraian: ${esc(hasil.skorUraian)} | Skor Akhir: <strong>${esc(hasil.skorAkhir)}</strong> (${esc(hasil.statusKetuntasan)})</div>
       </div>
       ${itemsHtml}
       <div class="dnc-form-grup dnc-mt-12">
@@ -2701,26 +3871,33 @@ function bukaModalKoreksiHasil(hasilId, hanyaBaca = false) {
         <textarea id="f-catatan-koreksi" class="dnc-textarea" placeholder="Tambahkan catatan umpan balik (opsional)" ${hanyaBaca ? 'disabled' : ''}>${esc(hasil.catatanKoreksi || '')}</textarea>
       </div>`,
     onSubmit: async () => {
+      let skorPg = 0;
       let skorUraian = 0;
       const jawabanBaru = (hasil.jawabanSiswa || []).map(j => {
-        const inp = document.querySelector(`[data-uraian-soal="${j.soalId}"]`);
-        if (!inp) return j;
-        const maks = Number(inp.dataset.maks || 0);
-        const val = Number(inp.value);
-        if (isNaN(val) || val < 0 || val > maks) {
-          throw new Error(`Skor uraian harus berada di rentang 0 sampai ${maks}.`);
+        const soal = cariById('bankSoal', j.soalId);
+        const inp = document.querySelector(`[data-koreksi-soal="${j.soalId}"]`);
+        if (inp) {
+          const maks = Number(inp.dataset.maks || 0);
+          const val = Number(inp.value);
+          if (isNaN(val) || val < 0 || val > maks) {
+            throw new Error(`Skor koreksi harus berada di rentang 0 sampai ${maks}.`);
+          }
+          if (inp.dataset.tipe === 'Uraian') skorUraian = bulatDua(skorUraian + val);
+          else skorPg = bulatDua(skorPg + val);
+          return { ...j, skor: val };
         }
-        skorUraian += val;
-        return { ...j, skor: val };
+        const nilaiButir = soal ? hitungSkorButirOtomatis(soal, j.jawaban) : Number(j.skor || 0);
+        skorPg = bulatDua(skorPg + nilaiButir);
+        return { ...j, skor: nilaiButir };
       });
 
-      const skorPg = Number(hasil.skorPg || 0);
       const skorAkhir = totalBobotPaket > 0 ? bulatDua(((skorPg + skorUraian) / totalBobotPaket) * 100) : 0;
       const statusKetuntasan = skorAkhir >= kkm ? 'Tuntas' : 'Belum Tuntas';
       const catatanKoreksi = document.getElementById('f-catatan-koreksi').value.trim();
 
       await dbUpdate(COLLECTIONS.hasilUjian, hasil.id, {
         jawabanSiswa: jawabanBaru,
+        skorPg,
         skorUraian,
         skorAkhir,
         statusUjian: 'Selesai',
@@ -2759,7 +3936,7 @@ function eksporRekapNilaiCsv() {
     tampilkanToast('Tidak ada data hasil ujian untuk diekspor.', 'error');
     return;
   }
-  const header = ['NomorInduk', 'NamaLengkap', 'Kelas', 'PaketASAS', 'MataPelajaran', 'StatusUjian', 'SkorPG', 'SkorUraian', 'SkorAkhir', 'Ketuntasan'];
+  const header = ['NomorInduk', 'NamaLengkap', 'Kelas', 'PaketASAS', 'MataPelajaran', 'StatusUjian', 'SkorOtomatis', 'SkorUraian', 'SkorAkhir', 'Ketuntasan'];
   const qCsv = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
   const baris = [header.join(',')];
   dataHasilTersaring.forEach(h => {
@@ -2970,17 +4147,14 @@ async function inisialisasiAplikasiDnc() {
   renderSlotPreviewLogin();
   setRoleLogin('Admin');
 
-  // Tab Pilih Role di Halaman Login
   document.querySelectorAll('[data-login-role]').forEach(btn => {
     btn.addEventListener('click', () => setRoleLogin(btn.getAttribute('data-login-role')));
   });
 
-  // Tombol intip password Login
   document.getElementById('btn-intip-password')?.addEventListener('click', e => {
     togglePassword('input-login-password', e.currentTarget);
   });
 
-  // Submit Login (anti page reload)
   document.getElementById('form-login-dnc')?.addEventListener('submit', async e => {
     e.preventDefault();
     const btn = document.getElementById('btn-masuk-dnc');
@@ -2993,11 +4167,9 @@ async function inisialisasiAplikasiDnc() {
     });
   });
 
-  // Tombol Keluar (Desktop & HP)
   document.getElementById('btn-keluar-desktop')?.addEventListener('click', keluarAplikasi);
   document.getElementById('btn-keluar-hp')?.addEventListener('click', keluarAplikasi);
 
-  // Modal Dinamis Universal
   document.getElementById('btn-tutup-modal')?.addEventListener('click', tutupModalFormDnc);
   document.getElementById('btn-batal-modal')?.addEventListener('click', tutupModalFormDnc);
   document.getElementById('dnc-modal-form')?.addEventListener('submit', async e => {
@@ -3007,7 +4179,6 @@ async function inisialisasiAplikasiDnc() {
     await denganLoading(btn, 'Menyimpan...', () => _modalSubmitHandler());
   });
 
-  // Modal Konfirmasi
   document.getElementById('btn-tutup-konfirmasi')?.addEventListener('click', tutupKonfirmasi);
   document.getElementById('btn-batal-konfirmasi')?.addEventListener('click', tutupKonfirmasi);
   document.getElementById('btn-ya-konfirmasi')?.addEventListener('click', async () => {
@@ -3020,7 +4191,6 @@ async function inisialisasiAplikasiDnc() {
     });
   });
 
-  // Sheet Lainnya HP
   document.getElementById('btn-tutup-sheet')?.addEventListener('click', () => {
     document.getElementById('dnc-sheet-lainnya').classList.add('dnc-disembunyikan');
   });
@@ -3040,6 +4210,7 @@ async function inisialisasiAplikasiDnc() {
   });
   document.getElementById('cari-kelas')?.addEventListener('input', debounceDnc(renderTabelKelas, 250));
   document.getElementById('filter-tingkat-kelas')?.addEventListener('change', renderTabelKelas);
+  document.getElementById('btn-impor-kelas')?.addEventListener('click', bukaModalImporKelas);
   document.getElementById('btn-tambah-kelas')?.addEventListener('click', () => bukaFormKelas());
   document.getElementById('tbody-kelas')?.addEventListener('click', e => {
     const btnUbah = e.target.closest('[data-ubah-kelas]');
@@ -3085,6 +4256,10 @@ async function inisialisasiAplikasiDnc() {
     document.getElementById(id)?.addEventListener('change', renderTabelPaket);
   });
   document.getElementById('tbody-paket')?.addEventListener('click', e => {
+    const bMulai = e.target.closest('[data-mulai-sesi]');
+    if (bMulai) mulaiSesiUjianOlehGuru(bMulai.dataset.mulaiSesi);
+    const bStop = e.target.closest('[data-berhenti-sesi]');
+    if (bStop) hentikanSesiUjianOlehGuru(bStop.dataset.berhentiSesi);
     const bTok = e.target.closest('[data-token-paket]');
     if (bTok) perbaruiTokenPaket(bTok.dataset.tokenPaket);
     const bUbah = e.target.closest('[data-ubah-paket]');
@@ -3153,7 +4328,6 @@ async function inisialisasiAplikasiDnc() {
     if (bTog) toggleStatusPengguna(bTog.dataset.toggleUser);
   });
 
-  // Pemulihan sesi Admin Firebase Auth otomatis saat mode Produksi
   if (!IS_PREVIEW) {
     try {
       const { auth, authMod } = await muatFirebaseSdk();
