@@ -5538,6 +5538,7 @@ async function inisialisasiAplikasiDnc() {
 
   // --- Event DNC-M7 ---
   document.getElementById('btn-muat-ulang-m7')?.addEventListener('click', () => muatM7Pengguna(true));
+  document.getElementById('btn-impor-siswa')?.addEventListener('click', bukaModalImporSiswa);
   document.getElementById('btn-tambah-pengguna')?.addEventListener('click', () => bukaFormPengguna());
   document.getElementById('cari-pengguna')?.addEventListener('input', debounceDnc(renderTabelPengguna, 250));
   ['filter-role-pengguna', 'filter-kelas-pengguna', 'filter-mapel-pengguna', 'filter-status-pengguna'].forEach(id => {
