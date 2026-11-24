@@ -617,6 +617,7 @@
               </div>
               <div class="dnc-flex-gap">
                 <span id="m5-status-live" class="dnc-badge dnc-badge-hijau"><span class="dnc-dot-live"></span>Sesi Dibuka Guru</span>
+                <span id="m5-status-lockdown" class="dnc-badge dnc-badge-biru">Layar Terkunci (0/3)</span>
                 <span id="m5-status-simpan" class="dnc-badge dnc-badge-abu">Autosave siap</span>
                 <div id="m5-timer" class="dnc-timer-badge">
                   <svg class="dnc-ikon"><use href="#icon-clock"></use></svg>
@@ -742,6 +743,10 @@
                 <svg class="dnc-ikon"><use href="#icon-refresh"></use></svg>
                 <span>Muat Ulang</span>
               </button>
+              <button type="button" id="btn-impor-siswa" class="dnc-tombol dnc-tombol-aksen">
+                <svg class="dnc-ikon"><use href="#icon-upload"></use></svg>
+                <span>Impor Massal Siswa</span>
+              </button>
               <button type="button" id="btn-tambah-pengguna" class="dnc-tombol dnc-tombol-primer">
                 <svg class="dnc-ikon"><use href="#icon-plus"></use></svg>
                 <span>Tambah Pengguna</span>
@@ -841,6 +846,27 @@
       <div class="dnc-sheet-handle"></div>
       <div id="dnc-sheet-menu-list"></div>
       <button type="button" id="btn-tutup-sheet" class="dnc-tombol dnc-tombol-sekunder dnc-tombol-penuh dnc-mt-12">Tutup</button>
+    </div>
+  </div>
+
+  <div id="dnc-lockdown-overlay" class="dnc-lockdown-overlay dnc-disembunyikan" role="alertdialog" aria-modal="true" aria-labelledby="dnc-lockdown-judul">
+    <div class="dnc-lockdown-kartu">
+      <div id="dnc-lockdown-ikon" class="dnc-lockdown-ikon">
+        <svg class="dnc-ikon"><use href="#icon-shield"></use></svg>
+      </div>
+      <h2 id="dnc-lockdown-judul" class="dnc-lockdown-judul">Mode Kunci Layar Siswa</h2>
+      <p id="dnc-lockdown-pesan" class="dnc-lockdown-pesan">
+        Untuk mencegah membuka tab atau situs lain, akun Siswa wajib berada dalam Mode Layar Penuh (Fullscreen) selama aplikasi dibuka.
+      </p>
+      <div id="dnc-lockdown-counter" class="dnc-lockdown-counter dnc-disembunyikan"></div>
+      <div class="dnc-lockdown-aksi">
+        <button type="button" id="btn-aktif-lockdown" class="dnc-tombol dnc-tombol-primer dnc-tombol-penuh">
+          Aktifkan Layar Penuh &amp; Lanjutkan
+        </button>
+        <button type="button" id="btn-keluar-lockdown" class="dnc-tombol dnc-tombol-sekunder dnc-tombol-penuh">
+          Keluar dari Aplikasi
+        </button>
+      </div>
     </div>
   </div>
 
