@@ -5934,9 +5934,11 @@ async function inisialisasiAplikasiDnc() {
   ['filter-role-pengguna', 'filter-kelas-pengguna', 'filter-mapel-pengguna', 'filter-status-pengguna'].forEach(id => {
     document.getElementById(id)?.addEventListener('change', renderTabelPengguna);
   });
-  document.getElementById('tbody-pengguna')?.addEventListener('click', e => {
+  document.getElementById('wadah-pengguna-m7')?.addEventListener('click', e => {
+    const bToggleKelas = e.target.closest('[data-toggle-kelas-m7]');
+    if (bToggleKelas) { toggleKelasSiswaM7(bToggleKelas.dataset.toggleKelasM7); return; }
     const bUbah = e.target.closest('[data-ubah-user]');
-    if (bUbah) bukaFormPengguna(cariById('pengguna', bUbah.dataset.ubahUser));
+    if (bUbah) { bukaFormPengguna(cariById('pengguna', bUbah.dataset.ubahUser)); return; }
     const bTog = e.target.closest('[data-toggle-user]');
     if (bTog) toggleStatusPengguna(bTog.dataset.toggleUser);
   });
