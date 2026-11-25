@@ -1083,6 +1083,122 @@ svg.dnc-ikon {
   overflow-y: auto;
 }
 
+.dnc-grup-halaman-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.dnc-grup-halaman-kartu {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.dnc-grup-halaman-kepala {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  background: var(--surface);
+  transition: background 0.15s ease;
+}
+
+.dnc-grup-halaman-kepala:hover {
+  background: #F8FAFC;
+}
+
+.dnc-grup-halaman-kepala.terbuka {
+  background: #EFF6FF;
+  border-bottom: 1px solid #DBEAFE;
+}
+
+.dnc-grup-halaman-toggle {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 2px 0;
+}
+
+.dnc-grup-halaman-judul {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-main);
+  word-break: break-word;
+}
+
+.dnc-grup-halaman-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 4px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.dnc-grup-halaman-aksi {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.dnc-grup-halaman-panah {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--primary);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.dnc-grup-halaman-isi {
+  padding: 12px;
+  background: #F8FAFC;
+}
+
+.dnc-grup-halaman-isi .dnc-pembungkus-tabel {
+  background: var(--surface);
+}
+
+.dnc-subbagian-judul {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin: 16px 0 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.dnc-subbagian-judul:first-child {
+  margin-top: 0;
+}
+
+.dnc-kosong-box {
+  text-align: center;
+  color: var(--text-muted);
+  padding: 28px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
 .dnc-file-drop {
   border: 1.5px dashed #CBD5E1;
   border-radius: var(--radius);
