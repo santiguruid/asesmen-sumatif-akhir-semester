@@ -4891,7 +4891,19 @@ async function muatM7Pengguna(paksa = false) {
   renderTabelPengguna();
 }
 
+const kelasSiswaTerbukaM7 = new Set();
+
+function toggleKelasSiswaM7(kunciKelas) {
+  if (!kunciKelas) return;
+  if (kelasSiswaTerbukaM7.has(kunciKelas)) kelasSiswaTerbukaM7.delete(kunciKelas);
+  else kelasSiswaTerbukaM7.add(kunciKelas);
+  renderTabelPengguna();
+}
+
 function renderTabelPengguna() {
+  const wadah = document.getElementById('wadah-pengguna-m7');
+  if (!wadah) return;
+
   const q = teks(document.getElementById('cari-pengguna')?.value || '');
   const fRole = document.getElementById('filter-role-pengguna')?.value || '';
   const fKelas = document.getElementById('filter-kelas-pengguna')?.value || '';
@@ -4904,32 +4916,168 @@ function renderTabelPengguna() {
     if (fMapel && !(u.mapelIds || []).includes(fMapel)) return false;
     if (fStatus === 'aktif' && u.statusAktif === false) return false;
     if (fStatus === 'nonaktif' && u.statusAktif !== false) return false;
-    if (q && !`${teks(u.namaLengkap)} ${teks(u.nomorInduk)} ${teks(u.email)}`.includes(q)) return false;
+    const teksKelas = u.role === 'Siswa' ? teks(namaKelasById(u.kelasId)) : '';
+    if (q && !`${teks(u.namaLengkap)} ${teks(u.nomorInduk)} ${teks(u.email)} ${teksKelas}`.includes(q)) return false;
     return true;
   });
 
-  renderTabelDnc('tbody-pengguna', data, [
-    { label: 'Nomor Induk', render: u => `<span class="dnc-mono">${esc(u.nomorInduk)}</span>` },
-    { label: 'Nama Lengkap', render: u => `<strong>${esc(u.namaLengkap)}</strong>` },
-    { label: 'Email', key: 'email' },
-    { label: 'Role', render: u => `<span class="dnc-badge dnc-badge-biru">${esc(u.role)}</span>` },
-    {
-      label: 'Kelas / Mapel Ampu',
-      render: u => {
-        if (u.role === 'Siswa') return esc(namaKelasById(u.kelasId));
-        if (u.role === 'Guru') return esc((u.mapelIds || []).map(id => namaMapelById(id)).join(', ') || '-');
-        return '<span class="dnc-teks-muted">Semua Cakupan</span>';
+  if (!data.length) {
+    wadah.innerHTML = '<div class="dnc-kosong-box">Belum ada data pengguna yang sesuai filter.</div>';
+    return;
+  }
+
+  const nonSiswa = data
+    .filter(u => u.role !== 'Siswa')
+    .sort((a, b) => {
+      const urutRole = r => (r === 'Admin' ? 0 : 1);
+      const selRole = urutRole(a.role) - urutRole(b.role);
+      return selRole !== 0 ? selRole : teks(a.namaLengkap).localeCompare(teks(b.namaLengkap));
+    });
+
+  const siswaList = data.filter(u => u.role === 'Siswa');
+  let htmlBagian = '';
+
+  if (nonSiswa.length) {
+    htmlBagian += `
+      <div class="dnc-subbagian-judul">
+        <span>Akun Admin &amp; Guru</span>
+        <span class="dnc-badge dnc-badge-abu">${nonSiswa.length} akun</span>
+      </div>
+      <div class="dnc-pembungkus-tabel dnc-mb-12">
+        <table class="dnc-tabel">
+          <thead>
+            <tr>
+              <th>Nomor Induk</th>
+              <th>Nama Lengkap</th>
+              <th>Email</th>
+              <th>Role</th>
+              <th>Mapel Ampu / Cakupan</th>
+              <th>Status</th>
+              <th>Aksi</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${nonSiswa.map(u => {
+              const cakupan = u.role === 'Guru'
+                ? esc((u.mapelIds || []).map(id => namaMapelById(id)).join(', ') || '-')
+                : '<span class="dnc-teks-muted">Semua Cakupan</span>';
+              return `
+                <tr>
+                  <td data-label="Nomor Induk"><span class="dnc-mono">${esc(u.nomorInduk)}</span></td>
+                  <td data-label="Nama Lengkap"><strong>${esc(u.namaLengkap)}</strong></td>
+                  <td data-label="Email">${esc(u.email)}</td>
+                  <td data-label="Role"><span class="dnc-badge dnc-badge-biru">${esc(u.role)}</span></td>
+                  <td data-label="Mapel Ampu / Cakupan">${cakupan}</td>
+                  <td data-label="Status">${badgeStatus(u.statusAktif !== false ? 'Aktif' : 'Nonaktif')}</td>
+                  <td class="dnc-sel-aksi">
+                    <div class="dnc-aksi-baris">
+                      <button type="button" class="dnc-tombol dnc-tombol-sekunder dnc-tombol-kecil" data-ubah-user="${esc(u.id)}">Ubah</button>
+                      <button type="button" class="dnc-tombol ${u.statusAktif !== false ? 'dnc-tombol-bahaya' : 'dnc-tombol-sukses'} dnc-tombol-kecil" data-toggle-user="${esc(u.id)}">${u.statusAktif !== false ? 'Nonaktifkan' : 'Aktifkan'}</button>
+                    </div>
+                  </td>
+                </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>`;
+  }
+
+  if (siswaList.length) {
+    const petaKelas = new Map();
+    siswaList.forEach(u => {
+      const kelasObj = u.kelasId ? cariById('kelas', u.kelasId) : null;
+      const kunciKelas = kelasObj ? kelasObj.id : '__tanpa_kelas__';
+      if (!petaKelas.has(kunciKelas)) {
+        petaKelas.set(kunciKelas, { kunciKelas, kelasObj, list: [] });
       }
-    },
-    { label: 'Status', render: u => badgeStatus(u.statusAktif !== false ? 'Aktif' : 'Nonaktif') },
-    {
-      label: 'Aksi', aksi: true,
-      render: u => `<div class="dnc-aksi-baris">
-        <button type="button" class="dnc-tombol dnc-tombol-sekunder dnc-tombol-kecil" data-ubah-user="${esc(u.id)}">Ubah</button>
-        <button type="button" class="dnc-tombol ${u.statusAktif !== false ? 'dnc-tombol-bahaya' : 'dnc-tombol-sukses'} dnc-tombol-kecil" data-toggle-user="${esc(u.id)}">${u.statusAktif !== false ? 'Nonaktifkan' : 'Aktifkan'}</button>
-      </div>`
-    }
-  ], 'Belum ada data pengguna');
+      petaKelas.get(kunciKelas).list.push(u);
+    });
+
+    const urutanKelasId = new Map(stateMemori.kelas.map((k, idx) => [k.id, idx]));
+    const daftarGrupKelas = [...petaKelas.values()].sort((a, b) => {
+      const ia = urutanKelasId.has(a.kunciKelas) ? urutanKelasId.get(a.kunciKelas) : 99999;
+      const ib = urutanKelasId.has(b.kunciKelas) ? urutanKelasId.get(b.kunciKelas) : 99999;
+      return ia - ib;
+    });
+
+    daftarGrupKelas.forEach(g => {
+      g.list.sort((a, b) =>
+        String(a.namaLengkap || '').localeCompare(String(b.namaLengkap || ''), 'id', { sensitivity: 'base' }) ||
+        String(a.nomorInduk || '').localeCompare(String(b.nomorInduk || ''), undefined, { numeric: true })
+      );
+    });
+
+    htmlBagian += `
+      <div class="dnc-subbagian-judul">
+        <span>Akun Siswa Berdasarkan Kelas (Klik kelas untuk melihat data siswa)</span>
+        <span class="dnc-badge dnc-badge-biru">${daftarGrupKelas.length} kelas • ${siswaList.length} siswa</span>
+      </div>
+      <div class="dnc-grup-halaman-list">
+        ${daftarGrupKelas.map(g => {
+          const terbuka = kelasSiswaTerbukaM7.has(g.kunciKelas);
+          const judulKelas = g.kelasObj
+            ? `${g.kelasObj.kodeKelas} — ${g.kelasObj.namaKelas}`
+            : 'Belum Ditempatkan di Kelas';
+          const jmlAktif = g.list.filter(s => s.statusAktif !== false).length;
+
+          const tabelSiswaHtml = terbuka ? `
+            <div class="dnc-grup-halaman-isi">
+              <div class="dnc-pembungkus-tabel">
+                <table class="dnc-tabel dnc-tabel-padat">
+                  <thead>
+                    <tr>
+                      <th>No</th>
+                      <th>Nomor Induk</th>
+                      <th>Nama Lengkap</th>
+                      <th>Email</th>
+                      <th>Status</th>
+                      <th>Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${g.list.map((u, idx) => `
+                      <tr>
+                        <td data-label="No"><strong>${idx + 1}</strong></td>
+                        <td data-label="Nomor Induk"><span class="dnc-mono">${esc(u.nomorInduk)}</span></td>
+                        <td data-label="Nama Lengkap"><strong>${esc(u.namaLengkap)}</strong></td>
+                        <td data-label="Email">${esc(u.email)}</td>
+                        <td data-label="Status">${badgeStatus(u.statusAktif !== false ? 'Aktif' : 'Nonaktif')}</td>
+                        <td class="dnc-sel-aksi">
+                          <div class="dnc-aksi-baris">
+                            <button type="button" class="dnc-tombol dnc-tombol-sekunder dnc-tombol-kecil" data-ubah-user="${esc(u.id)}">Ubah</button>
+                            <button type="button" class="dnc-tombol ${u.statusAktif !== false ? 'dnc-tombol-bahaya' : 'dnc-tombol-sukses'} dnc-tombol-kecil" data-toggle-user="${esc(u.id)}">${u.statusAktif !== false ? 'Nonaktifkan' : 'Aktifkan'}</button>
+                          </div>
+                        </td>
+                      </tr>`).join('')}
+                  </tbody>
+                </table>
+              </div>
+            </div>` : '';
+
+          return `
+            <div class="dnc-grup-halaman-kartu">
+              <div class="dnc-grup-halaman-kepala ${terbuka ? 'terbuka' : ''}">
+                <button type="button" class="dnc-grup-halaman-toggle" data-toggle-kelas-m7="${esc(g.kunciKelas)}" aria-expanded="${terbuka ? 'true' : 'false'}">
+                  <div style="min-width:0">
+                    <div class="dnc-grup-halaman-judul">${esc(judulKelas)}</div>
+                    <div class="dnc-grup-halaman-meta">
+                      ${g.kelasObj?.tingkat ? `<span class="dnc-badge dnc-badge-biru">${esc(labelTingkat(g.kelasObj.tingkat))}</span>` : ''}
+                      <span class="dnc-badge dnc-badge-abu">${g.list.length} siswa</span>
+                      <span>Aktif ${jmlAktif}/${g.list.length}</span>
+                      ${g.kelasObj?.waliKelas ? `<span>• Wali Kelas: ${esc(g.kelasObj.waliKelas)}</span>` : ''}
+                      ${g.kelasObj?.tahunAjaran ? `<span>• ${esc(g.kelasObj.tahunAjaran)}</span>` : ''}
+                    </div>
+                  </div>
+                  <span class="dnc-grup-halaman-panah">${terbuka ? 'Tutup Data Siswa ▴' : 'Lihat Data Siswa ▾'}</span>
+                </button>
+              </div>
+              ${tabelSiswaHtml}
+            </div>`;
+        }).join('')}
+      </div>`;
+  }
+
+  wadah.innerHTML = htmlBagian;
 }
 
 function bukaFormPengguna(item = null) {
