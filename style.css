@@ -2229,6 +2229,30 @@ body.dnc-mode-lockdown-siswa textarea {
     background: #EFF6FF;
   }
 
+  .dnc-grup-halaman-kepala {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 12px;
+  }
+
+  .dnc-grup-halaman-toggle {
+    min-height: 44px;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .dnc-grup-halaman-aksi {
+    width: 100%;
+  }
+
+  .dnc-grup-halaman-aksi .dnc-tombol {
+    flex: 1;
+  }
+
+  .dnc-grup-halaman-isi {
+    padding: 10px;
+  }
+
   .dnc-toast-container {
     left: 12px;
     right: 12px;
