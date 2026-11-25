@@ -1875,7 +1875,23 @@ function namaSumberPaketSoal(s) {
   return `Soal_Manual_${mapel}_Tingkat_${s?.tingkat || 'Umum'}`;
 }
 
+const paketSoalTerbukaM3 = new Set();
+
+function kunciGrupSoalM3(s) {
+  return `${namaSumberPaketSoal(s)}||${s.mapelId || ''}`;
+}
+
+function togglePaketSoalM3(kunci) {
+  if (!kunci) return;
+  if (paketSoalTerbukaM3.has(kunci)) paketSoalTerbukaM3.delete(kunci);
+  else paketSoalTerbukaM3.add(kunci);
+  renderTabelSoal();
+}
+
 function renderTabelSoal() {
+  const wadah = document.getElementById('wadah-paket-soal-m3');
+  if (!wadah) return;
+
   const q = teks(document.getElementById('cari-soal')?.value || '');
   const fMapel = document.getElementById('filter-mapel-soal')?.value || '';
   const fTingkat = document.getElementById('filter-tingkat-soal')?.value || '';
@@ -1892,33 +1908,106 @@ function renderTabelSoal() {
     return true;
   });
 
-  renderTabelDnc('tbody-soal', data, [
-    {
-      label: 'Kode Soal',
-      render: s => `<span class="dnc-mono">${esc(s.kodeSoal)}</span><div class="dnc-form-bantuan">${esc(namaSumberPaketSoal(s))}</div>`
-    },
-    { label: 'Mata Pelajaran', render: s => esc(namaMapelById(s.mapelId)) },
-    { label: 'Tingkat', render: s => `<span class="dnc-badge dnc-badge-biru">${esc(s.tingkat)}</span>` },
-    { label: 'Tipe Soal', render: s => badgeTipeSoal(s.tipeSoal) },
-    { label: 'Pertanyaan', render: s => `<div class="dnc-teks-potong" title="${esc(s.pertanyaan)}">${esc(s.pertanyaan)}</div>` },
-    {
-      label: 'Kunci Jawaban',
-      render: s => s.tipeSoal === 'Pilihan Ganda' || s.tipeSoal === 'Pilihan Ganda Kompleks'
-        ? `<strong class="dnc-mono">${esc(s.kunciJawaban || '-')}</strong>`
-        : `<div class="dnc-teks-potong" style="max-width:160px" title="${esc(s.kunciJawaban || '')}">${esc(s.kunciJawaban || 'Rubrik')}</div>`
-    },
-    { label: 'Bobot', render: s => `<strong>${esc(s.bobotNilai)}</strong>` },
-    { label: 'Status', render: s => badgeStatus(s.statusAktif ? 'Aktif' : 'Nonaktif') },
-    {
-      label: 'Aksi', aksi: true,
-      render: s => `<div class="dnc-aksi-baris">
-        <button type="button" class="dnc-tombol dnc-tombol-sekunder dnc-tombol-kecil" data-pratinjau-soal="${esc(s.id)}">Lihat</button>
-        <button type="button" class="dnc-tombol dnc-tombol-sekunder dnc-tombol-kecil" data-duplikat-soal="${esc(s.id)}">Duplikat</button>
-        <button type="button" class="dnc-tombol dnc-tombol-sekunder dnc-tombol-kecil" data-ubah-soal="${esc(s.id)}">Ubah</button>
-        <button type="button" class="dnc-tombol dnc-tombol-bahaya dnc-tombol-kecil" data-hapus-soal="${esc(s.id)}">Hapus</button>
-      </div>`
+  if (!data.length) {
+    wadah.innerHTML = '<div class="dnc-kosong-box">Belum ada paket atau butir soal yang sesuai filter.</div>';
+    return;
+  }
+
+  const petaGrup = new Map();
+  data.forEach(s => {
+    const kunci = kunciGrupSoalM3(s);
+    if (!petaGrup.has(kunci)) {
+      petaGrup.set(kunci, {
+        kunci,
+        namaGrup: namaSumberPaketSoal(s),
+        mapelId: s.mapelId,
+        list: []
+      });
     }
-  ], 'Belum ada butir soal');
+    petaGrup.get(kunci).list.push(s);
+  });
+
+  const daftarGrup = [...petaGrup.values()].map(g => {
+    g.list.sort((a, b) =>
+      String(a.kodeSoal || '').localeCompare(String(b.kodeSoal || ''), undefined, { numeric: true, sensitivity: 'base' })
+    );
+    return g;
+  });
+
+  wadah.innerHTML = daftarGrup.map(g => {
+    const terbuka = paketSoalTerbukaM3.has(g.kunci);
+    const totalBobot = bulatDua(g.list.reduce((acc, s) => acc + Number(s.bobotNilai || 0), 0));
+    const jmlAktif = g.list.filter(s => s.statusAktif !== false).length;
+    const daftarTingkat = [...new Set(g.list.map(s => s.tingkat).filter(Boolean))].join(', ');
+    const daftarTipe = [...new Set(g.list.map(s => s.tipeSoal).filter(Boolean))].join(', ');
+
+    const isiTabelHtml = terbuka ? `
+      <div class="dnc-grup-halaman-isi">
+        <div class="dnc-pembungkus-tabel">
+          <table class="dnc-tabel dnc-tabel-padat">
+            <thead>
+              <tr>
+                <th>No</th>
+                <th>Kode Soal</th>
+                <th>Tipe Soal</th>
+                <th>Pertanyaan</th>
+                <th>Kunci Jawaban</th>
+                <th>Bobot</th>
+                <th>Status</th>
+                <th>Aksi</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${g.list.map((s, idx) => {
+                const kunciHtml = s.tipeSoal === 'Pilihan Ganda' || s.tipeSoal === 'Pilihan Ganda Kompleks'
+                  ? `<strong class="dnc-mono">${esc(s.kunciJawaban || '-')}</strong>`
+                  : `<div class="dnc-teks-potong" style="max-width:160px" title="${esc(s.kunciJawaban || '')}">${esc(s.kunciJawaban || 'Rubrik')}</div>`;
+                return `
+                  <tr>
+                    <td data-label="No"><strong>${idx + 1}</strong></td>
+                    <td data-label="Kode Soal"><span class="dnc-mono">${esc(s.kodeSoal)}</span></td>
+                    <td data-label="Tipe Soal">${badgeTipeSoal(s.tipeSoal)}</td>
+                    <td data-label="Pertanyaan"><div class="dnc-teks-potong" title="${esc(s.pertanyaan)}">${esc(s.pertanyaan)}</div></td>
+                    <td data-label="Kunci Jawaban">${kunciHtml}</td>
+                    <td data-label="Bobot"><strong>${esc(s.bobotNilai)}</strong></td>
+                    <td data-label="Status">${badgeStatus(s.statusAktif ? 'Aktif' : 'Nonaktif')}</td>
+                    <td class="dnc-sel-aksi">
+                      <div class="dnc-aksi-baris">
+                        <button type="button" class="dnc-tombol dnc-tombol-sekunder dnc-tombol-kecil" data-pratinjau-soal="${esc(s.id)}">Lihat</button>
+                        <button type="button" class="dnc-tombol dnc-tombol-sekunder dnc-tombol-kecil" data-duplikat-soal="${esc(s.id)}">Duplikat</button>
+                        <button type="button" class="dnc-tombol dnc-tombol-sekunder dnc-tombol-kecil" data-ubah-soal="${esc(s.id)}">Ubah</button>
+                        <button type="button" class="dnc-tombol dnc-tombol-bahaya dnc-tombol-kecil" data-hapus-soal="${esc(s.id)}">Hapus</button>
+                      </div>
+                    </td>
+                  </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>` : '';
+
+    return `
+      <div class="dnc-grup-halaman-kartu">
+        <div class="dnc-grup-halaman-kepala ${terbuka ? 'terbuka' : ''}">
+          <button type="button" class="dnc-grup-halaman-toggle" data-toggle-paket-m3="${esc(g.kunci)}" aria-expanded="${terbuka ? 'true' : 'false'}">
+            <div style="min-width:0">
+              <div class="dnc-grup-halaman-judul">${esc(g.namaGrup)}</div>
+              <div class="dnc-grup-halaman-meta">
+                <span class="dnc-badge dnc-badge-biru">${esc(namaMapelById(g.mapelId))}</span>
+                ${daftarTingkat ? `<span class="dnc-badge dnc-badge-abu">Tingkat ${esc(daftarTingkat)}</span>` : ''}
+                <span>${g.list.length} butir soal • Total Bobot ${totalBobot} • Aktif ${jmlAktif}/${g.list.length}</span>
+                ${daftarTipe ? `<span>• ${esc(daftarTipe)}</span>` : ''}
+              </div>
+            </div>
+            <span class="dnc-grup-halaman-panah">${terbuka ? 'Tutup Butir ▴' : 'Lihat Butir ▾'}</span>
+          </button>
+          <div class="dnc-grup-halaman-aksi">
+            <button type="button" class="dnc-tombol dnc-tombol-bahaya dnc-tombol-kecil" data-hapus-paket-soal="${esc(g.kunci)}">Hapus Paket</button>
+          </div>
+        </div>
+        ${isiTabelHtml}
+      </div>`;
+  }).join('');
 }
 
 function opsiMapToObj(list) {
