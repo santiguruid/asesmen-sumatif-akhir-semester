@@ -5845,13 +5845,17 @@ async function inisialisasiAplikasiDnc() {
   ['filter-mapel-soal', 'filter-tingkat-soal', 'filter-tipe-soal', 'filter-status-soal'].forEach(id => {
     document.getElementById(id)?.addEventListener('change', renderTabelSoal);
   });
-  document.getElementById('tbody-soal')?.addEventListener('click', e => {
+  document.getElementById('wadah-paket-soal-m3')?.addEventListener('click', e => {
+    const bToggle = e.target.closest('[data-toggle-paket-m3]');
+    if (bToggle) { togglePaketSoalM3(bToggle.dataset.togglePaketM3); return; }
+    const bHapusPaket = e.target.closest('[data-hapus-paket-soal]');
+    if (bHapusPaket) { hapusPaketSoalDenganProteksi(bHapusPaket.dataset.hapusPaketSoal); return; }
     const bLihat = e.target.closest('[data-pratinjau-soal]');
-    if (bLihat) bukaPratinjauSoal(bLihat.dataset.pratinjauSoal);
+    if (bLihat) { bukaPratinjauSoal(bLihat.dataset.pratinjauSoal); return; }
     const bDup = e.target.closest('[data-duplikat-soal]');
-    if (bDup) duplikatSoal(bDup.dataset.duplikatSoal);
+    if (bDup) { duplikatSoal(bDup.dataset.duplikatSoal); return; }
     const bUbah = e.target.closest('[data-ubah-soal]');
-    if (bUbah) bukaFormSoal(cariById('bankSoal', bUbah.dataset.ubahSoal));
+    if (bUbah) { bukaFormSoal(cariById('bankSoal', bUbah.dataset.ubahSoal)); return; }
     const bHapus = e.target.closest('[data-hapus-soal]');
     if (bHapus) hapusSoalDenganProteksi(bHapus.dataset.hapusSoal);
   });
