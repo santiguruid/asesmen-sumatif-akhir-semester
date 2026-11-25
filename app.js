@@ -2212,6 +2212,7 @@ async function duplikatSoal(id) {
   const kodeBaru = `${s.kodeSoal}-CPY${Math.floor(10 + Math.random() * 89)}`;
   await dbCreate(COLLECTIONS.bankSoal, {
     kodeSoal: kodeBaru,
+    sumberPaket: s.sumberPaket || namaSumberPaketSoal(s),
     mapelId: s.mapelId,
     tingkat: s.tingkat,
     tipeSoal: s.tipeSoal,
@@ -2244,6 +2245,34 @@ function hapusSoalDenganProteksi(id) {
       resetCacheMenu(['DNC-M1', 'DNC-M3', 'DNC-M4']);
       await muatM3BankSoal(true);
       tampilkanToast('Butir soal berhasil dihapus.');
+    }
+  });
+}
+
+function hapusPaketSoalDenganProteksi(kunciGrup) {
+  const soalDalamPaket = stateMemori.bankSoal.filter(s => kunciGrupSoalM3(s) === kunciGrup);
+  if (!soalDalamPaket.length) return;
+  const namaGrup = namaSumberPaketSoal(soalDalamPaket[0]);
+  bukaKonfirmasi({
+    judul: 'Hapus Seluruh Paket Soal',
+    pesan: `Yakin ingin menghapus seluruh ${soalDalamPaket.length} butir soal dalam paket "${namaGrup}"?`,
+    labelYa: 'Ya, Hapus Paket',
+    onYa: async () => {
+      const pakets = await dbList(COLLECTIONS.paketAsas);
+      const idPaketSet = new Set(soalDalamPaket.map(s => s.id));
+      const terpakai = pakets.some(p =>
+        Array.isArray(p.daftarSoalIds) && p.daftarSoalIds.some(sid => idPaketSet.has(sid))
+      );
+      if (terpakai) {
+        throw new Error('Paket soal tidak dapat dihapus karena masih ada butir soal yang terpasang pada Paket ASAS.');
+      }
+      for (const s of soalDalamPaket) {
+        await dbDelete(COLLECTIONS.bankSoal, s.id);
+      }
+      paketSoalTerbukaM3.delete(kunciGrup);
+      resetCacheMenu(['DNC-M1', 'DNC-M3', 'DNC-M4']);
+      await muatM3BankSoal(true);
+      tampilkanToast(`Paket "${namaGrup}" (${soalDalamPaket.length} soal) berhasil dihapus.`);
     }
   });
 }
