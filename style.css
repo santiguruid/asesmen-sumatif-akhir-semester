@@ -2324,6 +2324,13 @@ body.dnc-mode-lockdown-siswa textarea {
     padding: 10px;
   }
 
+  .dnc-progres-soal-wrap {
+    min-width: 0;
+    width: 100%;
+    max-width: 210px;
+    text-align: left;
+  }
+
   .dnc-toast-container {
     left: 12px;
     right: 12px;
