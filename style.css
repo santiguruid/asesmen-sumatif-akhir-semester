@@ -1967,7 +1967,9 @@ body.dnc-mode-lockdown-siswa textarea {
   .dnc-sel-aksi,
   .dnc-preview-banner,
   .dnc-modal-backdrop,
-  .dnc-toast-container {
+  .dnc-toast-container,
+  .dnc-live-bar-m6,
+  .dnc-grup-halaman-panah {
     display: none !important;
   }
 
@@ -1980,6 +1982,11 @@ body.dnc-mode-lockdown-siswa textarea {
     border: none !important;
     box-shadow: none !important;
     padding: 0 !important;
+  }
+
+  .dnc-grup-halaman-isi {
+    background: #FFFFFF !important;
+    padding: 8px 0 0 !important;
   }
 
   .dnc-cetak-header {
