@@ -4649,6 +4649,7 @@ async function selesaikanUjianSiswa(otomatis = false, alasan = 'manual') {
 
   sesiUjianAktif = null;
   sedangSubmitUjian = false;
+  nonaktifkanWakeLockSiswa();
   resetCacheMenu(['DNC-M1', 'DNC-M5', 'DNC-M6']);
   await muatM5RuangUjian(true);
   if (alasan === 'manual') tampilkanToast('Lembar ujian ASAS berhasil dikumpulkan.');
