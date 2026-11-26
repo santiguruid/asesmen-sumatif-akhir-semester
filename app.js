@@ -1058,68 +1058,96 @@ function handleLockdownFullscreenChange() {
   }
 }
 
-function aktifkanLockdownSiswa() {
-  if (penggunaAktif?.role !== 'Siswa') return;
-  if (!lockdownTombolTerikat) {
-    lockdownTombolTerikat = true;
-    document.getElementById('btn-aktif-lockdown')?.addEventListener('click', () => {
-      mintaFullscreenSiswa();
-    });
-    document.getElementById('btn-keluar-lockdown')?.addEventListener('click', () => {
-      if (sesiUjianAktif) {
-        tampilkanToast('Selesaikan ujian terlebih dahulu sebelum keluar dari aplikasi.', 'error');
-        return;
-      }
-      keluarAplikasi();
-    });
-  }
+let wakeLockSentinel = null;
+let wakeLockDiinginkan = false;
+let wakeLockListenerTerpasang = false;
 
-  if (!lockdownSiswaAktif) {
-    lockdownSiswaAktif = true;
-    pernahMasukFullscreen = cekSedangFullscreenDnc();
-    document.body.classList.add('dnc-mode-lockdown-siswa');
-    document.addEventListener('contextmenu', handleLockdownContextMenu);
-    document.addEventListener('copy', handleLockdownClipboard);
-    document.addEventListener('cut', handleLockdownClipboard);
-    document.addEventListener('paste', handleLockdownClipboard);
-    document.addEventListener('keydown', handleLockdownKeydown, true);
-    document.addEventListener('visibilitychange', handleLockdownVisibility);
-    window.addEventListener('blur', handleLockdownBlur);
-    document.addEventListener('fullscreenchange', handleLockdownFullscreenChange);
-    document.addEventListener('webkitfullscreenchange', handleLockdownFullscreenChange);
-  }
-
-  if (!cekSedangFullscreenDnc()) {
-    tampilkanOverlayLockdownSiswa({
-      judul: 'Aktifkan Mode Kunci Layar Siswa',
-      pesan: 'Khusus akun Siswa, aplikasi wajib dijalankan dalam Mode Layar Penuh (Fullscreen). Membuka tab baru, berpindah aplikasi, atau mencari referensi di situs lain akan memicu peringatan dan pengumpulan ujian otomatis.',
-      bahaya: false
-    });
+function perbaruiBadgeWakeLockM5(status = 'siaga') {
+  const badge = document.getElementById('m5-status-wakelock');
+  if (!badge) return;
+  if (status === 'aktif') {
+    badge.className = 'dnc-badge dnc-badge-hijau';
+    badge.textContent = 'Layar Tetap Nyala (Aktif)';
+  } else if (status === 'tidak_didukung') {
+    badge.className = 'dnc-badge dnc-badge-abu';
+    badge.textContent = 'Mode Layar Standar';
+  } else {
+    badge.className = 'dnc-badge dnc-badge-biru';
+    badge.textContent = 'Layar Tetap Nyala (Siaga)';
   }
 }
 
-function nonaktifkanLockdownSiswa() {
-  if (lockdownSiswaAktif) {
-    lockdownSiswaAktif = false;
-    pernahMasukFullscreen = false;
-    document.body.classList.remove('dnc-mode-lockdown-siswa');
-    document.removeEventListener('contextmenu', handleLockdownContextMenu);
-    document.removeEventListener('copy', handleLockdownClipboard);
-    document.removeEventListener('cut', handleLockdownClipboard);
-    document.removeEventListener('paste', handleLockdownClipboard);
-    document.removeEventListener('keydown', handleLockdownKeydown, true);
-    document.removeEventListener('visibilitychange', handleLockdownVisibility);
-    window.removeEventListener('blur', handleLockdownBlur);
-    document.removeEventListener('fullscreenchange', handleLockdownFullscreenChange);
-    document.removeEventListener('webkitfullscreenchange', handleLockdownFullscreenChange);
+async function mintaWakeLockLayar() {
+  if (!wakeLockDiinginkan || document.hidden) return false;
+  if (!('wakeLock' in navigator) || !navigator.wakeLock?.request) {
+    perbaruiBadgeWakeLockM5('tidak_didukung');
+    return false;
   }
+  if (wakeLockSentinel && !wakeLockSentinel.released) {
+    perbaruiBadgeWakeLockM5('aktif');
+    return true;
+  }
+  try {
+    wakeLockSentinel = await navigator.wakeLock.request('screen');
+    perbaruiBadgeWakeLockM5('aktif');
+    wakeLockSentinel.addEventListener('release', () => {
+      wakeLockSentinel = null;
+      if (wakeLockDiinginkan) perbaruiBadgeWakeLockM5('siaga');
+    });
+    return true;
+  } catch (_) {
+    wakeLockSentinel = null;
+    perbaruiBadgeWakeLockM5('siaga');
+    return false;
+  }
+}
+
+function handleWakeLockVisibility() {
+  if (wakeLockDiinginkan && !document.hidden) {
+    mintaWakeLockLayar();
+  }
+}
+
+function handleWakeLockInteraksi() {
+  if (wakeLockDiinginkan && (!wakeLockSentinel || wakeLockSentinel.released)) {
+    mintaWakeLockLayar();
+  }
+}
+
+function aktifkanWakeLockSiswa() {
+  wakeLockDiinginkan = true;
+  if (!wakeLockListenerTerpasang) {
+    wakeLockListenerTerpasang = true;
+    document.addEventListener('visibilitychange', handleWakeLockVisibility);
+    window.addEventListener('pointerdown', handleWakeLockInteraksi, { passive: true });
+    window.addEventListener('touchstart', handleWakeLockInteraksi, { passive: true });
+  }
+  mintaWakeLockLayar();
+}
+
+async function nonaktifkanWakeLockSiswa() {
+  wakeLockDiinginkan = false;
+  if (wakeLockSentinel) {
+    try { await wakeLockSentinel.release(); } catch (_) {}
+    wakeLockSentinel = null;
+  }
+  perbaruiBadgeWakeLockM5('siaga');
+}
+
+function aktifkanLockdownSiswa() {
+  if (penggunaAktif?.role !== 'Siswa') return;
+  lockdownSiswaAktif = false;
+  pernahMasukFullscreen = false;
+  document.body.classList.remove('dnc-mode-lockdown-siswa');
   sembunyikanOverlayLockdownSiswa();
-  if (cekSedangFullscreenDnc()) {
-    try {
-      if (document.exitFullscreen) document.exitFullscreen().catch(() => {});
-      else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
-    } catch (_) {}
-  }
+}
+
+function nonaktifkanLockdownSiswa() {
+  lockdownSiswaAktif = false;
+  pernahMasukFullscreen = false;
+  document.body.classList.remove('dnc-mode-lockdown-siswa');
+  sembunyikanOverlayLockdownSiswa();
+  nonaktifkanWakeLockSiswa();
 }
 
 async function masukKeAplikasi(userObj) {
