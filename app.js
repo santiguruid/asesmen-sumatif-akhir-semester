@@ -4660,11 +4660,66 @@ async function selesaikanUjianSiswa(otomatis = false, alasan = 'manual') {
 
 // ===== BLOK: DNC_M6_HASIL_NILAI =====
 let dataHasilTersaring = [];
+const paketHasilTerbukaM6 = new Set();
+let unsubHasilLiveM6 = null;
+let waktuSyncLiveM6 = null;
+
+function hentikanListenerHasilM6() {
+  if (typeof unsubHasilLiveM6 === 'function') {
+    unsubHasilLiveM6();
+    unsubHasilLiveM6 = null;
+  }
+}
+
+async function pasangListenerHasilLiveM6() {
+  if (IS_PREVIEW || !penggunaAktif || penggunaAktif.role === 'Siswa') return;
+  if (typeof unsubHasilLiveM6 === 'function') return;
+  try {
+    const { db, fsMod } = await muatFirebaseSdk();
+    unsubHasilLiveM6 = fsMod.onSnapshot(fsMod.collection(db, COLLECTIONS.hasilUjian), snap => {
+      if (!penggunaAktif || penggunaAktif.role === 'Siswa') {
+        hentikanListenerHasilM6();
+        return;
+      }
+      const semua = snap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => (keDate(b.dibuat)?.getTime() || 0) - (keDate(a.dibuat)?.getTime() || 0));
+
+      stateMemori.hasilUjian = penggunaAktif.role === 'Guru'
+        ? semua.filter(h => bolehAksesMapel(h.mapelId))
+        : semua;
+      waktuSyncLiveM6 = new Date();
+      if (menuAktif === 'DNC-M6') {
+        renderTabelHasil();
+      }
+    });
+  } catch (_) {}
+}
+
+function togglePaketHasilM6(paketId) {
+  if (!paketId) return;
+  if (paketHasilTerbukaM6.has(paketId)) paketHasilTerbukaM6.delete(paketId);
+  else paketHasilTerbukaM6.add(paketId);
+  renderTabelHasil();
+}
+
+function hitungProgresSoalHasil(hasil, paket) {
+  const daftarJwb = Array.isArray(hasil?.jawabanSiswa) ? hasil.jawabanSiswa : [];
+  const totalSoal = (paket?.daftarSoalIds?.length)
+    || (Array.isArray(hasil?.urutanSoalIds) ? hasil.urutanSoalIds.length : 0)
+    || daftarJwb.length;
+  const dijawabMentah = daftarJwb.filter(j => String(j?.jawaban ?? '').trim() !== '').length;
+  const dijawab = totalSoal > 0 ? Math.min(dijawabMentah, totalSoal) : dijawabMentah;
+  const belum = Math.max(0, totalSoal - dijawab);
+  const persen = totalSoal > 0 ? Math.min(100, Math.round((dijawab / totalSoal) * 100)) : 0;
+  return { totalSoal, dijawab, belum, persen };
+}
 
 async function muatM6HasilNilai(paksa = false) {
   if (!sudahDimuat['DNC-M6'] || paksa) {
     await Promise.all([muatDataDasar(), muatDataPengguna(), muatDataBankSoal(), muatDataPaket(), muatDataHasil()]);
     sudahDimuat['DNC-M6'] = true;
+    waktuSyncLiveM6 = new Date();
   }
 
   const adalahSiswa = penggunaAktif.role === 'Siswa';
@@ -4672,16 +4727,21 @@ async function muatM6HasilNilai(paksa = false) {
   document.getElementById('btn-cetak-nilai').classList.toggle('dnc-disembunyikan', adalahSiswa);
   document.getElementById('filter-kelas-hasil').classList.toggle('dnc-disembunyikan', adalahSiswa);
   document.getElementById('subjudul-m6').textContent = adalahSiswa
-    ? 'Riwayat nilai pribadi untuk paket ASAS yang mengaktifkan penampilan nilai.'
-    : 'Pantau pengerjaan ujian, koreksi jawaban, perhitungan skor otomatis dari bobot file soal, dan ekspor daftar nilai ASAS.';
+    ? 'Riwayat nilai pribadi per paket ASAS yang mengaktifkan penampilan nilai.'
+    : 'Pantau pengerjaan siswa secara live per Judul Paket ASAS, progres soal terjawab/belum, koreksi jawaban, dan rekap nilai.';
 
   isiSelectOpsi('filter-paket-hasil', stateMemori.paketAsas.map(p => ({ value: p.id, label: p.judulPaket })), 'Semua Paket');
   isiSelectOpsi('filter-mapel-hasil', daftarMapelDiizinkan().map(m => ({ value: m.id, label: m.namaMapel })), 'Semua Mapel');
   isiSelectOpsi('filter-kelas-hasil', stateMemori.kelas.map(k => ({ value: k.id, label: `${k.kodeKelas} - ${k.namaKelas}` })), 'Semua Kelas');
   renderTabelHasil();
+  if (!adalahSiswa) pasangListenerHasilLiveM6();
 }
 
 function renderTabelHasil() {
+  const wadah = document.getElementById('wadah-hasil-paket-m6');
+  const liveBar = document.getElementById('live-bar-m6');
+  if (!wadah) return;
+
   const q = teks(document.getElementById('cari-hasil')?.value || '');
   const fPaket = document.getElementById('filter-paket-hasil')?.value || '';
   const fMapel = document.getElementById('filter-mapel-hasil')?.value || '';
@@ -4699,48 +4759,170 @@ function renderTabelHasil() {
     if (fStatus && h.statusUjian !== fStatus) return false;
     if (fTuntas && h.statusKetuntasan !== fTuntas) return false;
     const siswa = cariById('pengguna', h.penggunaId);
-    const teksCari = `${teks(siswa?.namaLengkap)} ${teks(siswa?.nomorInduk)} ${teks(paket?.judulPaket)}`;
+    const teksCari = `${teks(siswa?.namaLengkap)} ${teks(siswa?.nomorInduk)} ${teks(paket?.judulPaket)} ${teks(namaMapelById(h.mapelId))}`;
     if (q && !teksCari.includes(q)) return false;
     return true;
   });
 
-  renderTabelDnc('tbody-hasil', dataHasilTersaring, [
-    {
-      label: 'Peserta Didik',
-      render: h => {
-        const s = cariById('pengguna', h.penggunaId) || (h.penggunaId === penggunaAktif.id ? penggunaAktif : null);
-        return `<strong>${esc(s?.namaLengkap || h.penggunaId)}</strong><div class="dnc-form-bantuan">${esc(s?.nomorInduk || '-')}</div>`;
-      }
-    },
-    { label: 'Kelas', render: h => esc(cariById('kelas', h.kelasId)?.kodeKelas || '-') },
-    {
-      label: 'Paket & Mapel',
-      render: h => {
-        const p = cariById('paketAsas', h.paketId);
-        return `${esc(p?.judulPaket || '-')}<div class="dnc-form-bantuan">${esc(namaMapelById(h.mapelId))}</div>`;
-      }
-    },
-    {
-      label: 'Status Ujian',
-      render: h => {
-        const jmlPel = Number(h.jumlahPelanggaran || 0);
-        const logTeks = Array.isArray(h.logPelanggaran) && h.logPelanggaran.length ? h.logPelanggaran.join(' | ') : '';
-        return `${badgeStatus(h.statusUjian)}${jmlPel > 0 ? `<div style="margin-top:4px"><span class="dnc-badge dnc-badge-merah" title="${esc(logTeks)}">Keluar Layar: ${esc(jmlPel)}x</span></div>` : ''}`;
-      }
-    },
-    { label: 'Skor Otomatis / Manual', render: h => `${esc(h.skorPg ?? 0)} / ${esc(h.skorUraian ?? 0)}` },
-    { label: 'Skor Akhir', render: h => `<strong style="font-size:15px">${esc(h.skorAkhir ?? 0)}</strong>` },
-    { label: 'Ketuntasan', render: h => badgeStatus(h.statusKetuntasan || 'Menunggu Koreksi') },
-    {
-      label: 'Aksi', aksi: true,
-      render: h => adalahSiswa
-        ? `<button type="button" class="dnc-tombol dnc-tombol-sekunder dnc-tombol-kecil" data-rinci-hasil="${esc(h.id)}">Rincian</button>`
-        : `<div class="dnc-aksi-baris">
-            <button type="button" class="dnc-tombol dnc-tombol-primer dnc-tombol-kecil" data-koreksi-hasil="${esc(h.id)}">Koreksi / Rincian</button>
-            <button type="button" class="dnc-tombol dnc-tombol-bahaya dnc-tombol-kecil" data-reset-hasil="${esc(h.id)}">Reset Sesi</button>
-          </div>`
+  if (liveBar) {
+    if (adalahSiswa) {
+      liveBar.classList.add('dnc-disembunyikan');
+      liveBar.innerHTML = '';
+    } else {
+      const totalSedang = dataHasilTersaring.filter(h => h.statusUjian === 'Sedang Dikerjakan').length;
+      const totalSelesai = dataHasilTersaring.filter(h => h.statusUjian !== 'Sedang Dikerjakan').length;
+      const jamSync = waktuSyncLiveM6
+        ? waktuSyncLiveM6.toLocaleTimeString('id-ID', { hour12: false })
+        : '-';
+      liveBar.classList.remove('dnc-disembunyikan');
+      liveBar.innerHTML = `
+        <div class="dnc-flex-gap">
+          <span class="dnc-dot-live"></span>
+          <span>Pemantauan Live Progres Pengerjaan Aktif — Klik Judul Paket ASAS untuk melihat daftar siswa</span>
+        </div>
+        <span>${totalSedang} sedang mengerjakan • ${totalSelesai} sudah mengumpulkan • Sinkron: ${esc(jamSync)}</span>`;
     }
-  ], adalahSiswa ? 'Belum ada hasil nilai yang ditampilkan untuk Anda' : 'Belum ada data hasil ujian');
+  }
+
+  if (!dataHasilTersaring.length) {
+    wadah.innerHTML = `<div class="dnc-kosong-box">${esc(adalahSiswa ? 'Belum ada hasil nilai yang ditampilkan untuk Anda.' : 'Belum ada data hasil ujian yang sesuai filter.')}</div>`;
+    return;
+  }
+
+  const petaPaket = new Map();
+  dataHasilTersaring.forEach(h => {
+    const kunci = h.paketId || '__tanpa_paket__';
+    if (!petaPaket.has(kunci)) {
+      const paketObj = cariById('paketAsas', h.paketId);
+      petaPaket.set(kunci, {
+        kunci,
+        paketObj,
+        mapelId: paketObj?.mapelId || h.mapelId,
+        list: []
+      });
+    }
+    petaPaket.get(kunci).list.push(h);
+  });
+
+  const urutanPaketId = new Map(stateMemori.paketAsas.map((p, idx) => [p.id, idx]));
+  const daftarGrupPaket = [...petaPaket.values()].sort((a, b) => {
+    const aAktif = a.list.some(x => x.statusUjian === 'Sedang Dikerjakan') ? 0 : 1;
+    const bAktif = b.list.some(x => x.statusUjian === 'Sedang Dikerjakan') ? 0 : 1;
+    if (aAktif !== bAktif) return aAktif - bAktif;
+    const ia = urutanPaketId.has(a.kunci) ? urutanPaketId.get(a.kunci) : 99999;
+    const ib = urutanPaketId.has(b.kunci) ? urutanPaketId.get(b.kunci) : 99999;
+    return ia - ib;
+  });
+
+  const prioritasStatus = st => (st === 'Sedang Dikerjakan' ? 0 : (st === 'Menunggu Koreksi' ? 1 : 2));
+  daftarGrupPaket.forEach(g => {
+    g.list.sort((a, b) => {
+      const pSel = prioritasStatus(a.statusUjian) - prioritasStatus(b.statusUjian);
+      if (pSel !== 0) return pSel;
+      const sa = cariById('pengguna', a.penggunaId)?.namaLengkap || a.penggunaId;
+      const sb = cariById('pengguna', b.penggunaId)?.namaLengkap || b.penggunaId;
+      return String(sa).localeCompare(String(sb), 'id', { sensitivity: 'base' });
+    });
+  });
+
+  wadah.innerHTML = daftarGrupPaket.map(g => {
+    const terbuka = paketHasilTerbukaM6.has(g.kunci);
+    const judulPaket = g.paketObj?.judulPaket || 'Paket ASAS';
+    const jmlSedang = g.list.filter(h => h.statusUjian === 'Sedang Dikerjakan').length;
+    const jmlKoreksi = g.list.filter(h => h.statusUjian === 'Menunggu Koreksi').length;
+    const jmlSelesai = g.list.filter(h => h.statusUjian === 'Selesai').length;
+    const jmlSoalPaket = g.paketObj?.daftarSoalIds?.length || 0;
+    const kelasSasaranTeks = (g.paketObj?.kelasIds || [])
+      .map(id => cariById('kelas', id)?.kodeKelas || id)
+      .join(', ');
+
+    const isiTabelHtml = terbuka ? `
+      <div class="dnc-grup-halaman-isi">
+        <div class="dnc-pembungkus-tabel">
+          <table class="dnc-tabel dnc-tabel-padat">
+            <thead>
+              <tr>
+                <th>No</th>
+                <th>Peserta Didik</th>
+                <th>Kelas</th>
+                <th>Status Ujian</th>
+                <th>Progres Soal (Live)</th>
+                <th>Skor Otomatis / Manual</th>
+                <th>Skor Akhir</th>
+                <th>Ketuntasan</th>
+                <th>Aksi</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${g.list.map((h, idx) => {
+                const s = cariById('pengguna', h.penggunaId) || (h.penggunaId === penggunaAktif.id ? penggunaAktif : null);
+                const prog = hitungProgresSoalHasil(h, g.paketObj);
+                const statusBadge = h.statusUjian === 'Sedang Dikerjakan'
+                  ? `<span class="dnc-badge dnc-badge-hijau"><span class="dnc-dot-live"></span>Sedang Dikerjakan</span>`
+                  : badgeStatus(h.statusUjian);
+                const jmlPel = Number(h.jumlahPelanggaran || 0);
+                const logTeks = Array.isArray(h.logPelanggaran) && h.logPelanggaran.length ? h.logPelanggaran.join(' | ') : '';
+                const aksiHtml = adalahSiswa
+                  ? `<button type="button" class="dnc-tombol dnc-tombol-sekunder dnc-tombol-kecil" data-rinci-hasil="${esc(h.id)}">Rincian</button>`
+                  : `<div class="dnc-aksi-baris">
+                      <button type="button" class="dnc-tombol dnc-tombol-primer dnc-tombol-kecil" data-koreksi-hasil="${esc(h.id)}">Koreksi / Rincian</button>
+                      <button type="button" class="dnc-tombol dnc-tombol-bahaya dnc-tombol-kecil" data-reset-hasil="${esc(h.id)}">Reset Sesi</button>
+                    </div>`;
+
+                return `
+                  <tr>
+                    <td data-label="No"><strong>${idx + 1}</strong></td>
+                    <td data-label="Peserta Didik">
+                      <strong>${esc(s?.namaLengkap || h.penggunaId)}</strong>
+                      <div class="dnc-form-bantuan">${esc(s?.nomorInduk || '-')}</div>
+                    </td>
+                    <td data-label="Kelas">${esc(cariById('kelas', h.kelasId)?.kodeKelas || '-')}</td>
+                    <td data-label="Status Ujian">
+                      ${statusBadge}
+                      ${jmlPel > 0 ? `<div style="margin-top:4px"><span class="dnc-badge dnc-badge-merah" title="${esc(logTeks)}">Keluar Layar: ${esc(jmlPel)}x</span></div>` : ''}
+                    </td>
+                    <td data-label="Progres Soal (Live)">
+                      <div class="dnc-progres-soal-wrap">
+                        <div class="dnc-progres-soal-angka">
+                          <span class="dnc-progres-dijawab">Dijawab: ${prog.dijawab}/${prog.totalSoal}</span>
+                          <span class="dnc-progres-belum ${prog.belum === 0 ? 'habis' : ''}">Belum: ${prog.belum}</span>
+                        </div>
+                        <div class="dnc-progres-soal-track" title="${prog.persen}% terjawab">
+                          <div class="dnc-progres-soal-isi ${prog.belum === 0 && prog.totalSoal > 0 ? 'selesai' : ''}" style="width:${prog.persen}%"></div>
+                        </div>
+                      </div>
+                    </td>
+                    <td data-label="Skor Otomatis / Manual">${esc(h.skorPg ?? 0)} / ${esc(h.skorUraian ?? 0)}</td>
+                    <td data-label="Skor Akhir"><strong style="font-size:15px">${esc(h.skorAkhir ?? 0)}</strong></td>
+                    <td data-label="Ketuntasan">${badgeStatus(h.statusKetuntasan || 'Menunggu Koreksi')}</td>
+                    <td class="dnc-sel-aksi">${aksiHtml}</td>
+                  </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>` : '';
+
+    return `
+      <div class="dnc-grup-halaman-kartu">
+        <div class="dnc-grup-halaman-kepala ${terbuka ? 'terbuka' : ''}">
+          <button type="button" class="dnc-grup-halaman-toggle" data-toggle-paket-m6="${esc(g.kunci)}" aria-expanded="${terbuka ? 'true' : 'false'}">
+            <div style="min-width:0">
+              <div class="dnc-grup-halaman-judul">${esc(judulPaket)}</div>
+              <div class="dnc-grup-halaman-meta">
+                <span class="dnc-badge dnc-badge-biru">${esc(namaMapelById(g.mapelId))}</span>
+                ${kelasSasaranTeks ? `<span class="dnc-badge dnc-badge-abu">Kelas ${esc(kelasSasaranTeks)}</span>` : ''}
+                ${jmlSedang > 0 ? `<span class="dnc-badge dnc-badge-hijau"><span class="dnc-dot-live"></span>${jmlSedang} Sedang Mengerjakan</span>` : ''}
+                ${jmlKoreksi > 0 ? `<span class="dnc-badge dnc-badge-amber">${jmlKoreksi} Menunggu Koreksi</span>` : ''}
+                <span>${g.list.length} peserta • ${jmlSelesai} selesai${jmlSoalPaket ? ` • ${jmlSoalPaket} soal` : ''}</span>
+              </div>
+            </div>
+            <span class="dnc-grup-halaman-panah">${terbuka ? 'Tutup Daftar Siswa ▴' : 'Lihat Daftar Siswa ▾'}</span>
+          </button>
+        </div>
+        ${isiTabelHtml}
+      </div>`;
+  }).join('');
 }
 
 function bukaModalKoreksiHasil(hasilId, hanyaBaca = false) {
