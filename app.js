@@ -6129,11 +6129,13 @@ async function inisialisasiAplikasiDnc() {
   ['filter-paket-hasil', 'filter-mapel-hasil', 'filter-kelas-hasil', 'filter-status-hasil', 'filter-tuntas-hasil'].forEach(id => {
     document.getElementById(id)?.addEventListener('change', renderTabelHasil);
   });
-  document.getElementById('tbody-hasil')?.addEventListener('click', e => {
+  document.getElementById('wadah-hasil-paket-m6')?.addEventListener('click', e => {
+    const bTogglePaket = e.target.closest('[data-toggle-paket-m6]');
+    if (bTogglePaket) { togglePaketHasilM6(bTogglePaket.dataset.togglePaketM6); return; }
     const bKor = e.target.closest('[data-koreksi-hasil]');
-    if (bKor) bukaModalKoreksiHasil(bKor.dataset.koreksiHasil, false);
+    if (bKor) { bukaModalKoreksiHasil(bKor.dataset.koreksiHasil, false); return; }
     const bRinci = e.target.closest('[data-rinci-hasil]');
-    if (bRinci) bukaModalKoreksiHasil(bRinci.dataset.rinciHasil, true);
+    if (bRinci) { bukaModalKoreksiHasil(bRinci.dataset.rinciHasil, true); return; }
     const bRes = e.target.closest('[data-reset-hasil]');
     if (bRes) resetSesiHasilUjian(bRes.dataset.resetHasil);
   });
