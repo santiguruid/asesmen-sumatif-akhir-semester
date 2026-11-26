@@ -1178,6 +1178,7 @@ async function masukKeAplikasi(userObj) {
 async function keluarAplikasi() {
   if (typeof hentikanTimerUjian === 'function') hentikanTimerUjian();
   if (typeof hentikanListenerPaketSiswa === 'function') hentikanListenerPaketSiswa();
+  if (typeof hentikanListenerHasilM6 === 'function') hentikanListenerHasilM6();
   nonaktifkanLockdownSiswa();
   sesiUjianAktif = null;
   penggunaAktif = null;
