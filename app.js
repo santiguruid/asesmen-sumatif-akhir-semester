@@ -4385,9 +4385,9 @@ async function mulaiLembarUjian(paket, hasil) {
     badgeLive.innerHTML = '<span class="dnc-dot-live"></span>Sesi Dibuka Guru';
   }
 
-  perbaruiBadgeLockdownM5();
-  if (penggunaAktif?.role === 'Siswa' && !cekSedangFullscreenDnc() && dukungFullscreenDnc()) {
-    aktifkanLockdownSiswa();
+  sembunyikanOverlayLockdownSiswa();
+  if (penggunaAktif?.role === 'Siswa') {
+    aktifkanWakeLockSiswa();
   }
 
   renderSoalAktifM5();
