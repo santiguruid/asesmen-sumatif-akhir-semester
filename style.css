@@ -1199,6 +1199,70 @@ svg.dnc-ikon {
   background: var(--surface);
 }
 
+.dnc-live-bar-m6 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 9px 12px;
+  margin-bottom: 12px;
+  border-radius: var(--radius);
+  background: #F0FDF4;
+  border: 1px solid #BBF7D0;
+  color: #166534;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.dnc-progres-soal-wrap {
+  min-width: 155px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.dnc-progres-soal-angka {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.dnc-progres-dijawab {
+  color: var(--success);
+}
+
+.dnc-progres-belum {
+  color: #B45309;
+}
+
+.dnc-progres-belum.habis {
+  color: var(--text-muted);
+}
+
+.dnc-progres-soal-track {
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  background: #E2E8F0;
+  overflow: hidden;
+}
+
+.dnc-progres-soal-isi {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--primary);
+  transition: width 0.25s ease;
+}
+
+.dnc-progres-soal-isi.selesai {
+  background: var(--success);
+}
+
 .dnc-file-drop {
   border: 1.5px dashed #CBD5E1;
   border-radius: var(--radius);
