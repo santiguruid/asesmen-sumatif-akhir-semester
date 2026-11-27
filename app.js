@@ -3483,6 +3483,22 @@ function ekstrakSoalPintarDariSumber({ baris, tabel }, kodeMapelPrefix) {
   const dorongAktif = () => {
     if (!aktif) return;
     if (!aktif.pertanyaan.trim()) { aktif = null; return; }
+    // Ekstrak link gambar yang masih menempel di dalam teks pertanyaan
+    const eksTanya = ekstrakLinkGambarDariTeks(aktif.pertanyaan);
+    if (eksTanya.urlGambar) {
+      aktif.pertanyaan = eksTanya.teksBersih || aktif.pertanyaan;
+      if (!aktif.urlGambar) {
+        aktif.urlGambar = eksTanya.urlGambar;
+        aktif.urlGambarAsli = eksTanya.urlAsli;
+        aktif.labelGambar = eksTanya.labelTeksGambar;
+      }
+    }
+    if (aktif.urlGambar) {
+      aktif.urlGambar = normalisasiUrlGambarSoal(aktif.urlGambar);
+    }
+    aktif.statusMuatGambar = 'belum';
+    aktif.gambarTerverifikasi = false;
+
     // Pemindaian ulang terakhir: jika opsi masih menempel di dalam teks pertanyaan
     if (aktif.opsiJawaban.length < 2) {
       const pecahUlang = pecahOpsiInlineDariTeks(aktif.pertanyaan.replace(/\n+/g, ' '));
@@ -3503,11 +3519,15 @@ function ekstrakSoalPintarDariSumber({ baris, tabel }, kodeMapelPrefix) {
 
   barisGabungan.forEach(item => {
     const txt = String(item.teks || '').replace(/\s+/g, ' ').trim();
-    const imgSrc = item.img || '';
+    const imgSrc = item.img ? normalisasiUrlGambarSoal(item.img) : '';
+    const imgAsli = item.imgAsli || item.img || '';
+    const labelGbr = item.labelGambar || '';
     const isBold = Boolean(item.bold);
 
     if (!txt && imgSrc && aktif && !aktif.urlGambar) {
       aktif.urlGambar = imgSrc;
+      aktif.urlGambarAsli = imgAsli;
+      aktif.labelGambar = labelGbr;
       return;
     }
     if (!txt) return;
@@ -3545,6 +3565,8 @@ function ekstrakSoalPintarDariSumber({ baris, tabel }, kodeMapelPrefix) {
     const mTipe = txt.match(/^(?:tipe\s+soal|jenis\s+soal|bentuk\s+soal|tipe|jenis)\s*[:=\-]\s*(.+)$/i);
     const mBobot = txt.match(/^(?:bobot\s+nilai|bobot|skor\s+maks(?:imal)?|skor|poin|nilai)\s*[:=\-]\s*(\d+(?:[\.,]\d+)?)/i);
     const mKode = txt.match(/^(?:kode\s+soal|kode)\s*[:=\-]\s*([A-Za-z0-9_\-]+)/i);
+    const mGambarBaris = txt.match(/^(?:sumber\s+gambar|link\s+gambar|url\s+gambar|gambar|ilustrasi|foto)\s*[:=\-]\s*(https?:\/\/\S+)/i);
+    const adalahLinkGambarSaja = !mNomor && !mOpsiTunggal && /^https?:\/\/\S+$/i.test(txt) && adalahUrlGambarPotensial(txt);
 
     if (mNomor) {
       dorongAktif();
@@ -3572,6 +3594,8 @@ function ekstrakSoalPintarDariSumber({ baris, tabel }, kodeMapelPrefix) {
         tipeSoal: bagianAktif || '',
         pertanyaan: teksPertanyaan,
         urlGambar: imgSrc,
+        urlGambarAsli: imgAsli,
+        labelGambar: labelGbr,
         opsiJawaban: [],
         opsiTebal: [],
         kunciDariTanda: [],
@@ -3585,8 +3609,18 @@ function ekstrakSoalPintarDariSumber({ baris, tabel }, kodeMapelPrefix) {
         sisipkanOpsiKeAktif(pecahLangsung.opsi, pecahLangsung.kunciDariTanda, false);
       }
     } else if (aktif) {
-      if (imgSrc && !aktif.urlGambar) aktif.urlGambar = imgSrc;
-      if (mKunci) {
+      if (imgSrc && !aktif.urlGambar) {
+        aktif.urlGambar = imgSrc;
+        aktif.urlGambarAsli = imgAsli;
+        aktif.labelGambar = labelGbr;
+      }
+      if (mGambarBaris || adalahLinkGambarSaja) {
+        const rawLink = (mGambarBaris ? mGambarBaris[1] : txt).replace(/[.,;)\]]+$/, '');
+        if (!aktif.urlGambar) {
+          aktif.urlGambar = normalisasiUrlGambarSoal(rawLink);
+          aktif.urlGambarAsli = rawLink;
+        }
+      } else if (mKunci) {
         let kVal = mKunci[1].trim();
         const sk = ekstrakAngkaSkorTeks(kVal);
         if (sk > 0 && !aktif.bobotNilai) {
