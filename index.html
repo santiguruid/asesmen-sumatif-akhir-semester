@@ -738,7 +738,9 @@
                 <option value="">Semua Role</option>
                 <option value="Admin">Admin</option>
                 <option value="Guru">Guru</option>
-                <option value="Siswa">Siswa</option>
+                <option value="Guru Bimbel">Guru Bimbel</option>
+                <option value="Siswa">Siswa ASAS</option>
+                <option value="Siswa Bimbel">Siswa Bimbel</option>
               </select>
               <select id="filter-kelas-pengguna" class="dnc-select dnc-select-filter" aria-label="Filter Kelas Pengguna">
                 <option value="">Semua Kelas</option>
@@ -754,6 +756,61 @@
             </div>
             <div id="wadah-pengguna-m7"></div>
           </article>
+        </section>
+
+        <!-- DNC-M8: Profil & Ganti Sandi Mandiri (Khusus Siswa Bimbel) -->
+        <section id="sec-DNC-M8" class="dnc-section" aria-labelledby="judul-m8">
+          <div class="dnc-header-halaman">
+            <div>
+              <h1 id="judul-m8" class="dnc-judul-halaman">Profil &amp; Ganti Kata Sandi</h1>
+              <p class="dnc-subjudul-halaman">Informasi akun Siswa Bimbel dan pengaturan kata sandi login mandiri.</p>
+            </div>
+          </div>
+
+          <div class="dnc-profil-grid">
+            <article class="dnc-kartu">
+              <div class="dnc-kartu-header">
+                <h2 class="dnc-kartu-judul">Data Akun Siswa Bimbel</h2>
+              </div>
+              <div id="wadah-info-profil-m8"></div>
+            </article>
+
+            <article class="dnc-kartu">
+              <div class="dnc-kartu-header">
+                <h2 class="dnc-kartu-judul">Ubah Kata Sandi Login</h2>
+              </div>
+              <form id="form-ganti-sandi-m8" novalidate>
+                <div class="dnc-form-grup">
+                  <label class="dnc-label" for="input-sandi-lama-m8">Kata Sandi Saat Ini *</label>
+                  <div class="dnc-wadah-input-password">
+                    <input id="input-sandi-lama-m8" class="dnc-input" type="password" autocomplete="current-password" placeholder="Masukkan kata sandi saat ini" required>
+                    <button type="button" id="btn-intip-sandi-lama" class="dnc-tombol-intip" aria-label="Tampilkan kata sandi lama">
+                      <svg class="dnc-ikon"><use href="#icon-eye"></use></svg>
+                    </button>
+                  </div>
+                </div>
+                <div class="dnc-form-grup">
+                  <label class="dnc-label" for="input-sandi-baru-m8">Kata Sandi Baru (Minimal 6 Karakter) *</label>
+                  <div class="dnc-wadah-input-password">
+                    <input id="input-sandi-baru-m8" class="dnc-input" type="password" autocomplete="new-password" placeholder="Masukkan kata sandi baru" required>
+                    <button type="button" id="btn-intip-sandi-baru" class="dnc-tombol-intip" aria-label="Tampilkan kata sandi baru">
+                      <svg class="dnc-ikon"><use href="#icon-eye"></use></svg>
+                    </button>
+                  </div>
+                </div>
+                <div class="dnc-form-grup">
+                  <label class="dnc-label" for="input-sandi-konf-m8">Konfirmasi Kata Sandi Baru *</label>
+                  <div class="dnc-wadah-input-password">
+                    <input id="input-sandi-konf-m8" class="dnc-input" type="password" autocomplete="new-password" placeholder="Ulangi kata sandi baru" required>
+                    <button type="button" id="btn-intip-sandi-konf" class="dnc-tombol-intip" aria-label="Tampilkan konfirmasi kata sandi">
+                      <svg class="dnc-ikon"><use href="#icon-eye"></use></svg>
+                    </button>
+                  </div>
+                </div>
+                <button type="submit" id="btn-simpan-sandi-m8" class="dnc-tombol dnc-tombol-primer dnc-tombol-penuh dnc-mt-12">Simpan Kata Sandi Baru</button>
+              </form>
+            </article>
+          </div>
         </section>
       </div>
 
