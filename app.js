@@ -2414,7 +2414,9 @@ function bukaFormSoal(item = null) {
   }
   const opsi = opsiMapToObj(item?.opsiJawaban);
   const tipeAwal = item?.tipeSoal || 'Pilihan Ganda';
+  const kategoriAwal = normalisasiKategoriSoal(item?.kategoriSoal);
   const kunciSet = parseKunciKompleksSet(item?.kunciJawaban);
+  let gambarTerverifikasiForm = Boolean(item?.gambarTerverifikasi);
 
   bukaModalFormDnc({
     judul: item ? 'Ubah Butir Soal' : 'Tambah Butir Soal',
@@ -2424,6 +2426,12 @@ function bukaFormSoal(item = null) {
         <div class="dnc-form-grup">
           <label class="dnc-label" for="f-kodeSoal">Kode Soal *</label>
           <input id="f-kodeSoal" class="dnc-input" type="text" placeholder="Contoh: MTK06-003" value="${esc(item?.kodeSoal || '')}" required>
+        </div>
+        <div class="dnc-form-grup">
+          <label class="dnc-label" for="f-kategoriSoal">Kategori Soal *</label>
+          <select id="f-kategoriSoal" class="dnc-select" required>
+            ${KATEGORI_SOAL_LIST.map(k => `<option value="${k}" ${kategoriAwal === k ? 'selected' : ''}>Soal ${k}</option>`).join('')}
+          </select>
         </div>
         <div class="dnc-form-grup">
           <label class="dnc-label" for="f-mapelId">Mata Pelajaran *</label>
@@ -2443,6 +2451,10 @@ function bukaFormSoal(item = null) {
             ${daftarTipeSoalDiizinkanForm().map(t => `<option value="${t}" ${tipeAwal === t ? 'selected' : ''}>${t}</option>`).join('')}
           </select>
         </div>
+        <div class="dnc-form-grup">
+          <label class="dnc-label" for="f-bobotNilai">Bobot / Skor Soal *</label>
+          <input id="f-bobotNilai" class="dnc-input" type="number" min="0.5" step="0.5" value="${esc(item?.bobotNilai ?? 10)}" required>
+        </div>
         <div class="dnc-form-grup dnc-form-full">
           <label class="dnc-label" for="f-sumberPaket">Nama Paket / Grup Soal (Opsional)</label>
           <input id="f-sumberPaket" class="dnc-input" type="text" list="daftar-paket-soal-eksisting" placeholder="Contoh: Bank_Soal_ASAS_Matematika_Kelas_6_Semester_1" value="${esc(item?.sumberPaket || '')}">
@@ -2452,11 +2464,12 @@ function bukaFormSoal(item = null) {
         </div>
         <div class="dnc-form-grup dnc-form-full">
           <label class="dnc-label" for="f-pertanyaan">Pertanyaan *</label>
-          <textarea id="f-pertanyaan" class="dnc-textarea" placeholder="Tulis pertanyaan soal secara lengkap..." required>${esc(item?.pertanyaan || '')}</textarea>
+          <textarea id="f-pertanyaan" class="dnc-textarea" placeholder="Tulis pertanyaan soal secara lengkap (jika memuat link gambar akan terdeteksi otomatis)..." required>${esc(item?.pertanyaan || '')}</textarea>
         </div>
         <div class="dnc-form-grup dnc-form-full">
-          <label class="dnc-label" for="f-urlGambar">URL Gambar Pendukung (Opsional)</label>
-          <input id="f-urlGambar" class="dnc-input" type="text" placeholder="https://... atau hasil ekstraksi Word" value="${esc(item?.urlGambar || '')}">
+          <label class="dnc-label" for="f-urlGambar">Link / Sumber Gambar Pendukung (Opsional — dukung Google Drive, Dropbox, URL langsung)</label>
+          <input id="f-urlGambar" class="dnc-input" type="text" placeholder="Tempel link gambar (https://...) atau hasil ekstraksi dokumen" value="${esc(item?.urlGambar || '')}">
+          <div id="wadah-cek-gambar-form"></div>
         </div>
         <div id="wadah-opsi-pg" class="dnc-form-full ${!adalahTipeBeropsi(tipeAwal) ? 'dnc-disembunyikan' : ''}">
           <div class="dnc-form-grid">
@@ -2477,39 +2490,126 @@ function bukaFormSoal(item = null) {
               </label>`).join('')}
           </div>
         </div>
-        <div id="wadah-kunci-teks" class="dnc-form-grup ${tipeAwal === 'Pilihan Ganda Kompleks' ? 'dnc-disembunyikan' : ''}">
+        <div id="wadah-kunci-teks" class="dnc-form-grup dnc-form-full ${tipeAwal === 'Pilihan Ganda Kompleks' ? 'dnc-disembunyikan' : ''}">
           <label class="dnc-label" for="f-kunciJawaban">Kunci Jawaban / Rubrik</label>
           <input id="f-kunciJawaban" class="dnc-input" type="text" placeholder="A-E untuk PG, teks untuk Isian (pisah | jika lebih dari 1), rubrik Uraian" value="${esc(item?.kunciJawaban || '')}">
-        </div>
-        <div class="dnc-form-grup">
-          <label class="dnc-label" for="f-bobotNilai">Bobot / Skor Soal *</label>
-          <input id="f-bobotNilai" class="dnc-input" type="number" min="0.5" step="0.5" value="${esc(item?.bobotNilai ?? 10)}" required>
         </div>
         <div class="dnc-form-grup dnc-form-full">
           <label class="dnc-check-label">
             <input id="f-statusAktifSoal" type="checkbox" ${(item ? item.statusAktif : true) ? 'checked' : ''}>
-            <span>Status Aktif (tersedia untuk dipilih pada Paket ASAS)</span>
+            <span>Status Aktif (tersedia untuk dipilih pada Paket ASAS &amp; Bank Soal Bimbel)</span>
           </label>
         </div>
       </div>`,
     onMount: () => {
       const selTipe = document.getElementById('f-tipeSoal');
+      const wadahCek = document.getElementById('wadah-cek-gambar-form');
+
+      const ambilDraftSoalForm = () => {
+        const tp = selTipe.value;
+        const opsiNow = [];
+        ['A', 'B', 'C', 'D', 'E'].forEach(k => {
+          const val = (document.getElementById(`f-opsi-${k}`)?.value || '').trim();
+          if (val) opsiNow.push({ kode: k, teks: val });
+        });
+        const kunciNow = tp === 'Pilihan Ganda Kompleks'
+          ? [...document.querySelectorAll('input[name="f-kunci-kompleks"]:checked')].map(el => el.value).join(', ')
+          : (document.getElementById('f-kunciJawaban')?.value || '').trim();
+        const urlAsli = (document.getElementById('f-urlGambar')?.value || '').trim();
+        return {
+          tipeSoal: tp,
+          pertanyaan: (document.getElementById('f-pertanyaan')?.value || '').trim(),
+          urlGambar: normalisasiUrlGambarSoal(urlAsli),
+          urlGambarAsli: urlAsli,
+          opsiJawaban: opsiNow,
+          kunciJawaban: kunciNow,
+          gambarTerverifikasi: gambarTerverifikasiForm
+        };
+      };
+
+      const renderCekGambarForm = (statusMuat = 'belum') => {
+        if (!wadahCek) return;
+        const draft = ambilDraftSoalForm();
+        const cek = analisisKesesuaianGambarSoal(draft, statusMuat);
+        if (!cek) { wadahCek.innerHTML = ''; return; }
+        wadahCek.innerHTML = `
+          <div class="dnc-img-cek-box ${cek.kelas}">
+            <img id="f-img-preview-soal" class="dnc-img-cek-thumb" src="${esc(cek.urlTampil)}" alt="Pratinjau gambar soal" title="Klik untuk buka gambar di tab baru">
+            <div class="dnc-img-cek-info">
+              <div class="dnc-flex-between">
+                <strong>Cek Gambar &amp; Kunci: ${esc(cek.status)}</strong>
+                ${cek.kelas !== 'bahaya' && !gambarTerverifikasiForm ? '<button type="button" id="btn-verif-gbr-form" class="dnc-tombol dnc-tombol-sukses dnc-tombol-kecil" style="height:24px;font-size:11px">Tandai Sesuai</button>' : ''}
+              </div>
+              <div class="dnc-img-cek-kunci"><strong>Isi Kunci:</strong> ${esc(cek.ringkasKunci)}</div>
+              <div class="dnc-teks-muted">${esc(cek.pesan)}</div>
+            </div>
+          </div>`;
+        const imgEl = document.getElementById('f-img-preview-soal');
+        if (imgEl) {
+          imgEl.addEventListener('error', () => {
+            if (statusMuat !== 'gagal') renderCekGambarForm('gagal');
+          });
+          imgEl.addEventListener('click', () => window.open(cek.urlTampil, '_blank', 'noopener'));
+        }
+        document.getElementById('btn-verif-gbr-form')?.addEventListener('click', () => {
+          gambarTerverifikasiForm = true;
+          renderCekGambarForm('sukses');
+        });
+      };
+
       const perbaruiTampilanTipe = () => {
         const tp = selTipe.value;
         document.getElementById('wadah-opsi-pg').classList.toggle('dnc-disembunyikan', !adalahTipeBeropsi(tp));
         document.getElementById('wadah-kunci-kompleks').classList.toggle('dnc-disembunyikan', tp !== 'Pilihan Ganda Kompleks');
         document.getElementById('wadah-kunci-teks').classList.toggle('dnc-disembunyikan', tp === 'Pilihan Ganda Kompleks');
+        renderCekGambarForm();
       };
+
       selTipe.addEventListener('change', perbaruiTampilanTipe);
+      document.getElementById('f-urlGambar')?.addEventListener('input', debounceDnc(() => {
+        gambarTerverifikasiForm = false;
+        renderCekGambarForm();
+      }, 300));
+      document.getElementById('f-kunciJawaban')?.addEventListener('input', debounceDnc(() => renderCekGambarForm(), 250));
+      document.getElementById('f-pertanyaan')?.addEventListener('blur', () => {
+        const inpGbr = document.getElementById('f-urlGambar');
+        const inpTanya = document.getElementById('f-pertanyaan');
+        if (inpGbr && !inpGbr.value.trim() && inpTanya) {
+          const eks = ekstrakLinkGambarDariTeks(inpTanya.value);
+          if (eks.urlGambar) {
+            inpTanya.value = eks.teksBersih;
+            inpGbr.value = eks.urlGambar;
+            gambarTerverifikasiForm = false;
+            renderCekGambarForm();
+            tampilkanToast('Link gambar pada pertanyaan otomatis diubah menjadi soal bergambar.', 'info');
+          }
+        }
+      });
+      ['A', 'B', 'C', 'D', 'E'].forEach(k => {
+        document.getElementById(`f-opsi-${k}`)?.addEventListener('input', debounceDnc(() => renderCekGambarForm(), 300));
+      });
+      document.querySelectorAll('input[name="f-kunci-kompleks"]').forEach(el => {
+        el.addEventListener('change', () => renderCekGambarForm());
+      });
+
       perbaruiTampilanTipe();
     },
     onSubmit: async () => {
       const tipeSoal = document.getElementById('f-tipeSoal').value;
+      const kategoriSoal = normalisasiKategoriSoal(document.getElementById('f-kategoriSoal').value);
       const kodeSoal = document.getElementById('f-kodeSoal').value.trim();
       const mapelId = document.getElementById('f-mapelId').value;
       const tingkat = document.getElementById('f-tingkatSoal').value;
-      const pertanyaan = document.getElementById('f-pertanyaan').value.trim();
-      const urlGambar = document.getElementById('f-urlGambar').value.trim();
+      let pertanyaan = document.getElementById('f-pertanyaan').value.trim();
+      let urlGambarAsli = document.getElementById('f-urlGambar').value.trim();
+      if (!urlGambarAsli) {
+        const eks = ekstrakLinkGambarDariTeks(pertanyaan);
+        if (eks.urlGambar) {
+          pertanyaan = eks.teksBersih;
+          urlGambarAsli = eks.urlAsli;
+        }
+      }
+      const urlGambar = normalisasiUrlGambarSoal(urlGambarAsli);
       let kunciJawaban = document.getElementById('f-kunciJawaban').value.trim();
       const bobotNilai = Number(document.getElementById('f-bobotNilai').value);
       const statusAktif = document.getElementById('f-statusAktifSoal').checked;
@@ -2548,7 +2648,8 @@ function bukaFormSoal(item = null) {
 
       const sumberPaket = (document.getElementById('f-sumberPaket')?.value || '').trim();
       const payload = {
-        kodeSoal, sumberPaket, mapelId, tingkat, tipeSoal, pertanyaan, urlGambar,
+        kodeSoal, kategoriSoal, sumberPaket, mapelId, tingkat, tipeSoal, pertanyaan,
+        urlGambar, urlGambarAsli: urlGambarAsli || '', gambarTerverifikasi: Boolean(urlGambar && gambarTerverifikasiForm),
         opsiJawaban, kunciJawaban, bobotNilai, statusAktif,
         dibuatOleh: item?.dibuatOleh || penggunaAktif.id
       };
@@ -2556,7 +2657,7 @@ function bukaFormSoal(item = null) {
       else await dbCreate(COLLECTIONS.bankSoal, payload);
 
       tutupModalFormDnc();
-      resetCacheMenu(['DNC-M1', 'DNC-M3', 'DNC-M4']);
+      resetCacheMenu(['DNC-M1', 'DNC-M3', 'DNC-M4', 'DNC-M5']);
       await muatM3BankSoal(true);
       tampilkanToast(item ? 'Butir soal berhasil diperbarui.' : 'Butir soal berhasil disimpan.');
     }
