@@ -7653,12 +7653,41 @@ function parseTeksBarisSiswaBebas(daftarBaris, opsi) {
 }
 
 function validasiDaftarSiswaImpor(daftar, nisSudahAda, emailSudahAda) {
-  const nisDalamFile = new Set();
+  const nisKelasSudahAda = new Set(
+    stateMemori.pengguna
+      .filter(u => normalisasiRoleDnc(u.role) === 'Siswa')
+      .map(u => `${teks(u.nomorInduk)}||${u.kelasId || ''}`)
+  );
+  const nisNonSiswaSudahAda = new Set(
+    stateMemori.pengguna
+      .filter(u => normalisasiRoleDnc(u.role) !== 'Siswa')
+      .map(u => teks(u.nomorInduk))
+  );
+  const nisKelasDalamFile = new Set();
   const emailDalamFile = new Set();
 
   return daftar.map(it => {
     const masalah = [];
     const nisKey = teks(it.nomorInduk);
+    const nisKelasKey = `${nisKey}||${it.kelasId || ''}`;
+
+    // Jika email otomatis @siswa.asas.id bentrok karena NIS sama beda kelas, buat unik memakai kode kelas
+    if (it.email && /@siswa\.asas\.id$/i.test(it.email)) {
+      const emailCek = teks(it.email);
+      if (emailSudahAda.has(emailCek) || emailDalamFile.has(emailCek)) {
+        const basisNis = String(it.nomorInduk || '').toLowerCase().replace(/[^a-z0-9]/g, '') || 'siswa';
+        const klsObj = cariById('kelas', it.kelasId);
+        const tagKelas = String(klsObj?.kodeKelas || 'kls').toLowerCase().replace(/[^a-z0-9]/g, '') || 'kls';
+        let kandidat = `${basisNis}.${tagKelas}@siswa.asas.id`;
+        let urutan = 2;
+        while (emailSudahAda.has(teks(kandidat)) || emailDalamFile.has(teks(kandidat))) {
+          kandidat = `${basisNis}.${tagKelas}${urutan}@siswa.asas.id`;
+          urutan++;
+        }
+        it.email = kandidat;
+      }
+    }
+
     const emailKey = teks(it.email);
 
     if (!it.nomorInduk) masalah.push('NIS/NISN kosong');
@@ -7667,17 +7696,18 @@ function validasiDaftarSiswaImpor(daftar, nisSudahAda, emailSudahAda) {
     if (!it.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(it.email)) masalah.push('Format email tidak valid');
     if (!it.password || String(it.password).length < 6) masalah.push('Password min. 6 karakter');
 
-    if (nisKey && nisSudahAda.has(nisKey)) masalah.push('NIS sudah terdaftar');
-    else if (nisKey && nisDalamFile.has(nisKey)) masalah.push('NIS duplikat di file');
+    if (nisKey && nisNonSiswaSudahAda.has(nisKey)) masalah.push('NIS bentrok akun non-siswa');
+    else if (nisKey && nisKelasSudahAda.has(nisKelasKey)) masalah.push('NIS sudah terdaftar di kelas ini');
+    else if (nisKey && nisKelasDalamFile.has(nisKelasKey)) masalah.push('NIS duplikat di kelas yang sama');
 
     if (emailKey && emailSudahAda.has(emailKey)) masalah.push('Email sudah terdaftar');
     else if (emailKey && emailDalamFile.has(emailKey)) masalah.push('Email duplikat di file');
 
-    if (nisKey) nisDalamFile.add(nisKey);
+    if (nisKey) nisKelasDalamFile.add(nisKelasKey);
     if (emailKey) emailDalamFile.add(emailKey);
 
     it.valid = masalah.length === 0;
-    it.statusTeks = it.valid ? 'Valid' : (masalah.some(m => m.includes('terdaftar') || m.includes('duplikat')) ? 'Duplikat' : 'Perlu Perbaikan');
+    it.statusTeks = it.valid ? 'Valid' : (masalah.some(m => m.includes('terdaftar') || m.includes('duplikat') || m.includes('bentrok')) ? 'Duplikat' : 'Perlu Perbaikan');
     it.catatan = masalah.length ? masalah.join('; ') : 'Siap disimpan';
     return it;
   });
