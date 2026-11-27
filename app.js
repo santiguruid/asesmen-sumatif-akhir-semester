@@ -3007,12 +3007,16 @@ function bukaFormSoal(item = null) {
           </datalist>
         </div>
         <div class="dnc-form-grup dnc-form-full">
-          <label class="dnc-label" for="f-pertanyaan">Pertanyaan *</label>
-          <textarea id="f-pertanyaan" class="dnc-textarea" placeholder="Tulis pertanyaan soal secara lengkap (jika memuat link gambar akan terdeteksi otomatis)..." required>${esc(item?.pertanyaan || '')}</textarea>
-        </div>
-        <div class="dnc-form-grup dnc-form-full">
-          <label class="dnc-label" for="f-urlGambar">Link / Sumber Gambar Pendukung (Opsional — dukung Google Drive, Dropbox, URL langsung)</label>
-          <input id="f-urlGambar" class="dnc-input" type="text" placeholder="Tempel link gambar (https://...) atau hasil ekstraksi dokumen" value="${esc(item?.urlGambar || '')}">
+          <label class="dnc-label" for="f-urlGambar">Gambar Pendukung (Unggah File Lokal atau Tempel Link Drive / Dropbox / URL)</label>
+          <input id="f-urlGambar" class="dnc-input" type="text" placeholder="Tempel link gambar (https://...) atau gunakan tombol Unggah Gambar di bawah" value="${esc((item?.urlGambar || '').startsWith('data:image/') ? '' : (item?.urlGambar || ''))}">
+          <div class="dnc-gbr-aksi-row">
+            <label class="dnc-tombol dnc-tombol-sekunder dnc-tombol-kecil" style="cursor:pointer">
+              <span>Unggah Gambar Lokal</span>
+              <input id="f-file-gambar-soal" type="file" accept="image/*" style="display:none">
+            </label>
+            <button type="button" id="btn-ocr-gambar-form" class="dnc-tombol dnc-tombol-sekunder dnc-tombol-kecil">Baca Teks Gambar (OCR)</button>
+            <button type="button" id="btn-hapus-gambar-form" class="dnc-tombol dnc-tombol-bahaya dnc-tombol-kecil">Hapus Gambar</button>
+          </div>
           <div id="wadah-cek-gambar-form"></div>
         </div>
         <div id="wadah-opsi-pg" class="dnc-form-full ${!adalahTipeBeropsi(tipeAwal) ? 'dnc-disembunyikan' : ''}">
@@ -3035,8 +3039,9 @@ function bukaFormSoal(item = null) {
           </div>
         </div>
         <div id="wadah-kunci-teks" class="dnc-form-grup dnc-form-full ${tipeAwal === 'Pilihan Ganda Kompleks' ? 'dnc-disembunyikan' : ''}">
-          <label class="dnc-label" for="f-kunciJawaban">Kunci Jawaban / Rubrik</label>
-          <input id="f-kunciJawaban" class="dnc-input" type="text" placeholder="A-E untuk PG, teks untuk Isian (pisah | jika lebih dari 1), rubrik Uraian" value="${esc(item?.kunciJawaban || '')}">
+          <label id="lbl-kunci-teks-form" class="dnc-label" for="f-kunciJawaban">Kunci Jawaban / Rubrik</label>
+          <input id="f-kunciJawaban" class="dnc-input" type="text" placeholder="A-E untuk PG; 1. Benar, 2. Benar, 3. Salah untuk Benar/Salah; teks Isian; rubrik Uraian" value="${esc(item?.kunciJawaban || '')}">
+          <span id="bantuan-kunci-teks-form" class="dnc-form-bantuan"></span>
         </div>
         <div class="dnc-form-grup dnc-form-full">
           <label class="dnc-check-label">
@@ -3048,6 +3053,10 @@ function bukaFormSoal(item = null) {
     onMount: () => {
       const selTipe = document.getElementById('f-tipeSoal');
       const wadahCek = document.getElementById('wadah-cek-gambar-form');
+      const inpUrlGbr = document.getElementById('f-urlGambar');
+      if (inpUrlGbr) {
+        inpUrlGbr._gambarLokal = (item?.urlGambar || '').startsWith('data:image/') ? item.urlGambar : '';
+      }
 
       const ambilDraftSoalForm = () => {
         const tp = selTipe.value;
@@ -3059,12 +3068,13 @@ function bukaFormSoal(item = null) {
         const kunciNow = tp === 'Pilihan Ganda Kompleks'
           ? [...document.querySelectorAll('input[name="f-kunci-kompleks"]:checked')].map(el => el.value).join(', ')
           : (document.getElementById('f-kunciJawaban')?.value || '').trim();
-        const urlAsli = (document.getElementById('f-urlGambar')?.value || '').trim();
+        const urlInput = (inpUrlGbr?.value || '').trim();
+        const urlAsli = urlInput || inpUrlGbr?._gambarLokal || '';
         return {
           tipeSoal: tp,
           pertanyaan: (document.getElementById('f-pertanyaan')?.value || '').trim(),
           urlGambar: normalisasiUrlGambarSoal(urlAsli),
-          urlGambarAsli: urlAsli,
+          urlGambarAsli: urlInput,
           opsiJawaban: opsiNow,
           kunciJawaban: kunciNow,
           gambarTerverifikasi: gambarTerverifikasiForm
@@ -3078,7 +3088,7 @@ function bukaFormSoal(item = null) {
         if (!cek) { wadahCek.innerHTML = ''; return; }
         wadahCek.innerHTML = `
           <div class="dnc-img-cek-box ${cek.kelas}">
-            <img id="f-img-preview-soal" class="dnc-img-cek-thumb" src="${esc(cek.urlTampil)}" alt="Pratinjau gambar soal" title="Klik untuk buka gambar di tab baru">
+            <img id="f-img-preview-soal" class="dnc-img-cek-thumb" src="${esc(cek.urlTampil)}" alt="Pratinjau gambar soal" title="Klik untuk perbesar gambar">
             <div class="dnc-img-cek-info">
               <div class="dnc-flex-between">
                 <strong>Cek Gambar &amp; Kunci: ${esc(cek.status)}</strong>
@@ -3093,7 +3103,7 @@ function bukaFormSoal(item = null) {
           imgEl.addEventListener('error', () => {
             if (statusMuat !== 'gagal') renderCekGambarForm('gagal');
           });
-          imgEl.addEventListener('click', () => window.open(cek.urlTampil, '_blank', 'noopener'));
+          imgEl.addEventListener('click', () => bukaZoomGambarDnc(cek.urlTampil));
         }
         document.getElementById('btn-verif-gbr-form')?.addEventListener('click', () => {
           gambarTerverifikasiForm = true;
@@ -3101,11 +3111,78 @@ function bukaFormSoal(item = null) {
         });
       };
 
+      document.getElementById('f-file-gambar-soal')?.addEventListener('change', async e => {
+        const fileGbr = e.target.files[0];
+        if (!fileGbr) return;
+        try {
+          const terkompres = await kompresFileGambarLokal(fileGbr, 1024);
+          if (!terkompres) throw new Error('Ukuran gambar terlalu besar atau format tidak didukung.');
+          if (inpUrlGbr) {
+            inpUrlGbr._gambarLokal = terkompres;
+            inpUrlGbr.value = '';
+          }
+          gambarTerverifikasiForm = false;
+          renderCekGambarForm('sukses');
+          tampilkanToast('Gambar lokal berhasil dimuat dan dikompres tajam.');
+        } catch (err) {
+          tampilkanToast(err.message || 'Gagal memuat gambar lokal.', 'error');
+        }
+      });
+
+      document.getElementById('btn-hapus-gambar-form')?.addEventListener('click', () => {
+        if (inpUrlGbr) {
+          inpUrlGbr._gambarLokal = '';
+          inpUrlGbr.value = '';
+        }
+        gambarTerverifikasiForm = false;
+        renderCekGambarForm();
+        tampilkanToast('Gambar soal dihapus.', 'info');
+      });
+
+      document.getElementById('btn-ocr-gambar-form')?.addEventListener('click', async e => {
+        const btn = e.currentTarget;
+        const draft = ambilDraftSoalForm();
+        if (!draft.urlGambar) {
+          tampilkanToast('Unggah atau masukkan gambar soal terlebih dahulu.', 'error');
+          return;
+        }
+        await denganLoading(btn, 'Membaca OCR...', async () => {
+          const teksOcr = await bacaTeksOcrDariGambar(draft.urlGambar, pct => {
+            btn.textContent = `OCR ${pct}%...`;
+          });
+          if (!teksOcr) throw new Error('Tidak ada teks terbaca dari gambar.');
+          const inpTanya = document.getElementById('f-pertanyaan');
+          if (inpTanya) {
+            inpTanya.value = inpTanya.value.trim()
+              ? `${inpTanya.value.trim()}\n${teksOcr}`
+              : teksOcr;
+          }
+          tampilkanToast('Teks dari gambar berhasil dibaca (OCR) dan ditambahkan ke kolom pertanyaan.');
+        });
+      });
+
       const perbaruiTampilanTipe = () => {
         const tp = selTipe.value;
         document.getElementById('wadah-opsi-pg').classList.toggle('dnc-disembunyikan', !adalahTipeBeropsi(tp));
         document.getElementById('wadah-kunci-kompleks').classList.toggle('dnc-disembunyikan', tp !== 'Pilihan Ganda Kompleks');
         document.getElementById('wadah-kunci-teks').classList.toggle('dnc-disembunyikan', tp === 'Pilihan Ganda Kompleks');
+        const lblKunci = document.getElementById('lbl-kunci-teks-form');
+        const bantuanKunci = document.getElementById('bantuan-kunci-teks-form');
+        if (lblKunci && bantuanKunci) {
+          if (tp === 'Benar/Salah') {
+            lblKunci.textContent = 'Kunci Jawaban Benar/Salah *';
+            bantuanKunci.textContent = 'Format: 1. Benar, 2. Benar, 3. Salah (jumlah tombol pilihan di lembar ujian siswa otomatis mengikuti jumlah nomor kunci).';
+          } else if (tp === 'Pilihan Ganda') {
+            lblKunci.textContent = 'Kunci Jawaban Pilihan Ganda (A–E) *';
+            bantuanKunci.textContent = '';
+          } else if (tp === 'Isian Singkat') {
+            lblKunci.textContent = 'Kunci Isian Singkat *';
+            bantuanKunci.textContent = 'Pisahkan beberapa jawaban benar alternatif dengan tanda | (mis. Yogyakarta|Jogja).';
+          } else {
+            lblKunci.textContent = 'Rubrik / Kunci Uraian';
+            bantuanKunci.textContent = '';
+          }
+        }
         renderCekGambarForm();
       };
 
