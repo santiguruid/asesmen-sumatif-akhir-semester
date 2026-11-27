@@ -6839,15 +6839,6 @@ async function muatM7Pengguna(paksa = false) {
 }
 
 const kelasSiswaTerbukaM7 = new Set();
-
-function toggleKelasSiswaM7(kunciKelas) {
-  if (!kunciKelas) return;
-  if (kelasSiswaTerbukaM7.has(kunciKelas)) kelasSiswaTerbukaM7.delete(kunciKelas);
-  else kelasSiswaTerbukaM7.add(kunciKelas);
-  renderTabelPengguna();
-}
-
-const kelasSiswaTerbukaM7 = new Set();
 let siswaBimbelTerbukaM7 = false;
 
 function toggleKelasSiswaM7(kunciKelas) {
