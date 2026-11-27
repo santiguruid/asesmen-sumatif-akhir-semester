@@ -4874,6 +4874,70 @@ async function pasangListenerPaketUjianBerjalan(paketId) {
   } catch (_) {}
 }
 
+let filterKategoriBimbelM5 = '';
+let filterMapelBimbelM5 = '';
+let filterRiwayatBimbelM5 = '';
+
+function buatPaketIdBimbel(namaGrup, mapelId, kategoriSoal) {
+  const slug = String(namaGrup || 'paket')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 56) || 'paket';
+  const kat = normalisasiKategoriSoal(kategoriSoal).toLowerCase();
+  const mpl = String(mapelId || 'umum').replace(/[^a-zA-Z0-9_-]/g, '');
+  return `bmb_${kat}_${mpl}_${slug}`;
+}
+
+function buatDaftarPaketBimbel() {
+  const soalAktif = stateMemori.bankSoal.filter(s => s.statusAktif !== false);
+  const peta = new Map();
+  soalAktif.forEach(s => {
+    const namaGrup = namaSumberPaketSoal(s);
+    const kategoriSoal = normalisasiKategoriSoal(s.kategoriSoal);
+    const mapelId = s.mapelId || '';
+    const id = buatPaketIdBimbel(namaGrup, mapelId, kategoriSoal);
+    if (!peta.has(id)) {
+      peta.set(id, {
+        id,
+        judulPaket: namaGrup,
+        kategoriSoal,
+        mapelId,
+        list: []
+      });
+    }
+    peta.get(id).list.push(s);
+  });
+
+  return [...peta.values()].map(g => {
+    g.list.sort((a, b) =>
+      String(a.kodeSoal || '').localeCompare(String(b.kodeSoal || ''), undefined, { numeric: true, sensitivity: 'base' })
+    );
+    const daftarTingkat = [...new Set(g.list.map(s => s.tingkat).filter(Boolean))].join(', ');
+    const totalBobot = bulatDua(g.list.reduce((acc, s) => acc + Number(s.bobotNilai || 0), 0));
+    return {
+      id: g.id,
+      judulPaket: g.judulPaket,
+      kategoriSoal: g.kategoriSoal,
+      mapelId: g.mapelId,
+      daftarTingkat,
+      totalBobot,
+      daftarSoalIds: g.list.map(s => s.id),
+      durasiMenit: 0,
+      acakSoal: false,
+      acakOpsi: false,
+      tampilkanNilai: true,
+      statusPaket: 'Aktif',
+      ujianDibuka: true,
+      modeBimbel: true
+    };
+  }).sort((a, b) => {
+    const kSel = a.kategoriSoal.localeCompare(b.kategoriSoal);
+    if (kSel !== 0) return kSel;
+    return a.judulPaket.localeCompare(b.judulPaket, 'id', { sensitivity: 'base' });
+  });
+}
+
 async function muatM5RuangUjian(paksa = false) {
   if (sesiUjianAktif) return;
   if (!sudahDimuat['DNC-M5'] || paksa) {
@@ -4882,10 +4946,212 @@ async function muatM5RuangUjian(paksa = false) {
   }
   document.getElementById('m5-daftar-view').classList.remove('dnc-disembunyikan');
   document.getElementById('m5-lembar-view').classList.add('dnc-disembunyikan');
-  document.getElementById('subjudul-m5').textContent = `Kelas Anda: ${namaKelasById(penggunaAktif.kelasId)}. Ujian hanya bisa dimulai ketika Guru menekan tombol Mulai Ujian.`;
 
+  const elJudul = document.getElementById('judul-m5');
+  const elSub = document.getElementById('subjudul-m5');
+
+  if (penggunaAktif?.role === 'Siswa Bimbel') {
+    if (elJudul) elJudul.textContent = 'Bank Soal';
+    if (elSub) {
+      elSub.textContent = `${penggunaAktif.asalSekolah || 'Siswa Bimbel'} (${penggunaAktif.kelasTeks || '-'}) — Pilih paket soal kategori ASAS atau TKA yang ingin dikerjakan terlebih dahulu.`;
+    }
+    renderBankSoalBimbel();
+    return;
+  }
+
+  if (elJudul) elJudul.textContent = 'Ruang Ujian ASAS';
+  if (elSub) {
+    elSub.textContent = `Kelas Anda: ${namaKelasById(penggunaAktif.kelasId)}. Ujian hanya bisa dimulai ketika Guru menekan tombol Mulai Ujian.`;
+  }
   renderGridUjianSiswa();
   pasangListenerDaftarPaketSiswa();
+}
+
+function renderBankSoalBimbel() {
+  const grid = document.getElementById('grid-ujian-siswa');
+  if (!grid) return;
+
+  const semuaPaket = buatDaftarPaketBimbel();
+  const mapelTerpakai = [...new Set(semuaPaket.map(p => p.mapelId).filter(Boolean))]
+    .map(id => ({ id, nama: namaMapelById(id) }))
+    .sort((a, b) => a.nama.localeCompare(b.nama, 'id'));
+
+  const denganRiwayat = semuaPaket.map(p => {
+    const hasilId = `${p.id}_${penggunaAktif.id}`;
+    const hasil = stateMemori.hasilUjian.find(h => h.id === hasilId || (h.paketId === p.id && h.penggunaId === penggunaAktif.id)) || null;
+    let statusRiwayat = 'belum';
+    if (hasil) {
+      statusRiwayat = hasil.statusUjian === 'Sedang Dikerjakan' ? 'sedang' : 'sudah';
+    }
+    return { paket: p, hasil, statusRiwayat };
+  });
+
+  const jmlSudah = denganRiwayat.filter(x => x.statusRiwayat === 'sudah').length;
+  const jmlSedang = denganRiwayat.filter(x => x.statusRiwayat === 'sedang').length;
+  const jmlBelum = denganRiwayat.filter(x => x.statusRiwayat === 'belum').length;
+
+  const tersaring = denganRiwayat.filter(({ paket, statusRiwayat }) => {
+    if (filterKategoriBimbelM5 && paket.kategoriSoal !== filterKategoriBimbelM5) return false;
+    if (filterMapelBimbelM5 && paket.mapelId !== filterMapelBimbelM5) return false;
+    if (filterRiwayatBimbelM5 && statusRiwayat !== filterRiwayatBimbelM5) return false;
+    return true;
+  });
+
+  const filterBarHtml = `
+    <div class="dnc-kartu" style="grid-column:1/-1">
+      <div class="dnc-bimbel-filter-bar" style="margin-bottom:8px">
+        <select id="bmb-filter-kat" class="dnc-select dnc-select-filter" aria-label="Filter Kategori Bank Soal">
+          <option value="">Semua Kategori (ASAS &amp; TKA)</option>
+          <option value="ASAS" ${filterKategoriBimbelM5 === 'ASAS' ? 'selected' : ''}>Kategori ASAS</option>
+          <option value="TKA" ${filterKategoriBimbelM5 === 'TKA' ? 'selected' : ''}>Kategori TKA</option>
+        </select>
+        <select id="bmb-filter-mapel" class="dnc-select dnc-select-filter" aria-label="Filter Mapel Bank Soal">
+          <option value="">Semua Mapel</option>
+          ${mapelTerpakai.map(m => `<option value="${esc(m.id)}" ${filterMapelBimbelM5 === m.id ? 'selected' : ''}>${esc(m.nama)}</option>`).join('')}
+        </select>
+        <select id="bmb-filter-riwayat" class="dnc-select dnc-select-filter" aria-label="Filter Riwayat Pengerjaan">
+          <option value="">Semua Riwayat (${semuaPaket.length})</option>
+          <option value="belum" ${filterRiwayatBimbelM5 === 'belum' ? 'selected' : ''}>Belum Dikerjakan (${jmlBelum})</option>
+          <option value="sedang" ${filterRiwayatBimbelM5 === 'sedang' ? 'selected' : ''}>Sedang Dikerjakan (${jmlSedang})</option>
+          <option value="sudah" ${filterRiwayatBimbelM5 === 'sudah' ? 'selected' : ''}>Sudah Dikerjakan (${jmlSudah})</option>
+        </select>
+      </div>
+      <div class="dnc-bimbel-meta">
+        <span class="dnc-badge dnc-badge-hijau">Sudah Dikerjakan: ${jmlSudah}</span>
+        ${jmlSedang ? `<span class="dnc-badge dnc-badge-amber">Sedang Dikerjakan: ${jmlSedang}</span>` : ''}
+        <span class="dnc-badge dnc-badge-abu">Belum Dikerjakan: ${jmlBelum}</span>
+      </div>
+    </div>`;
+
+  if (!tersaring.length) {
+    grid.innerHTML = filterBarHtml +
+      `<div class="dnc-kartu dnc-teks-tengah dnc-teks-muted" style="grid-column:1/-1">Belum ada paket bank soal yang sesuai filter.</div>`;
+  } else {
+    const kategoriTampil = KATEGORI_SOAL_LIST.filter(k => tersaring.some(x => x.paket.kategoriSoal === k));
+    const blokKategoriHtml = kategoriTampil.map(kat => {
+      const daftarKat = tersaring.filter(x => x.paket.kategoriSoal === kat);
+      const judulKat = `
+        <div class="dnc-subbagian-judul" style="grid-column:1/-1;margin-top:6px">
+          <span>Paket Bank Soal Kategori ${esc(kat)}</span>
+          <span class="dnc-badge ${kat === 'TKA' ? 'dnc-badge-tka' : 'dnc-badge-asas'}">${daftarKat.length} paket</span>
+        </div>`;
+
+      const kartuKat = daftarKat.map(({ paket: p, hasil, statusRiwayat }) => {
+        let badgeRiwayat = '<span class="dnc-badge dnc-badge-abu">Belum Dikerjakan</span>';
+        let infoSkor = 'Belum ada riwayat pengerjaan';
+        let tombolHtml = `<button type="button" class="dnc-tombol dnc-tombol-primer dnc-tombol-penuh" data-bmb-mulai="${esc(p.id)}">Kerjakan Paket Soal</button>`;
+
+        if (statusRiwayat === 'sedang') {
+          const prog = hitungProgresSoalHasil(hasil, p);
+          badgeRiwayat = '<span class="dnc-badge dnc-badge-amber">Sedang Dikerjakan</span>';
+          infoSkor = `Progres: ${prog.dijawab}/${prog.totalSoal} soal terjawab`;
+          tombolHtml = `<button type="button" class="dnc-tombol dnc-tombol-aksen dnc-tombol-penuh" data-bmb-mulai="${esc(p.id)}">Lanjutkan Mengerjakan</button>`;
+        } else if (statusRiwayat === 'sudah') {
+          badgeRiwayat = '<span class="dnc-badge dnc-badge-hijau">Sudah Dikerjakan</span>';
+          infoSkor = `Nilai: <strong>${esc(hasil.skorAkhir ?? 0)}</strong> (${esc(hasil.statusKetuntasan || hasil.statusUjian)}) • ${formatTanggal(hasil.waktuSelesaiKerja, true)}`;
+          tombolHtml = `
+            <div class="dnc-aksi-baris" style="width:100%">
+              <button type="button" class="dnc-tombol dnc-tombol-sekunder dnc-tombol-kecil" style="flex:1" data-bmb-rinci="${esc(hasil.id)}">Lihat Rincian</button>
+              <button type="button" class="dnc-tombol dnc-tombol-primer dnc-tombol-kecil" style="flex:1" data-bmb-ulang="${esc(p.id)}">Kerjakan Ulang</button>
+            </div>`;
+        }
+
+        return `
+          <article class="dnc-kartu-ujian">
+            <div class="dnc-flex-between">
+              <div class="dnc-flex-gap">
+                ${badgeKategoriSoal(p.kategoriSoal)}
+                <span class="dnc-badge dnc-badge-biru">${esc(namaMapelById(p.mapelId))}</span>
+              </div>
+              ${badgeRiwayat}
+            </div>
+            <h3 style="font-size:15px;font-weight:700;word-break:break-word">${esc(p.judulPaket)}</h3>
+            <div class="dnc-ujian-meta">
+              <div><span class="dnc-teks-muted">Jumlah Soal:</span><br><strong>${p.daftarSoalIds.length} butir</strong></div>
+              <div><span class="dnc-teks-muted">Tingkat:</span><br><strong>${esc(p.daftarTingkat || '-')}</strong></div>
+              <div style="grid-column:1/-1"><span class="dnc-teks-muted">Riwayat:</span><br>${infoSkor}</div>
+            </div>
+            ${tombolHtml}
+          </article>`;
+      }).join('');
+
+      return judulKat + kartuKat;
+    }).join('');
+
+    grid.innerHTML = filterBarHtml + blokKategoriHtml;
+  }
+
+  document.getElementById('bmb-filter-kat')?.addEventListener('change', e => {
+    filterKategoriBimbelM5 = e.target.value;
+    renderBankSoalBimbel();
+  });
+  document.getElementById('bmb-filter-mapel')?.addEventListener('change', e => {
+    filterMapelBimbelM5 = e.target.value;
+    renderBankSoalBimbel();
+  });
+  document.getElementById('bmb-filter-riwayat')?.addEventListener('change', e => {
+    filterRiwayatBimbelM5 = e.target.value;
+    renderBankSoalBimbel();
+  });
+  grid.querySelectorAll('[data-bmb-mulai]').forEach(btn => {
+    btn.addEventListener('click', () => mulaiLatihanBimbel(btn.dataset.bmbMulai, false));
+  });
+  grid.querySelectorAll('[data-bmb-rinci]').forEach(btn => {
+    btn.addEventListener('click', () => bukaModalKoreksiHasil(btn.dataset.bmbRinci, true));
+  });
+  grid.querySelectorAll('[data-bmb-ulang]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const pid = btn.dataset.bmbUlang;
+      bukaKonfirmasi({
+        judul: 'Kerjakan Ulang Paket Soal',
+        pesan: 'Memulai ulang akan mereset jawaban sebelumnya pada paket soal ini agar Anda dapat berlatih kembali dari awal. Lanjutkan?',
+        labelYa: 'Ya, Mulai Ulang',
+        kelasTombol: 'dnc-tombol-primer',
+        onYa: () => mulaiLatihanBimbel(pid, true)
+      });
+    });
+  });
+}
+
+async function mulaiLatihanBimbel(paketId, kerjakanUlang = false) {
+  const paket = buatDaftarPaketBimbel().find(p => p.id === paketId);
+  if (!paket || !paket.daftarSoalIds.length) {
+    tampilkanToast('Paket soal tidak ditemukan atau belum memiliki butir soal.', 'error');
+    return;
+  }
+
+  const hasilId = `${paket.id}_${penggunaAktif.id}`;
+  let hasil = kerjakanUlang ? null : await dbGetById(COLLECTIONS.hasilUjian, hasilId);
+  if (!hasil || hasil.statusUjian !== 'Sedang Dikerjakan') {
+    const urutanSoalIds = [...paket.daftarSoalIds];
+    const jawabanAwal = urutanSoalIds.map(sid => ({ soalId: sid, jawaban: '', ragu: false, skor: 0 }));
+    hasil = await dbCreate(COLLECTIONS.hasilUjian, {
+      paketId: paket.id,
+      judulPaket: paket.judulPaket,
+      kategoriSoal: paket.kategoriSoal,
+      jenisSesi: 'Bimbel',
+      daftarSoalIds: urutanSoalIds,
+      penggunaId: penggunaAktif.id,
+      kelasId: '',
+      kelasTeks: penggunaAktif.kelasTeks || '',
+      asalSekolah: penggunaAktif.asalSekolah || '',
+      mapelId: paket.mapelId,
+      waktuMulaiKerja: new Date().toISOString(),
+      waktuSelesaiKerja: null,
+      statusUjian: 'Sedang Dikerjakan',
+      urutanSoalIds,
+      urutanOpsiMap: {},
+      jawabanSiswa: jawabanAwal,
+      skorPg: 0,
+      skorUraian: 0,
+      skorAkhir: 0,
+      statusKetuntasan: 'Menunggu Koreksi',
+      catatanKoreksi: '',
+      dikoreksiOleh: ''
+    }, hasilId);
+  }
+
+  await mulaiLembarUjian(paket, hasil);
 }
 
 function renderGridUjianSiswa() {
