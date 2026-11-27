@@ -2038,6 +2038,100 @@ body.dnc-mode-lockdown-siswa textarea {
   word-break: break-word;
 }
 
+/* --- Badge, Tabel & Tombol Interaktif Benar/Salah + Aksi Gambar OCR --- */
+.dnc-badge-bs {
+  background: #ECFEFF;
+  color: #0E7490;
+  border: 1px solid #A5F3FC;
+}
+
+.dnc-soal-gambar {
+  max-height: 360px;
+  cursor: zoom-in;
+}
+
+.dnc-gbr-aksi-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+
+.dnc-bs-tabel-wrap {
+  width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.dnc-bs-tabel {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.dnc-bs-tabel th {
+  background: #F1F5F9;
+  color: var(--text-main);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+
+.dnc-bs-tabel td {
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+.dnc-bs-tabel tr:last-child td {
+  border-bottom: none;
+}
+
+.dnc-bs-pilihan-grup {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.dnc-bs-btn {
+  min-width: 78px;
+  height: 36px;
+  padding: 0 12px;
+  border-radius: 6px;
+  border: 1.5px solid var(--border);
+  background: var(--surface);
+  color: var(--text-main);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.dnc-bs-btn:hover:not(:disabled) {
+  border-color: #93C5FD;
+  background: #F8FAFC;
+}
+
+.dnc-bs-btn.aktif-benar {
+  background: #ECFDF5;
+  border-color: var(--success);
+  color: var(--success);
+}
+
+.dnc-bs-btn.aktif-salah {
+  background: #FEF2F2;
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
 /* --- Antrean Pendaftar Siswa Bimbel (DNC-M7) --- */
 .dnc-kartu-antrean {
   border: 1px solid #FDE68A;
