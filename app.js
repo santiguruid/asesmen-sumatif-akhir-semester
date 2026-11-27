@@ -6840,7 +6840,7 @@ function renderTabelPengguna() {
 }
 
 function bukaFormPengguna(item = null) {
-  const roleAwal = item?.role || 'Siswa';
+  const roleAwal = item ? normalisasiRoleDnc(item.role) : 'Siswa';
   const mapelSet = new Set(item?.mapelIds || []);
 
   bukaModalFormDnc({
@@ -6853,12 +6853,14 @@ function bukaFormPengguna(item = null) {
           <select id="f-roleUser" class="dnc-select" ${item ? 'disabled' : ''}>
             <option value="Admin" ${roleAwal === 'Admin' ? 'selected' : ''}>Admin</option>
             <option value="Guru" ${roleAwal === 'Guru' ? 'selected' : ''}>Guru</option>
-            <option value="Siswa" ${roleAwal === 'Siswa' ? 'selected' : ''}>Siswa</option>
+            <option value="Guru Bimbel" ${roleAwal === 'Guru Bimbel' ? 'selected' : ''}>Guru Bimbel</option>
+            <option value="Siswa" ${roleAwal === 'Siswa' ? 'selected' : ''}>Siswa (ASAS)</option>
+            <option value="Siswa Bimbel" ${roleAwal === 'Siswa Bimbel' ? 'selected' : ''}>Siswa Bimbel</option>
           </select>
         </div>
         <div class="dnc-form-grup">
-          <label class="dnc-label" for="f-nomorInduk">Nomor Induk (NIS/NISN/NIP) *</label>
-          <input id="f-nomorInduk" class="dnc-input" type="text" placeholder="Contoh: 202610002" value="${esc(item?.nomorInduk || '')}" required>
+          <label class="dnc-label" for="f-nomorInduk">Nomor Induk (NIS/NISN/NIP/ID) *</label>
+          <input id="f-nomorInduk" class="dnc-input" type="text" placeholder="Contoh: 3558 atau BMB123456" value="${esc(item?.nomorInduk || '')}" required>
         </div>
         <div class="dnc-form-grup">
           <label class="dnc-label" for="f-namaLengkap">Nama Lengkap *</label>
@@ -6866,7 +6868,7 @@ function bukaFormPengguna(item = null) {
         </div>
         <div class="dnc-form-grup">
           <label class="dnc-label" for="f-emailUser">Email Login *</label>
-          <input id="f-emailUser" class="dnc-input" type="email" placeholder="nama@sekolah.id" value="${esc(item?.email || '')}" ${item && item.role === 'Admin' ? 'disabled' : ''} required>
+          <input id="f-emailUser" class="dnc-input" type="email" placeholder="3558@siswa.asas.id atau nama@gmail.com" value="${esc(item?.email || '')}" ${item && roleAwal === 'Admin' ? 'disabled' : ''} required>
         </div>
         <div class="dnc-form-grup dnc-form-full">
           <label class="dnc-label" for="f-passwordUser">${item ? 'Password Baru (kosongkan jika tidak diubah)' : 'Password Akun * (minimal 6 karakter)'}</label>
@@ -6878,14 +6880,26 @@ function bukaFormPengguna(item = null) {
           </div>
         </div>
         <div id="grup-kelas-user" class="dnc-form-grup dnc-form-full ${roleAwal !== 'Siswa' ? 'dnc-disembunyikan' : ''}">
-          <label class="dnc-label" for="f-kelasUser">Penempatan Kelas Siswa *</label>
+          <label class="dnc-label" for="f-kelasUser">Penempatan Kelas Siswa ASAS *</label>
           <select id="f-kelasUser" class="dnc-select">
             <option value="">-- Pilih Kelas --</option>
             ${stateMemori.kelas.map(k => `<option value="${esc(k.id)}" ${item?.kelasId === k.id ? 'selected' : ''}>${esc(k.kodeKelas)} - ${esc(k.namaKelas)}</option>`).join('')}
           </select>
         </div>
-        <div id="grup-mapel-user" class="dnc-form-grup dnc-form-full ${roleAwal !== 'Guru' ? 'dnc-disembunyikan' : ''}">
-          <label class="dnc-label">Mata Pelajaran yang Diampu Guru * (minimal 1)</label>
+        <div id="grup-bimbel-user" class="dnc-form-full ${roleAwal !== 'Siswa Bimbel' ? 'dnc-disembunyikan' : ''}">
+          <div class="dnc-form-grid">
+            <div class="dnc-form-grup">
+              <label class="dnc-label" for="f-asalSekolahUser">Asal Sekolah *</label>
+              <input id="f-asalSekolahUser" class="dnc-input" type="text" placeholder="Contoh: SDN 1 Banguntapan" value="${esc(item?.asalSekolah || '')}">
+            </div>
+            <div class="dnc-form-grup">
+              <label class="dnc-label" for="f-kelasTeksUser">Kelas Siswa Bimbel *</label>
+              <input id="f-kelasTeksUser" class="dnc-input" type="text" placeholder="Contoh: Kelas 6 / VI-A" value="${esc(item?.kelasTeks || '')}">
+            </div>
+          </div>
+        </div>
+        <div id="grup-mapel-user" class="dnc-form-grup dnc-form-full ${!adalahRoleGuru(roleAwal) ? 'dnc-disembunyikan' : ''}">
+          <label class="dnc-label">Mata Pelajaran yang Diampu (Guru / Guru Bimbel) * (minimal 1)</label>
           <div class="dnc-checklist-box" style="max-height:130px">
             ${stateMemori.mataPelajaran.map(m => `
               <label class="dnc-checklist-item">
@@ -6908,22 +6922,29 @@ function bukaFormPengguna(item = null) {
       document.getElementById('f-roleUser').addEventListener('change', e => {
         const r = e.target.value;
         document.getElementById('grup-kelas-user').classList.toggle('dnc-disembunyikan', r !== 'Siswa');
-        document.getElementById('grup-mapel-user').classList.toggle('dnc-disembunyikan', r !== 'Guru');
+        document.getElementById('grup-bimbel-user').classList.toggle('dnc-disembunyikan', r !== 'Siswa Bimbel');
+        document.getElementById('grup-mapel-user').classList.toggle('dnc-disembunyikan', !adalahRoleGuru(r));
       });
     },
     onSubmit: async () => {
-      const role = item ? item.role : document.getElementById('f-roleUser').value;
+      const role = item ? normalisasiRoleDnc(item.role) : document.getElementById('f-roleUser').value;
       const nomorInduk = document.getElementById('f-nomorInduk').value.trim();
       const namaLengkap = document.getElementById('f-namaLengkap').value.trim();
       const email = document.getElementById('f-emailUser').value.trim();
       const password = document.getElementById('f-passwordUser').value;
       const kelasId = role === 'Siswa' ? document.getElementById('f-kelasUser').value : '';
-      const mapelIds = role === 'Guru' ? [...document.querySelectorAll('input[name="f-mapel-guru"]:checked')].map(el => el.value) : [];
+      const asalSekolah = role === 'Siswa Bimbel' ? (document.getElementById('f-asalSekolahUser')?.value || '').trim() : '';
+      const kelasTeks = role === 'Siswa Bimbel' ? (document.getElementById('f-kelasTeksUser')?.value || '').trim() : '';
+      const mapelIds = adalahRoleGuru(role) ? [...document.querySelectorAll('input[name="f-mapel-guru"]:checked')].map(el => el.value) : [];
       const statusAktif = document.getElementById('f-statusUser').checked;
 
       if (!nomorInduk || !namaLengkap || !email) throw new Error('Nomor induk, nama lengkap, dan email wajib diisi.');
-      if (role === 'Siswa' && !kelasId) throw new Error('Siswa wajib ditempatkan pada satu kelas.');
-      if (role === 'Guru' && !mapelIds.length) throw new Error('Guru wajib mengampu minimal satu mata pelajaran.');
+      if (role === 'Siswa' && !kelasId) throw new Error('Siswa ASAS wajib ditempatkan pada satu kelas.');
+      if (role === 'Siswa Bimbel') {
+        if (!asalSekolah || !kelasTeks) throw new Error('Asal sekolah dan kelas wajib diisi untuk Siswa Bimbel.');
+        if (!/^[a-z0-9._%+-]+@gmail\.com$/i.test(email)) throw new Error('Email Siswa Bimbel wajib menggunakan akun Gmail (@gmail.com).');
+      }
+      if (adalahRoleGuru(role) && !mapelIds.length) throw new Error(`${role} wajib mengampu minimal satu mata pelajaran.`);
       if (!item && password.length < 6) throw new Error('Password akun baru minimal 6 karakter.');
       if (item && password && password.length < 6) throw new Error('Password baru minimal 6 karakter.');
 
@@ -6935,6 +6956,14 @@ function bukaFormPengguna(item = null) {
       }
 
       const payload = { email, namaLengkap, nomorInduk, role, kelasId, mapelIds, statusAktif };
+      if (role === 'Siswa Bimbel') {
+        payload.asalSekolah = asalSekolah;
+        payload.kelasTeks = kelasTeks;
+        payload.tingkat = deteksiTingkat(kelasTeks) || '';
+        payload.statusPendaftaran = item?.statusPendaftaran || 'Diterima';
+        payload.tanggalDaftar = item?.tanggalDaftar || new Date().toISOString();
+        payload.tanggalDiterima = item?.tanggalDiterima || new Date().toISOString();
+      }
       if (role !== 'Admin' && password) {
         payload.passwordHash = await hashTeks(password);
       }
