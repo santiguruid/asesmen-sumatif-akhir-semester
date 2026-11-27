@@ -3102,7 +3102,27 @@ function pecahOpsiInlineDariTeks(teksBaris, kodeSudahAda = []) {
 function ekstrakBarisDariElemenHtml(el) {
   const klon = el.cloneNode(true);
   klon.querySelectorAll('ol, ul').forEach(sub => sub.remove());
-  const imgSrc = klon.querySelector('img')?.getAttribute('src') || '';
+  let imgSrc = klon.querySelector('img')?.getAttribute('src') || '';
+  let imgAsli = imgSrc;
+  let labelGambar = '';
+
+  if (!imgSrc) {
+    const tautan = [...klon.querySelectorAll('a[href]')];
+    const cocokLink = tautan.find(a => {
+      const href = (a.getAttribute('href') || '').trim();
+      if (!/^https?:\/\//i.test(href)) return false;
+      return adalahUrlGambarPotensial(href) || /(?:gambar|ilustrasi|foto|image|sumber)/i.test(a.textContent || '');
+    });
+    if (cocokLink) {
+      imgAsli = (cocokLink.getAttribute('href') || '').trim();
+      imgSrc = normalisasiUrlGambarSoal(imgAsli);
+      labelGambar = (cocokLink.textContent || '').trim();
+      if (labelGambar === imgAsli || /^(?:https?:\/\/|link\s+gambar|sumber\s+gambar|gambar)/i.test(labelGambar)) {
+        cocokLink.remove();
+      }
+    }
+  }
+
   klon.querySelectorAll('br').forEach(br => br.replaceWith('\n'));
   const seluruhTebal = Boolean(klon.querySelector('strong, b, u, mark')) &&
     (klon.textContent || '').trim().length > 0 &&
@@ -3114,11 +3134,13 @@ function ekstrakBarisDariElemenHtml(el) {
     .filter(Boolean);
 
   if (!potongan.length && imgSrc) {
-    return [{ teks: '', img: imgSrc, bold: false }];
+    return [{ teks: '', img: imgSrc, imgAsli, labelGambar, bold: false }];
   }
   return potongan.map((t, idx) => ({
     teks: t,
     img: idx === 0 ? imgSrc : '',
+    imgAsli: idx === 0 ? imgAsli : '',
+    labelGambar: idx === 0 ? labelGambar : '',
     bold: seluruhTebal
   }));
 }
