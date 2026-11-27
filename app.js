@@ -7936,8 +7936,9 @@ function bukaModalImporSiswa() {
       if (!terpilih.length) throw new Error('Belum ada data siswa berstatus Valid yang dipilih untuk disimpan.');
 
       let tersimpan = 0;
+      let tersimpan = 0;
       for (const s of terpilih) {
-        if (!(await cekUnik(COLLECTIONS.pengguna, 'nomorInduk', s.nomorInduk))) continue;
+        if (!(await cekUnikNisPerKelas(s.nomorInduk, s.kelasId, 'Siswa'))) continue;
         if (!(await cekUnik(COLLECTIONS.pengguna, 'email', s.email))) continue;
         const passwordHash = await hashTeks(s.password);
         await dbCreate(COLLECTIONS.pengguna, {
