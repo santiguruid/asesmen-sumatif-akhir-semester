@@ -4745,11 +4745,11 @@ function bukaModalImporCsvSoal() {
 // ===== BLOK: DNC_M4_PAKET_ASAS =====
 async function muatM4PaketAsas(paksa = false) {
   if (!sudahDimuat['DNC-M4'] || paksa) {
-    await Promise.all([muatDataDasar(), muatDataBankSoal(), muatDataPaket()]);
+    await Promise.all([muatDataDasar(), muatDataPengguna(), muatDataBankSoal(), muatDataPaket()]);
     sudahDimuat['DNC-M4'] = true;
   }
   isiSelectOpsi('filter-mapel-paket', daftarMapelDiizinkan().map(m => ({ value: m.id, label: m.namaMapel })), 'Semua Mapel');
-  isiSelectOpsi('filter-kelas-paket', stateMemori.kelas.map(k => ({ value: k.id, label: `${k.kodeKelas} - ${k.namaKelas}` })), 'Semua Kelas');
+  isiSelectOpsi('filter-kelas-paket', daftarKelasDiizinkan().map(k => ({ value: k.id, label: `${k.kodeKelas} - ${k.namaKelas}` })), 'Semua Kelas');
   renderTabelPaket();
 }
 
