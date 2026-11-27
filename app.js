@@ -6924,11 +6924,19 @@ function renderTabelPengguna() {
   const data = stateMemori.pengguna.filter(u => {
     const roleNorm = normalisasiRoleDnc(u.role);
     if (fRole && roleNorm !== fRole) return false;
-    if (fKelas && u.kelasId !== fKelas) return false;
+    if (fKelas) {
+      const cocokKelasSiswa = u.kelasId === fKelas;
+      const cocokKelasGuru = adalahRoleGuru(roleNorm) && Array.isArray(u.kelasIds) && u.kelasIds.includes(fKelas);
+      if (!cocokKelasSiswa && !cocokKelasGuru) return false;
+    }
     if (fMapel && !(u.mapelIds || []).includes(fMapel)) return false;
     if (fStatus === 'aktif' && u.statusAktif === false) return false;
     if (fStatus === 'nonaktif' && u.statusAktif !== false) return false;
-    const teksKelas = roleNorm === 'Siswa' ? teks(namaKelasById(u.kelasId)) : teks(u.kelasTeks || '');
+    const teksKelas = roleNorm === 'Siswa'
+      ? teks(namaKelasById(u.kelasId))
+      : (adalahRoleGuru(roleNorm)
+        ? teks((u.kelasIds || []).map(id => namaKelasById(id)).join(' '))
+        : teks(u.kelasTeks || ''));
     const teksSekolah = teks(u.asalSekolah || '');
     if (q && !`${teks(u.namaLengkap)} ${teks(u.nomorInduk)} ${teks(u.email)} ${teksKelas} ${teksSekolah}`.includes(q)) return false;
     return true;
@@ -6965,7 +6973,7 @@ function renderTabelPengguna() {
               <th>Nama Lengkap</th>
               <th>Email</th>
               <th>Role</th>
-              <th>Mapel Ampu / Cakupan</th>
+              <th>Mapel &amp; Kelas Ampu</th>
               <th>Status</th>
               <th>Aksi</th>
             </tr>
@@ -6973,8 +6981,10 @@ function renderTabelPengguna() {
           <tbody>
             ${nonSiswa.map(u => {
               const r = normalisasiRoleDnc(u.role);
+              const mapelTeks = (u.mapelIds || []).map(id => namaMapelById(id)).join(', ') || '-';
+              const kelasAmpuTeks = (u.kelasIds || []).map(id => cariById('kelas', id)?.kodeKelas || id).join(', ');
               const cakupan = adalahRoleGuru(r)
-                ? esc((u.mapelIds || []).map(id => namaMapelById(id)).join(', ') || '-')
+                ? `${esc(mapelTeks)}<div class="dnc-form-bantuan">Kelas Ampu: ${kelasAmpuTeks ? esc(kelasAmpuTeks) : 'Semua Kelas'}</div>`
                 : '<span class="dnc-teks-muted">Semua Cakupan</span>';
               const badgeCls = r === 'Guru Bimbel' ? 'dnc-badge-ungu' : 'dnc-badge-biru';
               return `
