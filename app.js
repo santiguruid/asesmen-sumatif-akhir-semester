@@ -6465,6 +6465,79 @@ function toggleKelasSiswaM7(kunciKelas) {
   renderTabelPengguna();
 }
 
+const kelasSiswaTerbukaM7 = new Set();
+let siswaBimbelTerbukaM7 = false;
+
+function toggleKelasSiswaM7(kunciKelas) {
+  if (!kunciKelas) return;
+  if (kelasSiswaTerbukaM7.has(kunciKelas)) kelasSiswaTerbukaM7.delete(kunciKelas);
+  else kelasSiswaTerbukaM7.add(kunciKelas);
+  renderTabelPengguna();
+}
+
+function toggleSiswaBimbelM7() {
+  siswaBimbelTerbukaM7 = !siswaBimbelTerbukaM7;
+  renderTabelPengguna();
+}
+
+function terimaPendaftarSiswaBimbel(id) {
+  const u = cariById('pengguna', id);
+  if (!u) return;
+  bukaKonfirmasi({
+    judul: 'Terima Pendaftaran Siswa Bimbel',
+    pesan: `Terima pendaftaran atas nama ${u.namaLengkap} (${u.email})? Sistem akan mengaktifkan akun, membuat kata sandi sementara 8 karakter, dan mengirimkannya secara otomatis ke Gmail siswa.`,
+    labelYa: 'Ya, Terima & Kirim Sandi Otomatis',
+    kelasTombol: 'dnc-tombol-sukses',
+    onYa: async () => {
+      const sandiSementara = buatSandiSementaraBimbel(8);
+      const passwordHash = await hashTeks(sandiSementara);
+      const waktuDiterima = new Date().toISOString();
+
+      await dbUpdate(COLLECTIONS.pengguna, id, {
+        statusAktif: true,
+        statusPendaftaran: 'Diterima',
+        tanggalDiterima: waktuDiterima,
+        diterimaOleh: penggunaAktif?.namaLengkap || penggunaAktif?.id || 'Admin',
+        passwordHash
+      });
+
+      const hasilKirim = await kirimEmailSandiBimbelOtomatis({
+        email: u.email,
+        namaLengkap: u.namaLengkap,
+        sandiSementara,
+        asalSekolah: u.asalSekolah || '',
+        kelasTeks: u.kelasTeks || ''
+      });
+
+      siswaBimbelTerbukaM7 = true;
+      resetCacheMenu(['DNC-M1', 'DNC-M6', 'DNC-M7']);
+      await muatM7Pengguna(true);
+
+      if (hasilKirim.terkirim) {
+        tampilkanToast(`Siswa Bimbel ${u.namaLengkap} diterima. Kata sandi sementara telah terkirim otomatis ke ${u.email}.`);
+      } else {
+        tampilkanToast(`Akun ${u.namaLengkap} sudah aktif (Sandi: ${sandiSementara}), tetapi email otomatis gagal: ${hasilKirim.pesan}`, 'error');
+      }
+    }
+  });
+}
+
+function tolakPendaftarSiswaBimbel(id) {
+  const u = cariById('pengguna', id);
+  if (!u) return;
+  bukaKonfirmasi({
+    judul: 'Tolak Pendaftaran Siswa Bimbel',
+    pesan: `Yakin ingin menolak dan menghapus pendaftaran milik ${u.namaLengkap} (${u.email})?`,
+    labelYa: 'Ya, Tolak & Hapus',
+    onYa: async () => {
+      await dbDelete(COLLECTIONS.pengguna, id);
+      resetCacheMenu(['DNC-M1', 'DNC-M7']);
+      await muatM7Pengguna(true);
+      tampilkanToast(`Pendaftaran ${u.namaLengkap} telah ditolak dan dihapus.`, 'info');
+    }
+  });
+}
+
 function renderTabelPengguna() {
   const wadah = document.getElementById('wadah-pengguna-m7');
   if (!wadah) return;
@@ -6476,13 +6549,15 @@ function renderTabelPengguna() {
   const fStatus = document.getElementById('filter-status-pengguna')?.value || '';
 
   const data = stateMemori.pengguna.filter(u => {
-    if (fRole && u.role !== fRole) return false;
+    const roleNorm = normalisasiRoleDnc(u.role);
+    if (fRole && roleNorm !== fRole) return false;
     if (fKelas && u.kelasId !== fKelas) return false;
     if (fMapel && !(u.mapelIds || []).includes(fMapel)) return false;
     if (fStatus === 'aktif' && u.statusAktif === false) return false;
     if (fStatus === 'nonaktif' && u.statusAktif !== false) return false;
-    const teksKelas = u.role === 'Siswa' ? teks(namaKelasById(u.kelasId)) : '';
-    if (q && !`${teks(u.namaLengkap)} ${teks(u.nomorInduk)} ${teks(u.email)} ${teksKelas}`.includes(q)) return false;
+    const teksKelas = roleNorm === 'Siswa' ? teks(namaKelasById(u.kelasId)) : teks(u.kelasTeks || '');
+    const teksSekolah = teks(u.asalSekolah || '');
+    if (q && !`${teks(u.namaLengkap)} ${teks(u.nomorInduk)} ${teks(u.email)} ${teksKelas} ${teksSekolah}`.includes(q)) return false;
     return true;
   });
 
@@ -6492,20 +6567,21 @@ function renderTabelPengguna() {
   }
 
   const nonSiswa = data
-    .filter(u => u.role !== 'Siswa')
+    .filter(u => !adalahRoleSiswa(normalisasiRoleDnc(u.role)))
     .sort((a, b) => {
-      const urutRole = r => (r === 'Admin' ? 0 : 1);
-      const selRole = urutRole(a.role) - urutRole(b.role);
+      const urutRole = r => (r === 'Admin' ? 0 : (r === 'Guru' ? 1 : 2));
+      const selRole = urutRole(normalisasiRoleDnc(a.role)) - urutRole(normalisasiRoleDnc(b.role));
       return selRole !== 0 ? selRole : teks(a.namaLengkap).localeCompare(teks(b.namaLengkap));
     });
 
-  const siswaList = data.filter(u => u.role === 'Siswa');
+  const siswaList = data.filter(u => normalisasiRoleDnc(u.role) === 'Siswa');
+  const siswaBimbelList = data.filter(u => normalisasiRoleDnc(u.role) === 'Siswa Bimbel');
   let htmlBagian = '';
 
   if (nonSiswa.length) {
     htmlBagian += `
       <div class="dnc-subbagian-judul">
-        <span>Akun Admin &amp; Guru</span>
+        <span>Akun Admin, Guru &amp; Guru Bimbel</span>
         <span class="dnc-badge dnc-badge-abu">${nonSiswa.length} akun</span>
       </div>
       <div class="dnc-pembungkus-tabel dnc-mb-12">
@@ -6523,15 +6599,17 @@ function renderTabelPengguna() {
           </thead>
           <tbody>
             ${nonSiswa.map(u => {
-              const cakupan = u.role === 'Guru'
+              const r = normalisasiRoleDnc(u.role);
+              const cakupan = adalahRoleGuru(r)
                 ? esc((u.mapelIds || []).map(id => namaMapelById(id)).join(', ') || '-')
                 : '<span class="dnc-teks-muted">Semua Cakupan</span>';
+              const badgeCls = r === 'Guru Bimbel' ? 'dnc-badge-ungu' : 'dnc-badge-biru';
               return `
                 <tr>
                   <td data-label="Nomor Induk"><span class="dnc-mono">${esc(u.nomorInduk)}</span></td>
                   <td data-label="Nama Lengkap"><strong>${esc(u.namaLengkap)}</strong></td>
                   <td data-label="Email">${esc(u.email)}</td>
-                  <td data-label="Role"><span class="dnc-badge dnc-badge-biru">${esc(u.role)}</span></td>
+                  <td data-label="Role"><span class="dnc-badge ${badgeCls}">${esc(r)}</span></td>
                   <td data-label="Mapel Ampu / Cakupan">${cakupan}</td>
                   <td data-label="Status">${badgeStatus(u.statusAktif !== false ? 'Aktif' : 'Nonaktif')}</td>
                   <td class="dnc-sel-aksi">
@@ -6574,10 +6652,10 @@ function renderTabelPengguna() {
 
     htmlBagian += `
       <div class="dnc-subbagian-judul">
-        <span>Akun Siswa Berdasarkan Kelas (Klik kelas untuk melihat data siswa)</span>
+        <span>Akun Siswa ASAS Berdasarkan Kelas (Klik kelas untuk melihat data siswa)</span>
         <span class="dnc-badge dnc-badge-biru">${daftarGrupKelas.length} kelas • ${siswaList.length} siswa</span>
       </div>
-      <div class="dnc-grup-halaman-list">
+      <div class="dnc-grup-halaman-list dnc-mb-12">
         ${daftarGrupKelas.map(g => {
           const terbuka = kelasSiswaTerbukaM7.has(g.kunciKelas);
           const judulKelas = g.kelasObj
@@ -6639,6 +6717,122 @@ function renderTabelPengguna() {
               ${tabelSiswaHtml}
             </div>`;
         }).join('')}
+      </div>`;
+  }
+
+  if (siswaBimbelList.length || fRole === 'Siswa Bimbel') {
+    const pendaftarBaru = siswaBimbelList
+      .filter(u => u.statusPendaftaran === 'Menunggu')
+      .sort((a, b) => (keDate(b.tanggalDaftar || b.dibuat)?.getTime() || 0) - (keDate(a.tanggalDaftar || a.dibuat)?.getTime() || 0));
+
+    const bimbelDiterima = siswaBimbelList
+      .filter(u => u.statusPendaftaran !== 'Menunggu')
+      .sort((a, b) => (keDate(b.tanggalDiterima || b.dibuat)?.getTime() || 0) - (keDate(a.tanggalDiterima || a.dibuat)?.getTime() || 0));
+
+    const isiBimbelHtml = siswaBimbelTerbukaM7 ? `
+      <div class="dnc-grup-halaman-isi">
+        <div class="dnc-subbagian-judul" style="margin-top:0">
+          <span>Pendaftar Baru Siswa Bimbel (Perlu Eksekusi Terima)</span>
+          <span class="dnc-badge ${pendaftarBaru.length ? 'dnc-badge-amber' : 'dnc-badge-abu'}">${pendaftarBaru.length} menunggu</span>
+        </div>
+        ${pendaftarBaru.length ? `
+          <div class="dnc-pembungkus-tabel dnc-mb-12">
+            <table class="dnc-tabel dnc-tabel-padat">
+              <thead>
+                <tr>
+                  <th>No</th>
+                  <th>Nama Lengkap</th>
+                  <th>Asal Sekolah</th>
+                  <th>Kelas</th>
+                  <th>Email Gmail</th>
+                  <th>Tanggal Daftar</th>
+                  <th>Aksi</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${pendaftarBaru.map((u, idx) => `
+                  <tr>
+                    <td data-label="No"><strong>${idx + 1}</strong></td>
+                    <td data-label="Nama Lengkap"><strong>${esc(u.namaLengkap)}</strong><div class="dnc-form-bantuan">${esc(u.nomorInduk || '-')}</div></td>
+                    <td data-label="Asal Sekolah">${esc(u.asalSekolah || '-')}</td>
+                    <td data-label="Kelas">${esc(u.kelasTeks || '-')}</td>
+                    <td data-label="Email Gmail">${esc(u.email)}</td>
+                    <td data-label="Tanggal Daftar">${esc(formatTanggal(u.tanggalDaftar || u.dibuat, true))}</td>
+                    <td class="dnc-sel-aksi">
+                      <div class="dnc-aksi-baris">
+                        <button type="button" class="dnc-tombol dnc-tombol-sukses dnc-tombol-kecil" data-terima-bimbel="${esc(u.id)}">Terima</button>
+                        <button type="button" class="dnc-tombol dnc-tombol-bahaya dnc-tombol-kecil" data-tolak-bimbel="${esc(u.id)}">Tolak</button>
+                      </div>
+                    </td>
+                  </tr>`).join('')}
+              </tbody>
+            </table>
+          </div>` : '<div class="dnc-kosong-box dnc-mb-12" style="padding:14px">Tidak ada pendaftar baru Siswa Bimbel yang menunggu persetujuan.</div>'}
+
+        <div class="dnc-subbagian-judul">
+          <span>Daftar Siswa Bimbel (Sudah Diterima)</span>
+          <span class="dnc-badge dnc-badge-hijau">${bimbelDiterima.length} siswa</span>
+        </div>
+        ${bimbelDiterima.length ? `
+          <div class="dnc-pembungkus-tabel">
+            <table class="dnc-tabel dnc-tabel-padat">
+              <thead>
+                <tr>
+                  <th>No</th>
+                  <th>ID / Nomor Induk</th>
+                  <th>Nama Lengkap</th>
+                  <th>Asal Sekolah</th>
+                  <th>Kelas</th>
+                  <th>Email Gmail</th>
+                  <th>Tanggal Diterima</th>
+                  <th>Status</th>
+                  <th>Aksi</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${bimbelDiterima.map((u, idx) => `
+                  <tr>
+                    <td data-label="No"><strong>${idx + 1}</strong></td>
+                    <td data-label="ID / Nomor Induk"><span class="dnc-mono">${esc(u.nomorInduk || '-')}</span></td>
+                    <td data-label="Nama Lengkap"><strong>${esc(u.namaLengkap)}</strong></td>
+                    <td data-label="Asal Sekolah">${esc(u.asalSekolah || '-')}</td>
+                    <td data-label="Kelas">${esc(u.kelasTeks || '-')}</td>
+                    <td data-label="Email Gmail">${esc(u.email)}</td>
+                    <td data-label="Tanggal Diterima">${esc(formatTanggal(u.tanggalDiterima || u.dibuat, true))}</td>
+                    <td data-label="Status">${badgeStatus(u.statusAktif !== false ? 'Aktif' : 'Nonaktif')}</td>
+                    <td class="dnc-sel-aksi">
+                      <div class="dnc-aksi-baris">
+                        <button type="button" class="dnc-tombol dnc-tombol-sekunder dnc-tombol-kecil" data-ubah-user="${esc(u.id)}">Ubah</button>
+                        <button type="button" class="dnc-tombol ${u.statusAktif !== false ? 'dnc-tombol-bahaya' : 'dnc-tombol-sukses'} dnc-tombol-kecil" data-toggle-user="${esc(u.id)}">${u.statusAktif !== false ? 'Nonaktifkan' : 'Aktifkan'}</button>
+                      </div>
+                    </td>
+                  </tr>`).join('')}
+              </tbody>
+            </table>
+          </div>` : '<div class="dnc-kosong-box" style="padding:14px">Belum ada Siswa Bimbel yang diterima.</div>'}
+      </div>` : '';
+
+    htmlBagian += `
+      <div class="dnc-subbagian-judul">
+        <span>Kategori Siswa Bimbel (Klik dropdown untuk persetujuan pendaftar baru &amp; daftar siswa)</span>
+        <span class="dnc-badge dnc-badge-ungu">${siswaBimbelList.length} total akun</span>
+      </div>
+      <div class="dnc-grup-halaman-list">
+        <div class="dnc-grup-halaman-kartu">
+          <div class="dnc-grup-halaman-kepala ${siswaBimbelTerbukaM7 ? 'terbuka' : ''}">
+            <button type="button" class="dnc-grup-halaman-toggle" data-toggle-bimbel-m7="1" aria-expanded="${siswaBimbelTerbukaM7 ? 'true' : 'false'}">
+              <div style="min-width:0">
+                <div class="dnc-grup-halaman-judul">Siswa Bimbel</div>
+                <div class="dnc-grup-halaman-meta">
+                  ${pendaftarBaru.length ? `<span class="dnc-badge dnc-badge-amber">${pendaftarBaru.length} Pendaftar Baru (Perlu Terima)</span>` : '<span class="dnc-badge dnc-badge-abu">0 Pendaftar Baru</span>'}
+                  <span class="dnc-badge dnc-badge-hijau">${bimbelDiterima.length} Siswa Diterima</span>
+                </div>
+              </div>
+              <span class="dnc-grup-halaman-panah">${siswaBimbelTerbukaM7 ? 'Tutup Siswa Bimbel ▴' : 'Buka Siswa Bimbel ▾'}</span>
+            </button>
+          </div>
+          ${isiBimbelHtml}
+        </div>
       </div>`;
   }
 
