@@ -3773,12 +3773,18 @@ function bukaModalImporWord() {
     if (!wadah) return;
 
     const jmlValid = daftarEkstrak.filter(x => x.valid).length;
+    const jmlBergambar = daftarEkstrak.filter(x => Boolean(x.urlGambar)).length;
+    const jmlPeringatanGbr = daftarEkstrak.filter(x => {
+      if (!x.urlGambar) return false;
+      const cek = analisisKesesuaianGambarSoal(x, x.statusMuatGambar || 'belum');
+      return cek && cek.kelas === 'bahaya';
+    }).length;
     const totalBobot = bulatDua(daftarEkstrak.filter(x => x.dipilih && x.valid).reduce((acc, x) => acc + Number(x.bobotNilai || 0), 0));
     const hitungTipe = tp => daftarEkstrak.filter(x => x.tipeSoal === tp).length;
 
     info.textContent = daftarEkstrak.length
-      ? `Terdeteksi ${daftarEkstrak.length} butir soal (${jmlValid} Valid, ${daftarEkstrak.length - jmlValid} Perlu Perbaikan).`
-      : 'Unggah file soal format bebas (.docx, .pdf, .xlsx, .xls, .csv, .txt) — tanpa wajib memakai templat baku.';
+      ? `Terdeteksi ${daftarEkstrak.length} butir soal (${jmlValid} Valid, ${daftarEkstrak.length - jmlValid} Perlu Perbaikan${jmlBergambar ? `, ${jmlBergambar} Bergambar` : ''}${jmlPeringatanGbr ? `, ${jmlPeringatanGbr} Cek Ulang Gambar/Kunci` : ''}).`
+      : 'Unggah file soal format bebas (.docx, .pdf, .xlsx, .xls, .csv, .txt) — link gambar otomatis diubah menjadi soal bergambar dan dicek kesesuaiannya dengan kunci.';
 
     if (!daftarEkstrak.length) {
       wadah.innerHTML = '';
@@ -3789,7 +3795,7 @@ function bukaModalImporWord() {
       <div class="dnc-ringkasan-impor">
         <div>
           <strong>Deteksi Otomatis:</strong>
-          PG: ${hitungTipe('Pilihan Ganda')} | PG Kompleks: ${hitungTipe('Pilihan Ganda Kompleks')} | Isian: ${hitungTipe('Isian Singkat')} | Uraian: ${hitungTipe('Uraian')}
+          PG: ${hitungTipe('Pilihan Ganda')} | PG Kompleks: ${hitungTipe('Pilihan Ganda Kompleks')} | Isian: ${hitungTipe('Isian Singkat')} | Uraian: ${hitungTipe('Uraian')}${jmlBergambar ? ` | Bergambar: ${jmlBergambar}` : ''}
         </div>
         <div class="dnc-flex-gap">
           <button type="button" id="btn-auto-bobot-100" class="dnc-tombol dnc-tombol-sekunder dnc-tombol-kecil">Bagi Bobot Total = 100</button>
@@ -3802,7 +3808,7 @@ function bukaModalImporWord() {
             <tr>
               <th>Pilih</th>
               <th>Kode &amp; Tipe Soal</th>
-              <th>Pertanyaan &amp; Opsi</th>
+              <th>Pertanyaan, Gambar &amp; Opsi</th>
               <th>Kunci Otomatis &amp; Bobot</th>
               <th>Status Validasi</th>
             </tr>
@@ -3810,6 +3816,23 @@ function bukaModalImporWord() {
           <tbody>
             ${daftarEkstrak.map((it, idx) => {
               const petaOpsi = opsiMapToObj(it.opsiJawaban);
+              const cekGbr = it.urlGambar ? analisisKesesuaianGambarSoal(it, it.statusMuatGambar || 'belum') : null;
+              const htmlGambarEdit = `
+                <div style="margin-top:6px">
+                  <input class="dnc-input" style="height:28px;font-size:11px" data-w-gambar="${idx}" placeholder="Link sumber gambar (opsional — dukung Drive/Dropbox/URL langsung)" value="${esc(it.urlGambar && !it.urlGambar.startsWith('data:image/') ? (it.urlGambarAsli || it.urlGambar) : '')}">
+                </div>
+                ${cekGbr ? `
+                  <div class="dnc-img-cek-box ${cekGbr.kelas}">
+                    <img class="dnc-img-cek-thumb" data-w-img-cek="${idx}" src="${esc(cekGbr.urlTampil)}" alt="Gambar soal ${idx + 1}" title="Klik untuk perbesar gambar">
+                    <div class="dnc-img-cek-info">
+                      <div class="dnc-flex-between">
+                        <strong>${esc(cekGbr.status)}</strong>
+                        ${cekGbr.kelas !== 'bahaya' && !it.gambarTerverifikasi ? `<button type="button" class="dnc-tombol dnc-tombol-sukses dnc-tombol-kecil" style="height:22px;font-size:10px;padding:0 7px" data-w-verif-gbr="${idx}">Tandai Sesuai</button>` : ''}
+                      </div>
+                      <div class="dnc-img-cek-kunci"><strong>Kunci:</strong> ${esc(cekGbr.ringkasKunci)}</div>
+                      <div class="dnc-teks-muted">${esc(cekGbr.pesan)}</div>
+                    </div>
+                  </div>` : ''}`;
               const htmlOpsiEdit = adalahTipeBeropsi(it.tipeSoal)
                 ? `<div class="dnc-opsi-edit-grid">
                     ${['A', 'B', 'C', 'D', 'E'].map(hrf => `
@@ -3830,9 +3853,9 @@ function bukaModalImporWord() {
                       ${TIPE_SOAL_LIST.map(tp => `<option value="${tp}" ${it.tipeSoal === tp ? 'selected' : ''}>${tp}</option>`).join('')}
                     </select>
                   </td>
-                  <td data-label="Pertanyaan &amp; Opsi">
+                  <td data-label="Pertanyaan, Gambar &amp; Opsi">
                     <textarea class="dnc-textarea" style="min-height:52px" data-w-tanya="${idx}">${esc(it.pertanyaan)}</textarea>
-                    ${it.urlGambar ? '<div class="dnc-form-bantuan">Memuat gambar terkompresi dari dokumen</div>' : ''}
+                    ${htmlGambarEdit}
                     ${htmlOpsiEdit}
                   </td>
                   <td data-label="Kunci &amp; Bobot">
@@ -3866,11 +3889,62 @@ function bukaModalImporWord() {
         renderPratinjauWord();
       });
     });
+
+    wadah.querySelectorAll('[data-w-gambar]').forEach(el => {
+      el.addEventListener('change', () => {
+        const i = Number(el.dataset.wGambar);
+        const raw = el.value.trim();
+        daftarEkstrak[i].urlGambarAsli = raw;
+        daftarEkstrak[i].urlGambar = normalisasiUrlGambarSoal(raw);
+        daftarEkstrak[i].statusMuatGambar = 'belum';
+        daftarEkstrak[i].gambarTerverifikasi = false;
+        renderPratinjauWord();
+      });
+    });
+
+    wadah.querySelectorAll('[data-w-verif-gbr]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const i = Number(btn.dataset.wVerifGbr);
+        if (daftarEkstrak[i]) {
+          daftarEkstrak[i].gambarTerverifikasi = true;
+          renderPratinjauWord();
+        }
+      });
+    });
+
+    wadah.querySelectorAll('[data-w-img-cek]').forEach(img => {
+      const i = Number(img.dataset.wImgCek);
+      img.addEventListener('load', () => {
+        if (daftarEkstrak[i] && daftarEkstrak[i].statusMuatGambar !== 'sukses') {
+          daftarEkstrak[i].statusMuatGambar = 'sukses';
+        }
+      });
+      img.addEventListener('error', () => {
+        if (daftarEkstrak[i] && daftarEkstrak[i].statusMuatGambar !== 'gagal') {
+          daftarEkstrak[i].statusMuatGambar = 'gagal';
+          renderPratinjauWord();
+        }
+      });
+      img.addEventListener('click', () => {
+        const u = normalisasiUrlGambarSoal(daftarEkstrak[i]?.urlGambar || '');
+        if (u) window.open(u, '_blank', 'noopener');
+      });
+    });
+
     const ikatEdit = (attr, field, numerik = false) => {
       wadah.querySelectorAll(`[${attr}]`).forEach(el => {
         el.addEventListener('change', () => {
           const i = Number(el.getAttribute(attr));
           daftarEkstrak[i][field] = numerik ? Number(el.value) : el.value.trim();
+          if (field === 'pertanyaan' && !daftarEkstrak[i].urlGambar) {
+            const eks = ekstrakLinkGambarDariTeks(daftarEkstrak[i].pertanyaan);
+            if (eks.urlGambar) {
+              daftarEkstrak[i].pertanyaan = eks.teksBersih || daftarEkstrak[i].pertanyaan;
+              daftarEkstrak[i].urlGambar = eks.urlGambar;
+              daftarEkstrak[i].urlGambarAsli = eks.urlAsli;
+              daftarEkstrak[i].statusMuatGambar = 'belum';
+            }
+          }
           if (field === 'kunciJawaban' && adalahTipeBeropsi(daftarEkstrak[i].tipeSoal)) {
             daftarEkstrak[i].kunciJawaban = selesaikanKunciOpsiDariTeks(daftarEkstrak[i].kunciJawaban, daftarEkstrak[i].opsiJawaban, daftarEkstrak[i].tipeSoal);
           }
@@ -3909,6 +3983,12 @@ function bukaModalImporWord() {
     htmlKonten: `
       <div class="dnc-form-grid">
         <div class="dnc-form-grup">
+          <label class="dnc-label" for="w-kategoriSoal">Kategori Soal *</label>
+          <select id="w-kategoriSoal" class="dnc-select">
+            ${KATEGORI_SOAL_LIST.map(k => `<option value="${k}">Soal ${k}</option>`).join('')}
+          </select>
+        </div>
+        <div class="dnc-form-grup">
           <label class="dnc-label" for="w-mapelId">Mata Pelajaran Sasaran *</label>
           <select id="w-mapelId" class="dnc-select">${mapelList.map(m => `<option value="${esc(m.id)}">${esc(m.kodeMapel)} - ${esc(m.namaMapel)}</option>`).join('')}</select>
         </div>
@@ -3916,7 +3996,7 @@ function bukaModalImporWord() {
           <label class="dnc-label" for="w-tingkat">Tingkat Kelas *</label>
           <select id="w-tingkat" class="dnc-select">${TINGKAT_LIST.map(t => `<option value="${t}" ${t === 'VI' ? 'selected' : ''}>${esc(labelTingkat(t))}</option>`).join('')}</select>
         </div>
-        <div class="dnc-form-grup dnc-form-full">
+        <div class="dnc-form-grup">
           <label class="dnc-label" for="w-sumberPaket">Nama Paket / Grup Soal * (otomatis dari nama file)</label>
           <input id="w-sumberPaket" class="dnc-input" type="text" placeholder="Contoh: Bank_Soal_ASAS_Matematika_Kelas_6_Semester_1">
           <span class="dnc-form-bantuan">Seluruh soal dari file ini akan dikelompokkan dalam satu paket agar rapi saat dipilih di Jadwal &amp; Paket ASAS.</span>
