@@ -815,17 +815,37 @@ async function muatDataPengguna() {
   stateMemori.pengguna = await dbList(COLLECTIONS.pengguna);
 }
 
+async function cekUnikNisPerKelas(nomorInduk, kelasId = '', role = 'Siswa', kecualiId = null) {
+  const target = teks(String(nomorInduk || '').trim());
+  if (!target) return true;
+  const semua = await dbList(COLLECTIONS.pengguna);
+  const roleTarget = normalisasiRoleDnc(role);
+  const duplikat = semua.find(item => {
+    if (item.id === kecualiId) return false;
+    if (teks(String(item.nomorInduk || '').trim()) !== target) return false;
+    const roleItem = normalisasiRoleDnc(item.role);
+    if (roleTarget === 'Siswa' && roleItem === 'Siswa') {
+      return String(item.kelasId || '') === String(kelasId || '');
+    }
+    return true;
+  });
+  return !duplikat;
+}
+
 async function muatDataBankSoal() {
-  const semua = await dbList(COLLECTIONS.bankSoal, { urutDesc: 'dibuat', batas: 400 });
-  stateMemori.bankSoal = adalahRoleGuru(penggunaAktif?.role)
-    ? semua.filter(s => bolehAksesMapel(s.mapelId))
-    : semua;
+  const semua = await dbList(COLLECTIONS.bankSoal, { urutDesc: 'dibuat', batas: 1000 });
+  if (adalahRoleGuru(penggunaAktif?.role)) {
+    stateMemori.bankSoal = semua.filter(s => bolehAksesMapel(s.mapelId));
+  } else {
+    // Admin & Siswa Bimbel tetap menerima seluruh bank soal dari guru mana pun
+    stateMemori.bankSoal = semua;
+  }
 }
 
 async function muatDataPaket() {
-  const semua = await dbList(COLLECTIONS.paketAsas, { urutDesc: 'dibuat', batas: 100 });
+  const semua = await dbList(COLLECTIONS.paketAsas, { urutDesc: 'dibuat', batas: 150 });
   if (adalahRoleGuru(penggunaAktif?.role)) {
-    stateMemori.paketAsas = semua.filter(p => bolehAksesMapel(p.mapelId));
+    stateMemori.paketAsas = semua.filter(p => bolehKelolaPaket(p));
   } else if (penggunaAktif?.role === 'Siswa') {
     stateMemori.paketAsas = semua.filter(p => Array.isArray(p.kelasIds) && p.kelasIds.includes(penggunaAktif.kelasId));
   } else if (penggunaAktif?.role === 'Siswa Bimbel') {
@@ -836,9 +856,9 @@ async function muatDataPaket() {
 }
 
 async function muatDataHasil() {
-  const semua = await dbList(COLLECTIONS.hasilUjian, { urutDesc: 'dibuat', batas: 250 });
+  const semua = await dbList(COLLECTIONS.hasilUjian, { urutDesc: 'dibuat', batas: 300 });
   if (adalahRoleGuru(penggunaAktif?.role)) {
-    stateMemori.hasilUjian = semua.filter(h => bolehAksesMapel(h.mapelId));
+    stateMemori.hasilUjian = semua.filter(h => bolehAksesHasilGuru(h));
   } else if (adalahRoleSiswa(penggunaAktif?.role)) {
     stateMemori.hasilUjian = semua.filter(h => h.penggunaId === penggunaAktif.id);
   } else {
