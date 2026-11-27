@@ -743,27 +743,29 @@ async function muatDataPengguna() {
 
 async function muatDataBankSoal() {
   const semua = await dbList(COLLECTIONS.bankSoal, { urutDesc: 'dibuat', batas: 400 });
-  stateMemori.bankSoal = penggunaAktif?.role === 'Guru'
+  stateMemori.bankSoal = adalahRoleGuru(penggunaAktif?.role)
     ? semua.filter(s => bolehAksesMapel(s.mapelId))
     : semua;
 }
 
 async function muatDataPaket() {
   const semua = await dbList(COLLECTIONS.paketAsas, { urutDesc: 'dibuat', batas: 100 });
-  if (penggunaAktif?.role === 'Guru') {
+  if (adalahRoleGuru(penggunaAktif?.role)) {
     stateMemori.paketAsas = semua.filter(p => bolehAksesMapel(p.mapelId));
   } else if (penggunaAktif?.role === 'Siswa') {
     stateMemori.paketAsas = semua.filter(p => Array.isArray(p.kelasIds) && p.kelasIds.includes(penggunaAktif.kelasId));
+  } else if (penggunaAktif?.role === 'Siswa Bimbel') {
+    stateMemori.paketAsas = [];
   } else {
     stateMemori.paketAsas = semua;
   }
 }
 
 async function muatDataHasil() {
-  const semua = await dbList(COLLECTIONS.hasilUjian, { urutDesc: 'dibuat', batas: 100 });
-  if (penggunaAktif?.role === 'Guru') {
+  const semua = await dbList(COLLECTIONS.hasilUjian, { urutDesc: 'dibuat', batas: 250 });
+  if (adalahRoleGuru(penggunaAktif?.role)) {
     stateMemori.hasilUjian = semua.filter(h => bolehAksesMapel(h.mapelId));
-  } else if (penggunaAktif?.role === 'Siswa') {
+  } else if (adalahRoleSiswa(penggunaAktif?.role)) {
     stateMemori.hasilUjian = semua.filter(h => h.penggunaId === penggunaAktif.id);
   } else {
     stateMemori.hasilUjian = semua;
