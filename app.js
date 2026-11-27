@@ -1607,20 +1607,37 @@ async function bukaMenu(kodeMenu) {
 // ===== BLOK: DNC_M1_DASHBOARD =====
 async function muatM1Dashboard(paksa = false) {
   if (!sudahDimuat['DNC-M1'] || paksa) {
-    await Promise.all([muatDataDasar(), muatDataPengguna(), muatDataBankSoal(), muatDataPaket(), muatDataHasil()]);
+    await Promise.all([muatDataDasar(), muatDataPengguna(), muatDataBankSoal(), muatDataPaket()]);
+    await muatDataHasil();
     sudahDimuat['DNC-M1'] = true;
   }
 
   const sub = document.getElementById('subjudul-m1');
   if (adalahRoleGuru(penggunaAktif.role)) {
     const namaAmpu = daftarMapelDiizinkan().map(m => m.namaMapel).join(', ') || 'belum ditetapkan';
-    sub.textContent = `Cakupan ${penggunaAktif.role} — Mata Pelajaran Ampu: ${namaAmpu}.`;
+    const kelasAmpuTeks = punyaKelasAmpuGuru(penggunaAktif)
+      ? ` • Kelas Ampu: ${daftarKelasDiizinkan().map(k => k.kodeKelas).join(', ')}`
+      : '';
+    sub.textContent = `Cakupan ${penggunaAktif.role} — Mapel Ampu: ${namaAmpu}${kelasAmpuTeks}.`;
   } else {
     sub.textContent = 'Ringkasan capaian pelaksanaan, bank soal, dan status ketuntasan seluruh mata pelajaran.';
   }
 
-  const siswaAsasAktif = stateMemori.pengguna.filter(u => u.role === 'Siswa' && u.statusAktif !== false);
-  const siswaAktif = stateMemori.pengguna.filter(u => adalahRoleSiswa(u.role) && u.statusAktif !== false);
+  const siswaAsasAktif = stateMemori.pengguna.filter(u =>
+    normalisasiRoleDnc(u.role) === 'Siswa' &&
+    u.statusAktif !== false &&
+    (!adalahRoleGuru(penggunaAktif.role) || bolehAksesKelas(u.kelasId))
+  );
+  const siswaBimbelAktif = stateMemori.pengguna.filter(u =>
+    normalisasiRoleDnc(u.role) === 'Siswa Bimbel' && u.statusAktif !== false
+  );
+  const siswaAktif = penggunaAktif.role === 'Guru'
+    ? siswaAsasAktif
+    : (penggunaAktif.role === 'Guru Bimbel' ? [...siswaAsasAktif, ...siswaBimbelAktif] : [...siswaAsasAktif, ...siswaBimbelAktif]);
+
+  const jumlahSoalTampil = adalahRoleGuru(penggunaAktif.role)
+    ? stateMemori.bankSoal.filter(s => bolehKelolaSoal(s)).length
+    : stateMemori.bankSoal.length;
   const paketAktif = stateMemori.paketAsas.filter(p => p.statusPaket === 'Aktif');
   const hasilSelesai = stateMemori.hasilUjian.filter(h => h.statusUjian === 'Selesai');
   const rataSkor = hasilSelesai.length
@@ -1628,7 +1645,7 @@ async function muatM1Dashboard(paksa = false) {
     : 0;
 
   document.getElementById('kpi-siswa-aktif').textContent = siswaAktif.length;
-  document.getElementById('kpi-bank-soal').textContent = stateMemori.bankSoal.length;
+  document.getElementById('kpi-bank-soal').textContent = jumlahSoalTampil;
   document.getElementById('kpi-paket-aktif').textContent = paketAktif.length;
   document.getElementById('kpi-rata-skor').textContent = rataSkor;
 
