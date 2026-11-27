@@ -5323,7 +5323,8 @@ async function mulaiLembarUjian(paket, hasil) {
   const daftarSoal = urutanIds.map(id => {
     const s = cariById('bankSoal', id);
     if (!s) return null;
-    if (!adalahTipeBeropsi(s.tipeSoal)) return { ...s, opsiTampil: [] };
+    const urlGambarNorm = normalisasiUrlGambarSoal(s.urlGambar || '');
+    if (!adalahTipeBeropsi(s.tipeSoal)) return { ...s, urlGambar: urlGambarNorm, opsiTampil: [] };
 
     const opsiAsli = s.opsiJawaban || [];
     const urutanKode = Array.isArray(petaOpsiTersimpan[s.id]) && petaOpsiTersimpan[s.id].length
@@ -5339,7 +5340,7 @@ async function mulaiLembarUjian(paket, hasil) {
         teks: o.teks
       }));
 
-    return { ...s, opsiTampil };
+    return { ...s, urlGambar: urlGambarNorm, opsiTampil };
   }).filter(Boolean);
 
   if (!daftarSoal.length) {
@@ -5355,9 +5356,13 @@ async function mulaiLembarUjian(paket, hasil) {
     if (!petaJawaban[s.id]) petaJawaban[s.id] = { soalId: s.id, jawaban: '', ragu: false, skor: 0 };
   });
 
-  const batasMulaiPlusDurasi = (keDate(hasil.waktuMulaiKerja)?.getTime() || Date.now()) + Number(paket.durasiMenit || 60) * 60000;
-  const batasJadwal = keDate(paket.waktuSelesai)?.getTime() || batasMulaiPlusDurasi;
-  const batasAkhirMs = Math.min(batasMulaiPlusDurasi, batasJadwal);
+  const adalahModeBimbel = Boolean(paket.modeBimbel);
+  let batasAkhirMs = null;
+  if (!adalahModeBimbel) {
+    const batasMulaiPlusDurasi = (keDate(hasil.waktuMulaiKerja)?.getTime() || Date.now()) + Number(paket.durasiMenit || 60) * 60000;
+    const batasJadwal = keDate(paket.waktuSelesai)?.getTime() || batasMulaiPlusDurasi;
+    batasAkhirMs = Math.min(batasMulaiPlusDurasi, batasJadwal);
+  }
 
   sesiUjianAktif = {
     paket,
@@ -5366,6 +5371,8 @@ async function mulaiLembarUjian(paket, hasil) {
     petaJawaban,
     indeks: 0,
     batasAkhirMs,
+    modeBimbel: adalahModeBimbel,
+    mulaiBimbelMs: keDate(hasil.waktuMulaiKerja)?.getTime() || Date.now(),
     jumlahPelanggaran: Number(hasil.jumlahPelanggaran || 0),
     logPelanggaran: Array.isArray(hasil.logPelanggaran) ? [...hasil.logPelanggaran] : []
   };
@@ -5374,27 +5381,43 @@ async function mulaiLembarUjian(paket, hasil) {
   document.getElementById('m5-daftar-view').classList.add('dnc-disembunyikan');
   document.getElementById('m5-lembar-view').classList.remove('dnc-disembunyikan');
   document.getElementById('m5-judul-ujian').textContent = paket.judulPaket;
-  document.getElementById('m5-info-mapel').textContent = `${namaMapelById(paket.mapelId)} • ${daftarSoal.length} soal`;
+  document.getElementById('m5-info-mapel').textContent = `${namaMapelById(paket.mapelId)} • ${daftarSoal.length} soal${adalahModeBimbel ? ` • Kategori ${normalisasiKategoriSoal(paket.kategoriSoal)}` : ''}`;
   const badgeLive = document.getElementById('m5-status-live');
   if (badgeLive) {
-    badgeLive.className = 'dnc-badge dnc-badge-hijau';
-    badgeLive.innerHTML = '<span class="dnc-dot-live"></span>Sesi Dibuka Guru';
+    if (adalahModeBimbel) {
+      badgeLive.className = normalisasiKategoriSoal(paket.kategoriSoal) === 'TKA' ? 'dnc-badge dnc-badge-tka' : 'dnc-badge dnc-badge-asas';
+      badgeLive.textContent = `Bank Soal ${normalisasiKategoriSoal(paket.kategoriSoal)}`;
+    } else {
+      badgeLive.className = 'dnc-badge dnc-badge-hijau';
+      badgeLive.innerHTML = '<span class="dnc-dot-live"></span>Sesi Dibuka Guru';
+    }
   }
 
   sembunyikanOverlayLockdownSiswa();
-  if (penggunaAktif?.role === 'Siswa') {
+  if (adalahRoleSiswa(penggunaAktif?.role)) {
     aktifkanWakeLockSiswa();
   }
 
   renderSoalAktifM5();
   mulaiCountdownUjian();
-  pasangListenerPaketUjianBerjalan(paket.id);
+  if (!adalahModeBimbel) {
+    pasangListenerPaketUjianBerjalan(paket.id);
+  }
 }
 
 function mulaiCountdownUjian() {
   hentikanTimerUjian();
   const updateTimer = () => {
     if (!sesiUjianAktif) { hentikanTimerUjian(); return; }
+    if (sesiUjianAktif.modeBimbel) {
+      const berlaluDetik = Math.max(0, Math.floor((Date.now() - (sesiUjianAktif.mulaiBimbelMs || Date.now())) / 1000));
+      const jam = String(Math.floor(berlaluDetik / 3600)).padStart(2, '0');
+      const mnt = String(Math.floor((berlaluDetik % 3600) / 60)).padStart(2, '0');
+      const dtk = String(berlaluDetik % 60).padStart(2, '0');
+      document.getElementById('m5-timer-teks').textContent = `${jam}:${mnt}:${dtk}`;
+      document.getElementById('m5-timer').classList.remove('kritis');
+      return;
+    }
     const sisaDetik = Math.max(0, Math.floor((sesiUjianAktif.batasAkhirMs - Date.now()) / 1000));
     const jam = String(Math.floor(sisaDetik / 3600)).padStart(2, '0');
     const mnt = String(Math.floor((sisaDetik % 3600) / 60)).padStart(2, '0');
