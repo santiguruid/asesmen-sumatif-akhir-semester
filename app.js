@@ -2979,15 +2979,20 @@ function bukaPratinjauSoal(id) {
 async function duplikatSoal(id) {
   const s = cariById('bankSoal', id);
   if (!s) return;
-  const kodeBaru = `${s.kodeSoal}-CPY${Math.floor(10 + Math.random() * 89)}`;
+  const salinDariOrangLain = !bolehKelolaSoal(s);
+  const tagWaktu = Date.now().toString().slice(-3);
+  const kodeBaru = `${s.kodeSoal}-${salinDariOrangLain ? 'SLN' : 'CPY'}${tagWaktu}${Math.floor(10 + Math.random() * 89)}`;
+  const namaPaketAsli = s.sumberPaket || namaSumberPaketSoal(s);
+  const namaPaketBaru = salinDariOrangLain ? `${namaPaketAsli}_Salinan` : namaPaketAsli;
+
   await dbCreate(COLLECTIONS.bankSoal, {
     kodeSoal: kodeBaru,
     kategoriSoal: normalisasiKategoriSoal(s.kategoriSoal),
-    sumberPaket: s.sumberPaket || namaSumberPaketSoal(s),
+    sumberPaket: namaPaketBaru,
     mapelId: s.mapelId,
     tingkat: s.tingkat,
     tipeSoal: s.tipeSoal,
-    pertanyaan: `${s.pertanyaan} (Salinan)`,
+    pertanyaan: salinDariOrangLain ? s.pertanyaan : `${s.pertanyaan} (Salinan)`,
     urlGambar: normalisasiUrlGambarSoal(s.urlGambar || ''),
     urlGambarAsli: s.urlGambarAsli || '',
     gambarTerverifikasi: Boolean(s.gambarTerverifikasi),
@@ -2997,14 +3002,66 @@ async function duplikatSoal(id) {
     statusAktif: s.statusAktif,
     dibuatOleh: penggunaAktif.id
   });
-  resetCacheMenu(['DNC-M1', 'DNC-M3', 'DNC-M5']);
+  resetCacheMenu(['DNC-M1', 'DNC-M3', 'DNC-M4', 'DNC-M5']);
   await muatM3BankSoal(true);
-  tampilkanToast(`Soal berhasil diduplikasi dengan kode ${kodeBaru}.`);
+  tampilkanToast(salinDariOrangLain
+    ? `Soal berhasil disalin ke "Bank Soal Saya" dengan kode ${kodeBaru}.`
+    : `Soal berhasil diduplikasi dengan kode ${kodeBaru}.`);
+}
+
+function salinPaketSoalKeSaya(kunciGrup) {
+  const soalDalamPaket = stateMemori.bankSoal.filter(s => kunciGrupSoalM3(s) === kunciGrup);
+  if (!soalDalamPaket.length) return;
+  const namaAsli = namaSumberPaketSoal(soalDalamPaket[0]);
+  const namaDepan = String(penggunaAktif?.namaLengkap || 'Guru').split(/\s+/)[0].replace(/[^A-Za-z0-9]/g, '');
+  const namaPaketBaru = `${namaAsli}_Salinan_${namaDepan || 'Saya'}`;
+
+  bukaKonfirmasi({
+    judul: 'Salin Paket Referensi ke Bank Soal Saya',
+    pesan: `Salin seluruh ${soalDalamPaket.length} butir soal dari paket "${namaAsli}" menjadi salinan pribadi milik akun Anda? Soal asli milik guru pembuat tidak akan berubah.`,
+    labelYa: 'Ya, Salin ke Soal Saya',
+    kelasTombol: 'dnc-tombol-primer',
+    onYa: async () => {
+      const cap = Date.now().toString().slice(-4);
+      let tersalin = 0;
+      for (let i = 0; i < soalDalamPaket.length; i++) {
+        const s = soalDalamPaket[i];
+        const kodeBaru = `${s.kodeSoal}-S${cap}-${String(i + 1).padStart(2, '0')}`;
+        await dbCreate(COLLECTIONS.bankSoal, {
+          kodeSoal: kodeBaru,
+          kategoriSoal: normalisasiKategoriSoal(s.kategoriSoal),
+          sumberPaket: namaPaketBaru,
+          mapelId: s.mapelId,
+          tingkat: s.tingkat,
+          tipeSoal: s.tipeSoal,
+          pertanyaan: s.pertanyaan,
+          urlGambar: normalisasiUrlGambarSoal(s.urlGambar || ''),
+          urlGambarAsli: s.urlGambarAsli || '',
+          gambarTerverifikasi: Boolean(s.gambarTerverifikasi),
+          opsiJawaban: s.opsiJawaban || [],
+          kunciJawaban: s.kunciJawaban || '',
+          bobotNilai: s.bobotNilai,
+          statusAktif: true,
+          dibuatOleh: penggunaAktif.id
+        });
+        tersalin++;
+      }
+      const selPemilik = document.getElementById('filter-pemilik-soal');
+      if (selPemilik) selPemilik.value = 'milik_saya';
+      resetCacheMenu(['DNC-M1', 'DNC-M3', 'DNC-M4', 'DNC-M5']);
+      await muatM3BankSoal(true);
+      tampilkanToast(`${tersalin} butir soal berhasil disalin ke "Bank Soal Saya" (${namaPaketBaru}).`);
+    }
+  });
 }
 
 function hapusSoalDenganProteksi(id) {
   const s = cariById('bankSoal', id);
   if (!s) return;
+  if (!bolehKelolaSoal(s)) {
+    tampilkanToast('Anda tidak dapat menghapus soal milik guru lain.', 'error');
+    return;
+  }
   bukaKonfirmasi({
     judul: 'Hapus Butir Soal',
     pesan: `Yakin ingin menghapus soal ${s.kodeSoal}?`,
@@ -3015,7 +3072,7 @@ function hapusSoalDenganProteksi(id) {
         throw new Error('Soal tidak dapat dihapus karena masih terpasang pada Paket ASAS.');
       }
       await dbDelete(COLLECTIONS.bankSoal, id);
-      resetCacheMenu(['DNC-M1', 'DNC-M3', 'DNC-M4']);
+      resetCacheMenu(['DNC-M1', 'DNC-M3', 'DNC-M4', 'DNC-M5']);
       await muatM3BankSoal(true);
       tampilkanToast('Butir soal berhasil dihapus.');
     }
@@ -3025,6 +3082,10 @@ function hapusSoalDenganProteksi(id) {
 function hapusPaketSoalDenganProteksi(kunciGrup) {
   const soalDalamPaket = stateMemori.bankSoal.filter(s => kunciGrupSoalM3(s) === kunciGrup);
   if (!soalDalamPaket.length) return;
+  if (!soalDalamPaket.every(s => bolehKelolaSoal(s))) {
+    tampilkanToast('Anda tidak dapat menghapus paket soal milik guru lain.', 'error');
+    return;
+  }
   const namaGrup = namaSumberPaketSoal(soalDalamPaket[0]);
   bukaKonfirmasi({
     judul: 'Hapus Seluruh Paket Soal',
@@ -3043,9 +3104,129 @@ function hapusPaketSoalDenganProteksi(kunciGrup) {
         await dbDelete(COLLECTIONS.bankSoal, s.id);
       }
       paketSoalTerbukaM3.delete(kunciGrup);
-      resetCacheMenu(['DNC-M1', 'DNC-M3', 'DNC-M4']);
+      resetCacheMenu(['DNC-M1', 'DNC-M3', 'DNC-M4', 'DNC-M5']);
       await muatM3BankSoal(true);
       tampilkanToast(`Paket "${namaGrup}" (${soalDalamPaket.length} soal) berhasil dihapus.`);
+    }
+  });
+}
+
+function bukaModalAturPemilikSoal(kunciGrupTarget = '') {
+  if (penggunaAktif?.role !== 'Admin') {
+    tampilkanToast('Hanya Admin yang dapat mengatur kepemilikan Bank Soal.', 'error');
+    return;
+  }
+
+  const daftarKandidat = stateMemori.pengguna
+    .filter(u => !adalahRoleSiswa(normalisasiRoleDnc(u.role)) && u.statusAktif !== false)
+    .sort((a, b) => {
+      const prior = r => (adalahRoleGuru(r) ? 0 : 1);
+      const sel = prior(normalisasiRoleDnc(a.role)) - prior(normalisasiRoleDnc(b.role));
+      return sel !== 0 ? sel : teks(a.namaLengkap).localeCompare(teks(b.namaLengkap));
+    });
+
+  if (!daftarKandidat.length) {
+    tampilkanToast('Belum ada akun Guru atau Admin aktif pada Manajemen Pengguna.', 'error');
+    return;
+  }
+
+  const petaGrup = new Map();
+  stateMemori.bankSoal.forEach(s => {
+    const k = kunciGrupSoalM3(s);
+    if (!petaGrup.has(k)) {
+      petaGrup.set(k, {
+        kunci: k,
+        namaGrup: namaSumberPaketSoal(s),
+        mapelId: s.mapelId,
+        dibuatOleh: s.dibuatOleh || '',
+        jumlah: 0
+      });
+    }
+    petaGrup.get(k).jumlah++;
+  });
+
+  const guruIds = new Set(stateMemori.pengguna.filter(u => adalahRoleGuru(normalisasiRoleDnc(u.role))).map(u => u.id));
+  const jmlNonGuru = stateMemori.bankSoal.filter(s => !s.dibuatOleh || !guruIds.has(s.dibuatOleh)).length;
+
+  const opsiCakupan = [
+    `<option value="semua" ${!kunciGrupTarget ? 'selected' : ''}>Semua soal yang sudah ter-upload saat ini (${stateMemori.bankSoal.length} butir)</option>`,
+    `<option value="non_guru">Hanya soal milik Admin / belum ditetapkan ke Guru (${jmlNonGuru} butir)</option>`,
+    ...[...petaGrup.values()].map(g =>
+      `<option value="${esc(g.kunci)}" ${kunciGrupTarget === g.kunci ? 'selected' : ''}>Paket: ${esc(g.namaGrup)} — ${esc(namaMapelById(g.mapelId))} (Saat ini: ${esc(namaPemilikSoal(g.dibuatOleh))}, ${g.jumlah} butir)</option>`
+    )
+  ].join('');
+
+  bukaModalFormDnc({
+    judul: 'Atur / Alihkan Pemilik Bank Soal',
+    labelSimpan: 'Tetapkan Pemilik Soal',
+    htmlKonten: `
+      <div class="dnc-pratinjau-soal dnc-mb-12">
+        <strong>Pengaturan Hak Milik Bank Soal (Khusus Admin)</strong>
+        <div class="dnc-form-bantuan">Gunakan fitur ini untuk menetapkan seluruh soal yang sudah ter-upload saat ini menjadi hak milik akun Guru tertentu (misalnya <strong>Guru Santi</strong>), atau mengalihkan kepemilikan per paket soal.</div>
+      </div>
+      <div class="dnc-form-grup">
+        <label class="dnc-label" for="f-target-pemilik-soal">Tetapkan Menjadi Hak Milik Akun *</label>
+        <select id="f-target-pemilik-soal" class="dnc-select" required>
+          ${daftarKandidat.map(u => `<option value="${esc(u.id)}">${esc(u.namaLengkap)} — ${esc(normalisasiRoleDnc(u.role))} (${esc(u.email)})</option>`).join('')}
+        </select>
+      </div>
+      <div class="dnc-form-grup">
+        <label class="dnc-label" for="f-cakupan-pemilik-soal">Cakupan Soal yang Dialihkan *</label>
+        <select id="f-cakupan-pemilik-soal" class="dnc-select" required>
+          ${opsiCakupan}
+        </select>
+      </div>
+      <div class="dnc-form-grup">
+        <label class="dnc-check-label">
+          <input id="f-ikut-paket-asas" type="checkbox" checked>
+          <span>Ikut alihkan Paket ASAS yang menggunakan soal tersebut ke pemilik baru</span>
+        </label>
+        <span class="dnc-form-bantuan">Pastikan guru tujuan sudah mengampu mata pelajaran terkait pada menu Manajemen Pengguna agar seluruh soal langsung tampil di akunnya.</span>
+      </div>`,
+    onSubmit: async () => {
+      const targetUserId = document.getElementById('f-target-pemilik-soal').value;
+      const cakupan = document.getElementById('f-cakupan-pemilik-soal').value;
+      const ikutPaket = document.getElementById('f-ikut-paket-asas').checked;
+      if (!targetUserId) throw new Error('Pilih akun pemilik tujuan terlebih dahulu.');
+
+      let targetSoal = [];
+      if (cakupan === 'semua') {
+        targetSoal = [...stateMemori.bankSoal];
+      } else if (cakupan === 'non_guru') {
+        targetSoal = stateMemori.bankSoal.filter(s => !s.dibuatOleh || !guruIds.has(s.dibuatOleh));
+      } else {
+        targetSoal = stateMemori.bankSoal.filter(s => kunciGrupSoalM3(s) === cakupan);
+      }
+
+      if (!targetSoal.length) throw new Error('Tidak ada butir soal pada cakupan yang dipilih.');
+
+      let jmlDiubah = 0;
+      const idSoalDiubah = new Set();
+      for (const s of targetSoal) {
+        idSoalDiubah.add(s.id);
+        if (s.dibuatOleh !== targetUserId) {
+          await dbUpdate(COLLECTIONS.bankSoal, s.id, { dibuatOleh: targetUserId });
+          jmlDiubah++;
+        }
+      }
+
+      let jmlPaketDiubah = 0;
+      if (ikutPaket) {
+        const semuaPaket = await dbList(COLLECTIONS.paketAsas);
+        for (const p of semuaPaket) {
+          const terkait = Array.isArray(p.daftarSoalIds) && p.daftarSoalIds.some(sid => idSoalDiubah.has(sid));
+          if (terkait && p.dibuatOleh !== targetUserId) {
+            await dbUpdate(COLLECTIONS.paketAsas, p.id, { dibuatOleh: targetUserId, diubahOleh: penggunaAktif.id });
+            jmlPaketDiubah++;
+          }
+        }
+      }
+
+      const targetObj = cariById('pengguna', targetUserId);
+      tutupModalFormDnc();
+      resetCacheMenu(['DNC-M1', 'DNC-M3', 'DNC-M4', 'DNC-M5', 'DNC-M6']);
+      await muatM3BankSoal(true);
+      tampilkanToast(`${jmlDiubah} butir soal${jmlPaketDiubah ? ` dan ${jmlPaketDiubah} paket ASAS` : ''} resmi ditetapkan menjadi hak milik ${targetObj?.namaLengkap || 'pemilik baru'}.`);
     }
   });
 }
