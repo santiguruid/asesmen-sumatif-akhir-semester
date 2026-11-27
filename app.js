@@ -3943,10 +3943,10 @@ function ubahHtmlWordKeBarisTerstruktur(htmlStr) {
         if (sudahBernomor || sudahBerhuruf || adalahMeta) {
           hasilBaris.push(b);
         } else if (isHuruf && idxHuruf < hurufOpsi.length) {
-          hasilBaris.push({ teks: `${hurufOpsi[idxHuruf]}. ${txt}`, img: b.img, bold: b.bold });
+          hasilBaris.push({ teks: `${hurufOpsi[idxHuruf]}. ${txt}`, img: b.img, imgAsli: b.imgAsli || '', labelGambar: b.labelGambar || '', bold: b.bold });
           idxHuruf++;
         } else {
-          hasilBaris.push({ teks: `${nomor}. ${txt}`, img: b.img, bold: b.bold });
+          hasilBaris.push({ teks: `${nomor}. ${txt}`, img: b.img, imgAsli: b.imgAsli || '', labelGambar: b.labelGambar || '', bold: b.bold });
           nomor++;
         }
       });
@@ -3973,6 +3973,40 @@ function ubahHtmlWordKeBarisTerstruktur(htmlStr) {
           };
         })
       );
+
+      const semuaSel = rows.flat();
+      const semuaTeks = semuaSel.map(c => c.teks).filter(Boolean);
+      const gambarDalamTabel = semuaSel.map(c => c.img).filter(Boolean);
+
+      // 1. Jika tabel hanya berisi gambar (tanpa teks), sisipkan langsung di posisi soal
+      if (!semuaTeks.length && gambarDalamTabel.length) {
+        gambarDalamTabel.forEach(src => hasilBaris.push({ teks: '', img: src, imgAsli: src, labelGambar: '', bold: false }));
+        return;
+      }
+
+      // 2. Jika tabel merupakan matriks pernyataan Benar/Salah native Word, sisipkan inline ke soal induk
+      const headerRow = (rows[0] || []).map(c => teks(c.teks));
+      const idxPernyataan = headerRow.findIndex(h => h.includes('pernyataan') || h.includes('kalimat') || h.includes('uraian'));
+      const adaKolomBs = headerRow.some(h => h === 'benar' || h === 'true' || h === 'sesuai') &&
+        headerRow.some(h => h === 'salah' || h === 'false' || h.includes('tidak sesuai'));
+      if (idxPernyataan >= 0 && adaKolomBs && rows.length >= 2) {
+        for (let r = 1; r < rows.length; r++) {
+          const selP = rows[r][idxPernyataan];
+          const isiP = (selP?.teks || '').replace(/\s+/g, ' ').trim();
+          if (isiP) {
+            hasilBaris.push({
+              teks: `Pernyataan ${r}: ${isiP}`,
+              img: selP?.img || '',
+              imgAsli: selP?.img || '',
+              labelGambar: '',
+              bold: false,
+              isPernyataanBs: true
+            });
+          }
+        }
+        return;
+      }
+
       tabelTerpisah.push(rows);
     } else if (tag === 'OL' || tag === 'UL') {
       prosesDaftar(el, 0);
