@@ -1956,6 +1956,164 @@ body.dnc-mode-lockdown-siswa textarea {
   padding: 0 7px;
 }
 
+/* --- Login Daftar Akun Siswa Bimbel --- */
+.dnc-login-daftar-wrap {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dnc-login-daftar-teks {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* --- Badge Kategori Soal (ASAS & TKA) --- */
+.dnc-badge-asas {
+  background: #EFF6FF;
+  color: #1D4ED8;
+  border: 1px solid #BFDBFE;
+}
+
+.dnc-badge-tka {
+  background: #F0FDFA;
+  color: #0F766E;
+  border: 1px solid #99F6E4;
+}
+
+/* --- Panel Pratinjau & Cek Kesesuaian Gambar Soal --- */
+.dnc-img-cek-box {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--primary);
+  background: #F8FAFC;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.dnc-img-cek-box.cocok {
+  border-left-color: var(--success);
+  background: #F0FDF4;
+}
+
+.dnc-img-cek-box.peringatan {
+  border-left-color: var(--accent);
+  background: #FFFBEB;
+}
+
+.dnc-img-cek-box.bahaya {
+  border-left-color: var(--danger);
+  background: #FEF2F2;
+}
+
+.dnc-img-cek-thumb {
+  width: 84px;
+  height: 64px;
+  object-fit: contain;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: #FFFFFF;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.dnc-img-cek-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+}
+
+.dnc-img-cek-kunci {
+  color: var(--text-main);
+  word-break: break-word;
+}
+
+/* --- Antrean Pendaftar Siswa Bimbel (DNC-M7) --- */
+.dnc-kartu-antrean {
+  border: 1px solid #FDE68A;
+  border-radius: var(--radius);
+  background: var(--surface);
+  margin-bottom: 12px;
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+
+.dnc-kartu-antrean-kepala {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px;
+  background: #FFFBEB;
+  border-bottom: 1px solid transparent;
+}
+
+.dnc-kartu-antrean-kepala.terbuka {
+  border-bottom-color: #FDE68A;
+}
+
+/* --- Bank Soal & Riwayat Siswa Bimbel (DNC-M5) --- */
+.dnc-bimbel-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.dnc-bimbel-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* --- Profil & Ganti Sandi Siswa Bimbel (DNC-M8) --- */
+.dnc-profil-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--grid-gap);
+  align-items: start;
+}
+
+.dnc-profil-baris {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 9px 0;
+  border-bottom: 1px solid #F1F5F9;
+  font-size: 13px;
+}
+
+.dnc-profil-baris:last-child {
+  border-bottom: none;
+}
+
+.dnc-profil-label {
+  color: var(--text-muted);
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.dnc-profil-nilai {
+  color: var(--text-main);
+  font-weight: 700;
+  text-align: right;
+  word-break: break-word;
+}
+
 /* --- Cetak Berita Acara & Rekap Nilai --- */
 @media print {
   .dnc-sidebar,
