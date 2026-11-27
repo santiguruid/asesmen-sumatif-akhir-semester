@@ -173,20 +173,14 @@
     <section class="dnc-login-panel-kanan" aria-label="Formulir Masuk">
       <div class="dnc-login-kartu">
         <h2 class="dnc-login-heading">Masuk ke Portal ASAS</h2>
-        <p class="dnc-login-sub">Pilih peran akun Anda lalu masukkan kredensial terdaftar.</p>
+        <p class="dnc-login-sub">Masukkan Email atau NIS/NIP beserta kata sandi Anda. Peran akun akan terdeteksi secara otomatis.</p>
 
         <div id="dnc-preview-login-slot"></div>
 
-        <div class="dnc-role-tabs" role="tablist" aria-label="Pilih Peran">
-          <button type="button" class="dnc-role-tab aktif" data-login-role="Admin" role="tab" aria-selected="true">Admin</button>
-          <button type="button" class="dnc-role-tab" data-login-role="Guru" role="tab" aria-selected="false">Guru</button>
-          <button type="button" class="dnc-role-tab" data-login-role="Siswa" role="tab" aria-selected="false">Siswa</button>
-        </div>
-
         <form id="form-login-dnc" novalidate>
           <div class="dnc-form-grup">
-            <label id="label-login-identitas" class="dnc-label" for="input-login-identitas">Email</label>
-            <input id="input-login-identitas" class="dnc-input" type="email" autocomplete="username" placeholder="Masukkan email terdaftar" required>
+            <label id="label-login-identitas" class="dnc-label" for="input-login-identitas">Email / Username (NIS atau NIP)</label>
+            <input id="input-login-identitas" class="dnc-input" type="text" autocomplete="username" placeholder="Contoh: admin@..., 3558@siswa.asas.id, atau nama@gmail.com" required>
           </div>
           <div class="dnc-form-grup">
             <label class="dnc-label" for="input-login-password">Password</label>
@@ -199,6 +193,13 @@
           </div>
           <button type="submit" id="btn-masuk-dnc" class="dnc-tombol dnc-tombol-primer dnc-tombol-penuh dnc-mt-12">Masuk</button>
         </form>
+
+        <div class="dnc-login-daftar-wrap">
+          <span class="dnc-login-daftar-teks">Siswa Bimbel baru? Daftarkan akun menggunakan email Gmail Anda.</span>
+          <button type="button" id="btn-daftar-bimbel" class="dnc-tombol dnc-tombol-sekunder dnc-tombol-penuh">
+            Daftar Akun Siswa Bimbel
+          </button>
+        </div>
       </div>
       <footer class="dnc-footer">DigitalNetCare@copyright</footer>
     </section>
