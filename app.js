@@ -6173,7 +6173,7 @@ async function pasangListenerHasilLiveM6() {
         .sort((a, b) => (keDate(b.dibuat)?.getTime() || 0) - (keDate(a.dibuat)?.getTime() || 0));
 
       stateMemori.hasilUjian = adalahRoleGuru(penggunaAktif.role)
-        ? semua.filter(h => bolehAksesMapel(h.mapelId))
+        ? semua.filter(h => bolehAksesHasilGuru(h))
         : semua;
       waktuSyncLiveM6 = new Date();
       if (menuAktif === 'DNC-M6') {
@@ -6205,7 +6205,8 @@ function hitungProgresSoalHasil(hasil, paket) {
 
 async function muatM6HasilNilai(paksa = false) {
   if (!sudahDimuat['DNC-M6'] || paksa) {
-    await Promise.all([muatDataDasar(), muatDataPengguna(), muatDataBankSoal(), muatDataPaket(), muatDataHasil()]);
+    await Promise.all([muatDataDasar(), muatDataPengguna(), muatDataBankSoal(), muatDataPaket()]);
+    await muatDataHasil();
     sudahDimuat['DNC-M6'] = true;
     waktuSyncLiveM6 = new Date();
   }
@@ -6231,7 +6232,7 @@ async function muatM6HasilNilai(paksa = false) {
 
   isiSelectOpsi('filter-paket-hasil', [...petaOpsiPaket.entries()].map(([value, label]) => ({ value, label })), 'Semua Paket');
   isiSelectOpsi('filter-mapel-hasil', daftarMapelDiizinkan().map(m => ({ value: m.id, label: m.namaMapel })), 'Semua Mapel');
-  isiSelectOpsi('filter-kelas-hasil', stateMemori.kelas.map(k => ({ value: k.id, label: `${k.kodeKelas} - ${k.namaKelas}` })), 'Semua Kelas');
+  isiSelectOpsi('filter-kelas-hasil', daftarKelasDiizinkan().map(k => ({ value: k.id, label: `${k.kodeKelas} - ${k.namaKelas}` })), 'Semua Kelas');
   renderTabelHasil();
   if (!adalahSiswa) pasangListenerHasilLiveM6();
 }
