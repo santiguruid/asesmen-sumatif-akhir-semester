@@ -2668,6 +2668,8 @@ function bukaPratinjauSoal(id) {
   const s = cariById('bankSoal', id);
   if (!s) return;
   const kunciSet = parseKunciKompleksSet(s.kunciJawaban);
+  const urlImg = normalisasiUrlGambarSoal(s.urlGambar);
+  const cekGbr = urlImg ? analisisKesesuaianGambarSoal(s) : null;
   const opsiHtml = adalahTipeBeropsi(s.tipeSoal)
     ? `<div class="dnc-opsi-list dnc-mt-12">${(s.opsiJawaban || []).map(o => `
         <div class="dnc-opsi-item ${kunciSet.has(o.kode) ? 'terpilih' : ''}">
@@ -2683,10 +2685,14 @@ function bukaPratinjauSoal(id) {
     htmlKonten: `
       <div class="dnc-pratinjau-soal">
         <div class="dnc-flex-between dnc-mb-12">
-          <span class="dnc-badge dnc-badge-biru">${esc(namaMapelById(s.mapelId))} • ${esc(labelTingkat(s.tingkat))}</span>
+          <div class="dnc-flex-gap">
+            ${badgeKategoriSoal(s.kategoriSoal)}
+            <span class="dnc-badge dnc-badge-biru">${esc(namaMapelById(s.mapelId))} • ${esc(labelTingkat(s.tingkat))}</span>
+          </div>
           <div class="dnc-flex-gap">${badgeTipeSoal(s.tipeSoal)}<span class="dnc-badge dnc-badge-abu">Bobot ${esc(s.bobotNilai)}</span></div>
         </div>
-        ${s.urlGambar ? `<img src="${esc(s.urlGambar)}" alt="Gambar soal" class="dnc-soal-gambar">` : ''}
+        ${urlImg ? `<img src="${esc(urlImg)}" alt="Gambar soal" class="dnc-soal-gambar">` : ''}
+        ${cekGbr ? `<div class="dnc-img-cek-box ${cekGbr.kelas} dnc-mb-12"><div class="dnc-img-cek-info"><strong>Status Gambar &amp; Kunci: ${esc(cekGbr.status)}</strong><div class="dnc-img-cek-kunci"><strong>Kunci:</strong> ${esc(cekGbr.ringkasKunci)}</div><div class="dnc-teks-muted">${esc(cekGbr.pesan)}</div></div></div>` : ''}
         <div class="dnc-soal-teks">${esc(s.pertanyaan)}</div>
         ${opsiHtml}
       </div>`
@@ -2699,19 +2705,22 @@ async function duplikatSoal(id) {
   const kodeBaru = `${s.kodeSoal}-CPY${Math.floor(10 + Math.random() * 89)}`;
   await dbCreate(COLLECTIONS.bankSoal, {
     kodeSoal: kodeBaru,
+    kategoriSoal: normalisasiKategoriSoal(s.kategoriSoal),
     sumberPaket: s.sumberPaket || namaSumberPaketSoal(s),
     mapelId: s.mapelId,
     tingkat: s.tingkat,
     tipeSoal: s.tipeSoal,
     pertanyaan: `${s.pertanyaan} (Salinan)`,
-    urlGambar: s.urlGambar || '',
+    urlGambar: normalisasiUrlGambarSoal(s.urlGambar || ''),
+    urlGambarAsli: s.urlGambarAsli || '',
+    gambarTerverifikasi: Boolean(s.gambarTerverifikasi),
     opsiJawaban: s.opsiJawaban || [],
     kunciJawaban: s.kunciJawaban || '',
     bobotNilai: s.bobotNilai,
     statusAktif: s.statusAktif,
     dibuatOleh: penggunaAktif.id
   });
-  resetCacheMenu(['DNC-M1', 'DNC-M3']);
+  resetCacheMenu(['DNC-M1', 'DNC-M3', 'DNC-M5']);
   await muatM3BankSoal(true);
   tampilkanToast(`Soal berhasil diduplikasi dengan kode ${kodeBaru}.`);
 }
