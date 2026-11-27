@@ -5671,10 +5671,79 @@ async function selesaikanUjianSiswa(otomatis = false, alasan = 'manual') {
   nonaktifkanWakeLockSiswa();
   resetCacheMenu(['DNC-M1', 'DNC-M5', 'DNC-M6']);
   await muatM5RuangUjian(true);
-  if (alasan === 'manual') tampilkanToast('Lembar ujian ASAS berhasil dikumpulkan.');
+  if (alasan === 'manual') tampilkanToast(paket.modeBimbel ? `Latihan selesai! Skor Anda: ${skorAkhir}.` : 'Lembar ujian ASAS berhasil dikumpulkan.');
   else if (alasan === 'waktu_habis') tampilkanToast('Ujian selesai otomatis karena waktu habis.');
 }
 // ===== AKHIR BLOK: DNC_M5_RUANG_UJIAN =====
+
+// ===== BLOK: DNC_M8_PROFIL =====
+async function muatM8Profil() {
+  if (!penggunaAktif) return;
+  const wadah = document.getElementById('wadah-info-profil-m8');
+  if (!wadah) return;
+
+  const baris = [
+    ['Nama Lengkap', penggunaAktif.namaLengkap || '-'],
+    ['Peran Akun', penggunaAktif.role || 'Siswa Bimbel'],
+    ['ID Peserta', penggunaAktif.nomorInduk || '-'],
+    ['Asal Sekolah', penggunaAktif.asalSekolah || '-'],
+    ['Kelas', penggunaAktif.kelasTeks || '-'],
+    ['Email Gmail Login', penggunaAktif.email || '-'],
+    ['Tanggal Diterima', penggunaAktif.tanggalDiterima ? formatTanggal(penggunaAktif.tanggalDiterima, true) : '-']
+  ];
+
+  wadah.innerHTML = baris.map(([lbl, val]) => `
+    <div class="dnc-profil-baris">
+      <span class="dnc-profil-label">${esc(lbl)}</span>
+      <span class="dnc-profil-nilai">${esc(val)}</span>
+    </div>`).join('');
+  sudahDimuat['DNC-M8'] = true;
+}
+
+async function simpanGantiSandiBimbel() {
+  if (!penggunaAktif || penggunaAktif.role !== 'Siswa Bimbel') {
+    throw new Error('Fitur ganti sandi mandiri hanya tersedia untuk akun Siswa Bimbel.');
+  }
+  const sandiLama = document.getElementById('input-sandi-lama-m8')?.value || '';
+  const sandiBaru = document.getElementById('input-sandi-baru-m8')?.value || '';
+  const sandiKonf = document.getElementById('input-sandi-konf-m8')?.value || '';
+
+  if (!sandiLama || !sandiBaru || !sandiKonf) {
+    throw new Error('Seluruh kolom kata sandi wajib diisi.');
+  }
+  if (sandiBaru.length < 6) {
+    throw new Error('Kata sandi baru minimal 6 karakter.');
+  }
+  if (sandiBaru !== sandiKonf) {
+    throw new Error('Konfirmasi kata sandi baru tidak cocok.');
+  }
+  if (sandiBaru === sandiLama) {
+    throw new Error('Kata sandi baru harus berbeda dari kata sandi saat ini.');
+  }
+
+  const hashLama = await hashTeks(sandiLama);
+  let hashTersimpan = penggunaAktif.passwordHash || '';
+  if (!hashTersimpan) {
+    const dokTerbaru = await dbGetById(COLLECTIONS.pengguna, penggunaAktif.id);
+    hashTersimpan = dokTerbaru?.passwordHash || '';
+  }
+  if (hashTersimpan && hashTersimpan !== hashLama) {
+    throw new Error('Kata sandi saat ini yang Anda masukkan salah.');
+  }
+
+  const passwordHashBaru = await hashTeks(sandiBaru);
+  await dbUpdate(COLLECTIONS.pengguna, penggunaAktif.id, {
+    passwordHash: passwordHashBaru,
+    sandiDiubahPada: new Date().toISOString()
+  });
+
+  penggunaAktif.passwordHash = passwordHashBaru;
+  document.getElementById('input-sandi-lama-m8').value = '';
+  document.getElementById('input-sandi-baru-m8').value = '';
+  document.getElementById('input-sandi-konf-m8').value = '';
+  tampilkanToast('Kata sandi berhasil diperbarui. Gunakan kata sandi baru saat login berikutnya.');
+}
+// ===== AKHIR BLOK: DNC_M8_PROFIL =====
 
 // ===== BLOK: DNC_M6_HASIL_NILAI =====
 let dataHasilTersaring = [];
