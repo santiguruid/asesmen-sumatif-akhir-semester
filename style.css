@@ -2597,6 +2597,16 @@ body.dnc-mode-lockdown-siswa textarea {
     height: auto;
   }
 
+  .dnc-bs-btn {
+    min-height: 44px;
+    min-width: 72px;
+    padding: 0 10px;
+  }
+
+  .dnc-gbr-aksi-row .dnc-tombol {
+    flex: 1;
+  }
+
   .dnc-toast-container {
     left: 12px;
     right: 12px;
