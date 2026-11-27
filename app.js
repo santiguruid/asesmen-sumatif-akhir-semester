@@ -37,7 +37,7 @@ const MENU_DAFTAR = [
 ];
 
 const TINGKAT_LIST = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
-const TIPE_SOAL_LIST = ['Pilihan Ganda', 'Pilihan Ganda Kompleks', 'Isian Singkat', 'Uraian'];
+const TIPE_SOAL_LIST = ['Pilihan Ganda', 'Pilihan Ganda Kompleks', 'Benar/Salah', 'Isian Singkat', 'Uraian'];
 const KATEGORI_SOAL_LIST = ['ASAS', 'TKA'];
 // ===== AKHIR BLOK: DNC_CONFIG =====
 
