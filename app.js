@@ -958,6 +958,73 @@ async function sinkronProfilAdminDnc(fbUser, profilKetemu = null) {
   return profilFinal;
 }
 
+async function pilihAkunLoginGandaDnc(kandidatList) {
+  if (!stateMemori.kelas.length) {
+    try { await muatDataDasar(); } catch (_) {}
+  }
+
+  return new Promise((resolve, reject) => {
+    let selesai = false;
+    const btnBatal = document.getElementById('btn-batal-modal');
+    const btnTutup = document.getElementById('btn-tutup-modal');
+
+    const bersihkan = () => {
+      btnBatal?.removeEventListener('click', handleBatal);
+      btnTutup?.removeEventListener('click', handleBatal);
+    };
+
+    const handleBatal = () => {
+      if (selesai) return;
+      selesai = true;
+      bersihkan();
+      reject(new Error('Pemilihan akun dibatalkan.'));
+    };
+
+    const daftarHtml = kandidatList.map((u, idx) => {
+      const kls = u.kelasId ? cariById('kelas', u.kelasId) : null;
+      const infoKelas = kls
+        ? `${kls.kodeKelas} — ${kls.namaKelas} (${labelTingkat(kls.tingkat)})`
+        : (u.kelasTeks || 'Kelas belum ditetapkan');
+      return `
+        <button type="button" class="dnc-opsi-item" data-pilih-akun-ganda="${idx}" style="align-items:center;min-height:54px">
+          <span class="dnc-opsi-kode">${idx + 1}</span>
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:700;color:var(--text-main)">${esc(u.namaLengkap || '-')}</div>
+            <div class="dnc-form-bantuan">NIS: ${esc(u.nomorInduk || '-')} • ${esc(infoKelas)}</div>
+            <div class="dnc-form-bantuan">${esc(u.email || '-')}</div>
+          </div>
+          <span class="dnc-badge dnc-badge-biru">Pilih</span>
+        </button>`;
+    }).join('');
+
+    bukaModalFormDnc({
+      judul: 'Pilih Akun & Kelas Anda',
+      tampilSimpan: false,
+      labelBatal: 'Batal',
+      htmlKonten: `
+        <div class="dnc-pratinjau-soal dnc-mb-12">
+          <strong>NIS Terdaftar di Lebih dari Satu Kelas</strong>
+          <div class="dnc-form-bantuan">Pilih nama dan kelas Anda di bawah ini untuk melanjutkan masuk ke Portal ASAS.</div>
+        </div>
+        <div class="dnc-opsi-list">${daftarHtml}</div>`,
+      onMount: fields => {
+        btnBatal?.addEventListener('click', handleBatal);
+        btnTutup?.addEventListener('click', handleBatal);
+        fields.querySelectorAll('[data-pilih-akun-ganda]').forEach(btn => {
+          btn.addEventListener('click', () => {
+            if (selesai) return;
+            selesai = true;
+            bersihkan();
+            const dipilih = kandidatList[Number(btn.dataset.pilihAkunGanda)];
+            tutupModalFormDnc();
+            resolve(dipilih);
+          });
+        });
+      }
+    });
+  });
+}
+
 async function prosesLoginDnc(identitas, password) {
   const idTrim = String(identitas || '').trim();
   const pw = String(password || '');
@@ -965,29 +1032,55 @@ async function prosesLoginDnc(identitas, password) {
 
   const cari = teks(idTrim);
 
+  const selesaikanKandidatNonAdmin = async (daftarKandidat, hashInput) => {
+    if (!daftarKandidat.length) return null;
+    const menunggu = daftarKandidat.filter(u =>
+      normalisasiRoleDnc(u.role) === 'Siswa Bimbel' && u.statusPendaftaran === 'Menunggu'
+    );
+    const aktifList = daftarKandidat.filter(u =>
+      u.statusAktif !== false && !(normalisasiRoleDnc(u.role) === 'Siswa Bimbel' && u.statusPendaftaran === 'Menunggu')
+    );
+
+    if (!aktifList.length) {
+      if (menunggu.length) {
+        throw new Error('Pendaftaran Anda masih menunggu persetujuan Admin. Kata sandi sementara akan dikirim otomatis ke Gmail Anda setelah diterima.');
+      }
+      throw new Error('Akun Anda berstatus nonaktif. Hubungi Admin.');
+    }
+
+    const cocokPw = aktifList.filter(u => u.passwordHash && u.passwordHash === hashInput);
+    if (!cocokPw.length) {
+      throw new Error('Password yang dimasukkan salah.');
+    }
+    if (cocokPw.length === 1) {
+      return { ...cocokPw[0], role: normalisasiRoleDnc(cocokPw[0].role) };
+    }
+    const dipilih = await pilihAkunLoginGandaDnc(cocokPw);
+    return { ...dipilih, role: normalisasiRoleDnc(dipilih.role) };
+  };
+
   if (IS_PREVIEW) {
     const daftar = memoriPreview[COLLECTIONS.pengguna] || [];
-    const cocok = daftar.find(u =>
-      teks(u.email) === cari ||
-      teks(u.nomorInduk) === cari ||
-      (normalisasiRoleDnc(u.role) === 'Siswa' && teks(`${u.nomorInduk}@siswa.asas.id`) === cari)
-    );
-    if (!cocok) throw new Error('Akun tidak ditemukan pada data preview.');
-    const roleNorm = normalisasiRoleDnc(cocok.role);
-    if (roleNorm === 'Siswa Bimbel' && cocok.statusPendaftaran === 'Menunggu') {
-      throw new Error('Pendaftaran akun Siswa Bimbel Anda masih menunggu persetujuan Admin.');
-    }
-    if (cocok.statusAktif === false) throw new Error('Akun Anda sedang dinonaktifkan oleh Admin.');
-    if (roleNorm === 'Admin') {
+    const cocokAdmin = daftar.find(u => normalisasiRoleDnc(u.role) === 'Admin' && (teks(u.email) === cari || teks(u.nomorInduk) === cari));
+    if (cocokAdmin) {
+      if (cocokAdmin.statusAktif === false) throw new Error('Akun Admin sedang dinonaktifkan.');
       if (pw !== 'admin123') throw new Error('Password Admin salah.');
-    } else {
-      const h = await hashTeks(pw);
-      if (cocok.passwordHash && cocok.passwordHash !== h) throw new Error('Password salah.');
+      return { ...cocokAdmin, role: 'Admin' };
     }
-    return { ...cocok, role: roleNorm };
+    const tepatEmail = daftar.filter(u => normalisasiRoleDnc(u.role) !== 'Admin' && teks(u.email) === cari);
+    const kandidat = tepatEmail.length ? tepatEmail : daftar.filter(u => {
+      const r = normalisasiRoleDnc(u.role);
+      if (r === 'Admin') return false;
+      if (u.nomorInduk && teks(u.nomorInduk) === cari) return true;
+      if (r === 'Siswa' && u.nomorInduk && teks(`${u.nomorInduk}@siswa.asas.id`) === cari) return true;
+      return false;
+    });
+    if (!kandidat.length) throw new Error('Akun tidak ditemukan pada data preview.');
+    const h = await hashTeks(pw);
+    return await selesaikanKandidatNonAdmin(kandidat, h);
   }
 
-  // MODE PRODUKSI MURNI — DETEKSI PERAN OTOMATIS
+  // MODE PRODUKSI MURNI — DETEKSI PERAN OTOMATIS + ANTI-BENTROK NIS BEDA KELAS
   sedangProsesLogin = true;
   try {
     const { auth, authMod } = await muatFirebaseSdk();
@@ -996,29 +1089,23 @@ async function prosesLoginDnc(identitas, password) {
       semuaPengguna = await dbList(COLLECTIONS.pengguna);
     } catch (_) {}
 
-    // 1. Cek akun Non-Admin (Siswa ASAS: NIS@siswa.asas.id / NIS, Guru, Guru Bimbel, Siswa Bimbel)
-    const userNonAdmin = semuaPengguna.find(u => {
-      const r = normalisasiRoleDnc(u.role);
-      if (r === 'Admin') return false;
-      if (teks(u.email) === cari) return true;
-      if (u.nomorInduk && teks(u.nomorInduk) === cari) return true;
-      if (r === 'Siswa' && u.nomorInduk && teks(`${u.nomorInduk}@siswa.asas.id`) === cari) return true;
-      return false;
-    });
+    // 1. Cek akun Non-Admin (prioritas email persis agar langsung unik, lalu NIS lintas kelas)
+    const tepatEmailNonAdmin = semuaPengguna.filter(u =>
+      normalisasiRoleDnc(u.role) !== 'Admin' && teks(u.email) === cari
+    );
+    const kandidatNonAdmin = tepatEmailNonAdmin.length
+      ? tepatEmailNonAdmin
+      : semuaPengguna.filter(u => {
+          const r = normalisasiRoleDnc(u.role);
+          if (r === 'Admin') return false;
+          if (u.nomorInduk && teks(u.nomorInduk) === cari) return true;
+          if (r === 'Siswa' && u.nomorInduk && teks(`${u.nomorInduk}@siswa.asas.id`) === cari) return true;
+          return false;
+        });
 
-    if (userNonAdmin) {
-      const roleNorm = normalisasiRoleDnc(userNonAdmin.role);
-      if (roleNorm === 'Siswa Bimbel' && userNonAdmin.statusPendaftaran === 'Menunggu') {
-        throw new Error('Pendaftaran Anda masih menunggu persetujuan Admin. Kata sandi sementara akan dikirim otomatis ke Gmail Anda setelah diterima.');
-      }
-      if (userNonAdmin.statusAktif === false) {
-        throw new Error('Akun Anda berstatus nonaktif. Hubungi Admin.');
-      }
+    if (kandidatNonAdmin.length) {
       const hashInput = await hashTeks(pw);
-      if (!userNonAdmin.passwordHash || userNonAdmin.passwordHash !== hashInput) {
-        throw new Error('Password yang dimasukkan salah.');
-      }
-      return { ...userNonAdmin, role: roleNorm };
+      return await selesaikanKandidatNonAdmin(kandidatNonAdmin, hashInput);
     }
 
     // 2. Cek akun Admin via Firebase Authentication
