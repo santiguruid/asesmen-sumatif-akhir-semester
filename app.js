@@ -4564,9 +4564,13 @@ function bukaModalImporWord() {
       const urutKey = String(it.urutanGlobal || '');
       const entri = (it.bagianAsal ? kunciPerBagian[`${it.bagianAsal}#${noKey}`] : null) || kunciGlobal[noKey] || kunciGlobal[urutKey];
       if (entri?.kunci) {
-        it.kunciJawaban = adalahTipeBeropsi(it.tipeSoal)
-          ? selesaikanKunciOpsiDariTeks(entri.kunci, it.opsiJawaban, it.tipeSoal)
-          : entri.kunci;
+        if (adalahTipeBeropsi(it.tipeSoal)) {
+          it.kunciJawaban = selesaikanKunciOpsiDariTeks(entri.kunci, it.opsiJawaban, it.tipeSoal);
+        } else if (it.tipeSoal === 'Benar/Salah') {
+          it.kunciJawaban = normalisasiKunciBenarSalah(entri.kunci);
+        } else {
+          it.kunciJawaban = entri.kunci;
+        }
       }
       if (entri?.bobot > 0) it.bobotNilai = entri.bobot;
       else if (bobotDefaultTipe[it.tipeSoal] > 0) it.bobotNilai = bobotDefaultTipe[it.tipeSoal];
@@ -4593,7 +4597,7 @@ function bukaModalImporWord() {
 
     info.textContent = daftarEkstrak.length
       ? `Terdeteksi ${daftarEkstrak.length} butir soal (${jmlValid} Valid, ${daftarEkstrak.length - jmlValid} Perlu Perbaikan${jmlBergambar ? `, ${jmlBergambar} Bergambar` : ''}${jmlPeringatanGbr ? `, ${jmlPeringatanGbr} Cek Ulang Gambar/Kunci` : ''}).`
-      : 'Unggah file soal format bebas (.docx, .pdf, .xlsx, .xls, .csv, .txt) — link gambar otomatis diubah menjadi soal bergambar dan dicek kesesuaiannya dengan kunci.';
+      : 'Unggah file soal format bebas (.docx, .pdf, .xlsx, .xls, .csv, .txt, atau gambar .png/.jpg/.webp) — gambar tertanam, PDF scan, dan link gambar otomatis terbaca.';
 
     if (!daftarEkstrak.length) {
       wadah.innerHTML = '';
@@ -4604,7 +4608,7 @@ function bukaModalImporWord() {
       <div class="dnc-ringkasan-impor">
         <div>
           <strong>Deteksi Otomatis:</strong>
-          PG: ${hitungTipe('Pilihan Ganda')} | PG Kompleks: ${hitungTipe('Pilihan Ganda Kompleks')} | Isian: ${hitungTipe('Isian Singkat')} | Uraian: ${hitungTipe('Uraian')}${jmlBergambar ? ` | Bergambar: ${jmlBergambar}` : ''}
+          PG: ${hitungTipe('Pilihan Ganda')} | PGK: ${hitungTipe('Pilihan Ganda Kompleks')} | Benar/Salah: ${hitungTipe('Benar/Salah')} | Isian: ${hitungTipe('Isian Singkat')} | Uraian: ${hitungTipe('Uraian')}${jmlBergambar ? ` | Bergambar: ${jmlBergambar}` : ''}
         </div>
         <div class="dnc-flex-gap">
           <button type="button" id="btn-auto-bobot-100" class="dnc-tombol dnc-tombol-sekunder dnc-tombol-kecil">Bagi Bobot Total = 100</button>
@@ -4628,7 +4632,15 @@ function bukaModalImporWord() {
               const cekGbr = it.urlGambar ? analisisKesesuaianGambarSoal(it, it.statusMuatGambar || 'belum') : null;
               const htmlGambarEdit = `
                 <div style="margin-top:6px">
-                  <input class="dnc-input" style="height:28px;font-size:11px" data-w-gambar="${idx}" placeholder="Link sumber gambar (opsional — dukung Drive/Dropbox/URL langsung)" value="${esc(it.urlGambar && !it.urlGambar.startsWith('data:image/') ? (it.urlGambarAsli || it.urlGambar) : '')}">
+                  <input class="dnc-input" style="height:28px;font-size:11px" data-w-gambar="${idx}" placeholder="Link sumber gambar (opsional — atau unggah file lokal di bawah)" value="${esc(it.urlGambar && !it.urlGambar.startsWith('data:image/') ? (it.urlGambarAsli || it.urlGambar) : '')}">
+                </div>
+                <div class="dnc-gbr-aksi-row">
+                  <label class="dnc-tombol dnc-tombol-sekunder dnc-tombol-kecil" style="height:26px;font-size:11px;cursor:pointer">
+                    <span>${it.urlGambar ? 'Ganti Gambar' : 'Unggah Gambar'}</span>
+                    <input type="file" accept="image/*" data-w-file-gbr="${idx}" style="display:none">
+                  </label>
+                  ${it.urlGambar ? `<button type="button" class="dnc-tombol dnc-tombol-sekunder dnc-tombol-kecil" style="height:26px;font-size:11px" data-w-ocr-gbr="${idx}">Baca Teks Gambar (OCR)</button>` : ''}
+                  ${it.urlGambar ? `<button type="button" class="dnc-tombol dnc-tombol-bahaya dnc-tombol-kecil" style="height:26px;font-size:11px" data-w-hapus-gbr="${idx}">Hapus Gambar</button>` : ''}
                 </div>
                 ${cekGbr ? `
                   <div class="dnc-img-cek-box ${cekGbr.kelas}">
@@ -4668,7 +4680,7 @@ function bukaModalImporWord() {
                     ${htmlOpsiEdit}
                   </td>
                   <td data-label="Kunci &amp; Bobot">
-                    <input class="dnc-input" style="height:30px;margin-bottom:4px" data-w-kunci="${idx}" placeholder="Kunci (mis. B / A, C)" value="${esc(it.kunciJawaban)}">
+                    <input class="dnc-input" style="height:30px;margin-bottom:4px" data-w-kunci="${idx}" placeholder="Kunci (B / A, C / 1. Benar, 2. Salah)" value="${esc(it.kunciJawaban)}">
                     <input class="dnc-input" style="height:30px" type="number" min="0.5" step="0.5" data-w-bobot="${idx}" value="${esc(it.bobotNilai)}">
                   </td>
                   <td data-label="Validasi">
@@ -4711,6 +4723,55 @@ function bukaModalImporWord() {
       });
     });
 
+    wadah.querySelectorAll('[data-w-file-gbr]').forEach(el => {
+      el.addEventListener('change', async () => {
+        const i = Number(el.dataset.wFileGbr);
+        const fileGbr = el.files[0];
+        if (!fileGbr || !daftarEkstrak[i]) return;
+        try {
+          const terkompres = await kompresFileGambarLokal(fileGbr, 1024);
+          if (!terkompres) throw new Error('Ukuran gambar terlalu besar atau format tidak didukung.');
+          daftarEkstrak[i].urlGambar = terkompres;
+          daftarEkstrak[i].urlGambarAsli = '';
+          daftarEkstrak[i].statusMuatGambar = 'sukses';
+          daftarEkstrak[i].gambarTerverifikasi = false;
+          renderPratinjauWord();
+          tampilkanToast(`Gambar untuk soal #${i + 1} berhasil dipasang.`);
+        } catch (err) {
+          tampilkanToast(err.message || 'Gagal memuat gambar.', 'error');
+        }
+      });
+    });
+
+    wadah.querySelectorAll('[data-w-ocr-gbr]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const i = Number(btn.dataset.wOcrGbr);
+        const it = daftarEkstrak[i];
+        if (!it?.urlGambar) return;
+        await denganLoading(btn, 'OCR...', async () => {
+          const teksOcr = await bacaTeksOcrDariGambar(it.urlGambar, pct => {
+            btn.textContent = `OCR ${pct}%`;
+          });
+          if (!teksOcr) throw new Error('Tidak ada teks yang terbaca dari gambar.');
+          it.pertanyaan = it.pertanyaan.trim() ? `${it.pertanyaan.trim()}\n${teksOcr}` : teksOcr;
+          validasiItemSoalPintar(it);
+          renderPratinjauWord();
+          tampilkanToast(`Teks gambar soal #${i + 1} berhasil diekstrak (OCR).`);
+        });
+      });
+    });
+
+    wadah.querySelectorAll('[data-w-hapus-gbr]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const i = Number(btn.dataset.wHapusGbr);
+        if (!daftarEkstrak[i]) return;
+        daftarEkstrak[i].urlGambar = '';
+        daftarEkstrak[i].urlGambarAsli = '';
+        daftarEkstrak[i].gambarTerverifikasi = false;
+        renderPratinjauWord();
+      });
+    });
+
     wadah.querySelectorAll('[data-w-verif-gbr]').forEach(btn => {
       btn.addEventListener('click', () => {
         const i = Number(btn.dataset.wVerifGbr);
@@ -4736,7 +4797,7 @@ function bukaModalImporWord() {
       });
       img.addEventListener('click', () => {
         const u = normalisasiUrlGambarSoal(daftarEkstrak[i]?.urlGambar || '');
-        if (u) window.open(u, '_blank', 'noopener');
+        if (u) bukaZoomGambarDnc(u);
       });
     });
 
@@ -4754,8 +4815,12 @@ function bukaModalImporWord() {
               daftarEkstrak[i].statusMuatGambar = 'belum';
             }
           }
-          if (field === 'kunciJawaban' && adalahTipeBeropsi(daftarEkstrak[i].tipeSoal)) {
-            daftarEkstrak[i].kunciJawaban = selesaikanKunciOpsiDariTeks(daftarEkstrak[i].kunciJawaban, daftarEkstrak[i].opsiJawaban, daftarEkstrak[i].tipeSoal);
+          if (field === 'kunciJawaban') {
+            if (adalahTipeBeropsi(daftarEkstrak[i].tipeSoal)) {
+              daftarEkstrak[i].kunciJawaban = selesaikanKunciOpsiDariTeks(daftarEkstrak[i].kunciJawaban, daftarEkstrak[i].opsiJawaban, daftarEkstrak[i].tipeSoal);
+            } else if (daftarEkstrak[i].tipeSoal === 'Benar/Salah') {
+              daftarEkstrak[i].kunciJawaban = normalisasiKunciBenarSalah(daftarEkstrak[i].kunciJawaban);
+            }
           }
           validasiItemSoalPintar(daftarEkstrak[i]);
           if (daftarEkstrak[i].valid) daftarEkstrak[i].dipilih = true;
