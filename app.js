@@ -7696,14 +7696,16 @@ async function inisialisasiAplikasiDnc() {
   document.getElementById('btn-muat-ulang-m6')?.addEventListener('click', () => muatM6HasilNilai(true));
   document.getElementById('btn-ekspor-csv-nilai')?.addEventListener('click', eksporRekapNilaiCsv);
   document.getElementById('btn-cetak-nilai')?.addEventListener('click', () => {
-    document.getElementById('cetak-sub-m6').textContent = `Dicetak pada ${formatTanggal(new Date(), true)} oleh ${penggunaAktif?.namaLengkap || '-'}`;
-    window.print();
+    const fPaket = document.getElementById('filter-paket-hasil')?.value || '';
+    cetakRekapTabelPaketM6(fPaket);
   });
   document.getElementById('cari-hasil')?.addEventListener('input', debounceDnc(renderTabelHasil, 250));
   ['filter-paket-hasil', 'filter-mapel-hasil', 'filter-kelas-hasil', 'filter-status-hasil', 'filter-tuntas-hasil'].forEach(id => {
     document.getElementById(id)?.addEventListener('change', renderTabelHasil);
   });
   document.getElementById('wadah-hasil-paket-m6')?.addEventListener('click', e => {
+    const bCetakPaket = e.target.closest('[data-cetak-paket-m6]');
+    if (bCetakPaket) { cetakRekapTabelPaketM6(bCetakPaket.dataset.cetakPaketM6); return; }
     const bTogglePaket = e.target.closest('[data-toggle-paket-m6]');
     if (bTogglePaket) { togglePaketHasilM6(bTogglePaket.dataset.togglePaketM6); return; }
     const bKor = e.target.closest('[data-koreksi-hasil]');
@@ -7725,10 +7727,32 @@ async function inisialisasiAplikasiDnc() {
   document.getElementById('wadah-pengguna-m7')?.addEventListener('click', e => {
     const bToggleKelas = e.target.closest('[data-toggle-kelas-m7]');
     if (bToggleKelas) { toggleKelasSiswaM7(bToggleKelas.dataset.toggleKelasM7); return; }
+    const bToggleBimbel = e.target.closest('[data-toggle-bimbel-m7]');
+    if (bToggleBimbel) { toggleSiswaBimbelM7(); return; }
+    const bTerima = e.target.closest('[data-terima-bimbel]');
+    if (bTerima) { terimaPendaftarSiswaBimbel(bTerima.dataset.terimaBimbel); return; }
+    const bTolak = e.target.closest('[data-tolak-bimbel]');
+    if (bTolak) { tolakPendaftarSiswaBimbel(bTolak.dataset.tolakBimbel); return; }
     const bUbah = e.target.closest('[data-ubah-user]');
     if (bUbah) { bukaFormPengguna(cariById('pengguna', bUbah.dataset.ubahUser)); return; }
     const bTog = e.target.closest('[data-toggle-user]');
     if (bTog) toggleStatusPengguna(bTog.dataset.toggleUser);
+  });
+
+  // --- Event DNC-M8 (Profil & Ganti Sandi Mandiri Siswa Bimbel) ---
+  document.getElementById('btn-intip-sandi-lama')?.addEventListener('click', e => {
+    togglePassword('input-sandi-lama-m8', e.currentTarget);
+  });
+  document.getElementById('btn-intip-sandi-baru')?.addEventListener('click', e => {
+    togglePassword('input-sandi-baru-m8', e.currentTarget);
+  });
+  document.getElementById('btn-intip-sandi-konf')?.addEventListener('click', e => {
+    togglePassword('input-sandi-konf-m8', e.currentTarget);
+  });
+  document.getElementById('form-ganti-sandi-m8')?.addEventListener('submit', async e => {
+    e.preventDefault();
+    const btn = document.getElementById('btn-simpan-sandi-m8');
+    await denganLoading(btn, 'Menyimpan...', simpanGantiSandiBimbel);
   });
 
   if (!IS_PREVIEW) {
