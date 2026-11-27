@@ -3656,27 +3656,54 @@ function parseCsvBaris(teksCsv) {
   return baris;
 }
 
-function kompresDataGambar(dataUrl, maksLebar = 640, kualitas = 0.72) {
+function kompresDataGambar(dataUrl, maksLebar = 1024, kualitas = 0.85) {
   return new Promise(resolve => {
     const img = new Image();
     img.onload = () => {
-      const skala = img.width > maksLebar ? maksLebar / img.width : 1;
-      const c = document.createElement('canvas');
-      c.width = Math.max(1, Math.round(img.width * skala));
-      c.height = Math.max(1, Math.round(img.height * skala));
-      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-      const hasil = c.toDataURL('image/jpeg', kualitas);
-      resolve(hasil.length < 240000 ? hasil : '');
+      const batasKarakter = 360000;
+      const langkah = [
+        [maksLebar, kualitas],
+        [Math.min(maksLebar, 920), 0.76],
+        [Math.min(maksLebar, 760), 0.68],
+        [Math.min(maksLebar, 620), 0.58],
+        [480, 0.5]
+      ];
+      let hasilTerbaik = '';
+      for (const [lebarTarget, q] of langkah) {
+        const skala = img.width > lebarTarget ? lebarTarget / img.width : 1;
+        const c = document.createElement('canvas');
+        c.width = Math.max(1, Math.round(img.width * skala));
+        c.height = Math.max(1, Math.round(img.height * skala));
+        const ctx = c.getContext('2d');
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(0, 0, c.width, c.height);
+        ctx.drawImage(img, 0, 0, c.width, c.height);
+        const kandidat = c.toDataURL('image/jpeg', q);
+        hasilTerbaik = kandidat;
+        if (kandidat.length <= batasKarakter) {
+          resolve(kandidat);
+          return;
+        }
+      }
+      resolve(hasilTerbaik.length <= 500000 ? hasilTerbaik : '');
     };
     img.onerror = () => resolve('');
     img.src = dataUrl;
   });
 }
 
-// --- Mesin Parser Pintar Bank Soal (Word, PDF, Excel) ---
+// --- Mesin Parser Pintar Bank Soal (Word, PDF, Excel, Gambar) ---
 function deteksiTipeDariTeks(teksRaw, opsiCount, kunciRaw, pertanyaanRaw) {
   const t = teks(teksRaw || '');
   const p = teks(pertanyaanRaw || '');
+  if (
+    (t.includes('benar') && t.includes('salah')) ||
+    t === 'bs' || t === 'b/s' ||
+    (t.includes('true') && t.includes('false')) ||
+    (t.includes('sesuai') && t.includes('tidak'))
+  ) {
+    return 'Benar/Salah';
+  }
   if (t.includes('kompleks') || t.includes('pgk') || t.includes('multi') || t.includes('lebih dari satu')) {
     return 'Pilihan Ganda Kompleks';
   }
@@ -3698,6 +3725,12 @@ function deteksiTipeDariTeks(teksRaw, opsiCount, kunciRaw, pertanyaanRaw) {
     return 'Pilihan Ganda';
   }
 
+  const bsItems = parseKunciBenarSalah(kunciRaw);
+  const ciriBs = /(?:tentukan\s+benar\s+(?:atau|\/)\s+salah|benar\s+(?:atau|\/)\s+salah\s+untuk\s+pernyataan|pernyataan\s+berikut.*benar.*salah|sesuai\s+atau\s+tidak\s+sesuai)/i.test(p);
+  if (bsItems.length >= 2 || (ciriBs && bsItems.length >= 1) || ciriBs) {
+    return 'Benar/Salah';
+  }
+
   const kunciBersih = String(kunciRaw || '').trim();
   const ciriIsian = /(?:_{3,}|\.{4,}|isilah\s+titik|lengkapi\s+kalimat)/i.test(p);
   if (ciriIsian || (kunciBersih && kunciBersih.length <= 55 && kunciBersih.split(/\s+/).length <= 5)) {
@@ -3709,6 +3742,9 @@ function deteksiTipeDariTeks(teksRaw, opsiCount, kunciRaw, pertanyaanRaw) {
 function deteksiHeadingBagianSoal(teksBaris) {
   const b = String(teksBaris || '').trim();
   if (!b || b.length > 130) return null;
+  if (/^(?:(?:[IVX]+|[A-E]|\d+)[\.\)]\s*)?(?:soal\s+)?(?:benar\s*\/\s*salah|benar\s+atau\s+salah|true\s*\/\s*false)\b/i.test(b)) {
+    return 'Benar/Salah';
+  }
   if (/^(?:(?:[IVX]+|[A-E]|\d+)[\.\)]\s*)?(?:soal\s+)?(?:pilihan\s+ganda\s+kompleks|pg\s+kompleks|pgk)\b/i.test(b)) {
     return 'Pilihan Ganda Kompleks';
   }
@@ -3746,6 +3782,11 @@ function validasiItemSoalPintar(item) {
     const setK = parseKunciKompleksSet(item.kunciJawaban);
     const cocokSemua = [...setK].every(k => (item.opsiJawaban || []).some(o => o.kode === k));
     if (setK.size < 2 || !cocokSemua) masalah.push('Kunci PG Kompleks minimal 2 opsi valid (mis. A, C)');
+  } else if (item.tipeSoal === 'Benar/Salah') {
+    item.kunciJawaban = normalisasiKunciBenarSalah(item.kunciJawaban);
+    if (!parseKunciBenarSalah(item.kunciJawaban).length) {
+      masalah.push('Kunci Benar/Salah kosong / tidak valid (contoh: 1. Benar, 2. Benar, 3. Salah)');
+    }
   } else if (item.tipeSoal === 'Isian Singkat') {
     if (!String(item.kunciJawaban || '').trim()) masalah.push('Kunci Isian Singkat kosong');
   }
