@@ -3229,12 +3229,26 @@ function ekstraksiSoalDariTabel(rows, kodeMapelPrefix, cap) {
 
   if (idxTanya >= 0 && rows.length >= 2) {
     const idxKode = header.findIndex(h => h.includes('kode'));
+    const idxGambar = header.findIndex(h => h.includes('gambar') || h.includes('image') || h.includes('foto') || h.includes('ilustrasi') || h.includes('url') || h.includes('link'));
     const soal = [];
     for (let r = 1; r < rows.length; r++) {
       const sel = rows[r];
       const ambil = i => (i >= 0 && sel[i] ? sel[i].teks.trim() : '');
       let pertanyaan = ambil(idxTanya);
       if (!pertanyaan) continue;
+
+      let urlGambarAsli = ambil(idxGambar) || sel[idxGambar]?.img || sel[idxTanya]?.img || '';
+      let labelGambar = '';
+      const eks = ekstrakLinkGambarDariTeks(pertanyaan);
+      if (eks.urlGambar) {
+        pertanyaan = eks.teksBersih || pertanyaan;
+        if (!urlGambarAsli) {
+          urlGambarAsli = eks.urlAsli;
+          labelGambar = eks.labelTeksGambar;
+        }
+      }
+      const urlGambar = normalisasiUrlGambarSoal(urlGambarAsli);
+
       let opsiJawaban = [];
       ['a', 'b', 'c', 'd', 'e'].forEach(hrf => {
         const io = header.findIndex(h => h === hrf || h === `opsi ${hrf}` || h === `pilihan ${hrf}` || h === `opsi_${hrf}` || h === `opsi${hrf}` || h === `jawaban ${hrf}`);
@@ -3259,7 +3273,11 @@ function ekstraksiSoalDariTabel(rows, kodeMapelPrefix, cap) {
         kodeSoal: ambil(idxKode) || `${kodeMapelPrefix}-S${cap}-${String(soal.length + 1).padStart(2, '0')}`,
         tipeSoal,
         pertanyaan,
-        urlGambar: sel[idxTanya]?.img || '',
+        urlGambar,
+        urlGambarAsli,
+        labelGambar,
+        statusMuatGambar: 'belum',
+        gambarTerverifikasi: false,
         opsiJawaban: adalahTipeBeropsi(tipeSoal) ? opsiJawaban : [],
         kunciJawaban: kunciRaw,
         bobotNilai
