@@ -2680,6 +2680,10 @@ function adalahTipeBeropsi(tipe) {
 }
 
 function bukaFormSoal(item = null) {
+  if (item && !bolehKelolaSoal(item)) {
+    tampilkanToast('Soal milik guru lain berstatus Hanya Baca. Klik "Salin ke Soal Saya" untuk membuat salinan yang dapat Anda ubah.', 'error');
+    return;
+  }
   const mapelList = daftarMapelDiizinkan();
   if (!mapelList.length) {
     tampilkanToast('Tambahkan mata pelajaran terlebih dahulu sebelum membuat soal.', 'error');
