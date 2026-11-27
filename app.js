@@ -7225,6 +7225,7 @@ function renderTabelPengguna() {
 function bukaFormPengguna(item = null) {
   const roleAwal = item ? normalisasiRoleDnc(item.role) : 'Siswa';
   const mapelSet = new Set(item?.mapelIds || []);
+  const kelasAmpuSet = new Set(item?.kelasIds || []);
 
   bukaModalFormDnc({
     judul: item ? 'Ubah Profil Pengguna' : 'Tambah Akun Pengguna',
@@ -7291,6 +7292,17 @@ function bukaFormPengguna(item = null) {
               </label>`).join('')}
           </div>
         </div>
+        <div id="grup-kelas-guru" class="dnc-form-grup dnc-form-full ${!adalahRoleGuru(roleAwal) ? 'dnc-disembunyikan' : ''}">
+          <label class="dnc-label">Kelas yang Diampu Guru (Opsional — kosongkan jika semua kelas)</label>
+          <div class="dnc-checklist-box" style="max-height:130px">
+            ${stateMemori.kelas.map(k => `
+              <label class="dnc-checklist-item">
+                <input type="checkbox" name="f-kelas-guru" value="${esc(k.id)}" ${kelasAmpuSet.has(k.id) ? 'checked' : ''}>
+                <span><strong>${esc(k.kodeKelas)}</strong> — ${esc(k.namaKelas)} (${esc(labelTingkat(k.tingkat))})</span>
+              </label>`).join('')}
+          </div>
+          <span class="dnc-form-bantuan">Jika dicentang (mis. khusus Kelas VI), guru hanya dapat memilih kelas tersebut di Paket ASAS serta memantau hasil nilai kelas ampunya saja.</span>
+        </div>
         <div class="dnc-form-grup dnc-form-full">
           <label class="dnc-check-label">
             <input id="f-statusUser" type="checkbox" ${(item ? item.statusAktif !== false : true) ? 'checked' : ''}>
@@ -7307,6 +7319,7 @@ function bukaFormPengguna(item = null) {
         document.getElementById('grup-kelas-user').classList.toggle('dnc-disembunyikan', r !== 'Siswa');
         document.getElementById('grup-bimbel-user').classList.toggle('dnc-disembunyikan', r !== 'Siswa Bimbel');
         document.getElementById('grup-mapel-user').classList.toggle('dnc-disembunyikan', !adalahRoleGuru(r));
+        document.getElementById('grup-kelas-guru').classList.toggle('dnc-disembunyikan', !adalahRoleGuru(r));
       });
     },
     onSubmit: async () => {
@@ -7316,6 +7329,7 @@ function bukaFormPengguna(item = null) {
       const email = document.getElementById('f-emailUser').value.trim();
       const password = document.getElementById('f-passwordUser').value;
       const kelasId = role === 'Siswa' ? document.getElementById('f-kelasUser').value : '';
+      const kelasIds = adalahRoleGuru(role) ? [...document.querySelectorAll('input[name="f-kelas-guru"]:checked')].map(el => el.value) : [];
       const asalSekolah = role === 'Siswa Bimbel' ? (document.getElementById('f-asalSekolahUser')?.value || '').trim() : '';
       const kelasTeks = role === 'Siswa Bimbel' ? (document.getElementById('f-kelasTeksUser')?.value || '').trim() : '';
       const mapelIds = adalahRoleGuru(role) ? [...document.querySelectorAll('input[name="f-mapel-guru"]:checked')].map(el => el.value) : [];
@@ -7331,14 +7345,16 @@ function bukaFormPengguna(item = null) {
       if (!item && password.length < 6) throw new Error('Password akun baru minimal 6 karakter.');
       if (item && password && password.length < 6) throw new Error('Password baru minimal 6 karakter.');
 
-      if (!(await cekUnik(COLLECTIONS.pengguna, 'nomorInduk', nomorInduk, item?.id))) {
-        throw new Error(`Nomor Induk "${nomorInduk}" sudah terdaftar.`);
+      if (!(await cekUnikNisPerKelas(nomorInduk, kelasId, role, item?.id))) {
+        throw new Error(role === 'Siswa'
+          ? `NIS "${nomorInduk}" sudah terdaftar pada kelas tersebut.`
+          : `Nomor Induk "${nomorInduk}" sudah terdaftar.`);
       }
       if (!(await cekUnik(COLLECTIONS.pengguna, 'email', email, item?.id))) {
         throw new Error(`Email "${email}" sudah terdaftar.`);
       }
 
-      const payload = { email, namaLengkap, nomorInduk, role, kelasId, mapelIds, statusAktif };
+      const payload = { email, namaLengkap, nomorInduk, role, kelasId, kelasIds, mapelIds, statusAktif };
       if (role === 'Siswa Bimbel') {
         payload.asalSekolah = asalSekolah;
         payload.kelasTeks = kelasTeks;
