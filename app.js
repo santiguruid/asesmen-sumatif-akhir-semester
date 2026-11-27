@@ -8054,16 +8054,21 @@ async function inisialisasiAplikasiDnc() {
 
   // --- Event DNC-M3 ---
   document.getElementById('btn-muat-ulang-m3')?.addEventListener('click', () => muatM3BankSoal(true));
+  document.getElementById('btn-tetapkan-pemilik-soal')?.addEventListener('click', () => bukaModalAturPemilikSoal());
   document.getElementById('btn-tambah-soal')?.addEventListener('click', () => bukaFormSoal());
   document.getElementById('btn-impor-word')?.addEventListener('click', bukaModalImporWord);
   document.getElementById('btn-impor-csv-soal')?.addEventListener('click', bukaModalImporCsvSoal);
   document.getElementById('cari-soal')?.addEventListener('input', debounceDnc(renderTabelSoal, 250));
-  ['filter-kategori-soal', 'filter-mapel-soal', 'filter-tingkat-soal', 'filter-tipe-soal', 'filter-status-soal'].forEach(id => {
+  ['filter-pemilik-soal', 'filter-kategori-soal', 'filter-mapel-soal', 'filter-tingkat-soal', 'filter-tipe-soal', 'filter-status-soal'].forEach(id => {
     document.getElementById(id)?.addEventListener('change', renderTabelSoal);
   });
   document.getElementById('wadah-paket-soal-m3')?.addEventListener('click', e => {
     const bToggle = e.target.closest('[data-toggle-paket-m3]');
     if (bToggle) { togglePaketSoalM3(bToggle.dataset.togglePaketM3); return; }
+    const bAlihkan = e.target.closest('[data-alihkan-pemilik-paket]');
+    if (bAlihkan) { bukaModalAturPemilikSoal(bAlihkan.dataset.alihkanPemilikPaket); return; }
+    const bSalinPaket = e.target.closest('[data-salin-paket-soal]');
+    if (bSalinPaket) { salinPaketSoalKeSaya(bSalinPaket.dataset.salinPaketSoal); return; }
     const bHapusPaket = e.target.closest('[data-hapus-paket-soal]');
     if (bHapusPaket) { hapusPaketSoalDenganProteksi(bHapusPaket.dataset.hapusPaketSoal); return; }
     const bLihat = e.target.closest('[data-pratinjau-soal]');
