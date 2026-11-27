@@ -4135,12 +4135,13 @@ function bukaModalImporWord() {
     onSubmit: async () => {
       const terpilih = daftarEkstrak.filter(x => x.dipilih && x.valid);
       if (!terpilih.length) throw new Error('Belum ada butir soal berstatus Valid yang dipilih untuk disimpan.');
+      const kategoriSoal = normalisasiKategoriSoal(document.getElementById('w-kategoriSoal')?.value);
       const mapelId = document.getElementById('w-mapelId').value;
       const tingkat = document.getElementById('w-tingkat').value;
       if (!bolehAksesMapel(mapelId)) throw new Error('Anda tidak memiliki akses pada mata pelajaran tersebut.');
       const mapelObjSimpan = cariById('mataPelajaran', mapelId);
       const sumberPaket = (document.getElementById('w-sumberPaket')?.value || '').trim() ||
-        `Paket_Soal_${(mapelObjSimpan?.namaMapel || 'Mapel').replace(/\s+/g, '_')}_Tingkat_${tingkat}`;
+        `Paket_Soal_${kategoriSoal}_${(mapelObjSimpan?.namaMapel || 'Mapel').replace(/\s+/g, '_')}_Tingkat_${tingkat}`;
 
       let tersimpan = 0;
       for (const it of terpilih) {
@@ -4148,14 +4149,18 @@ function bukaModalImporWord() {
         if (!(await cekUnik(COLLECTIONS.bankSoal, 'kodeSoal', kodeUnik))) {
           kodeUnik = `${kodeUnik}-${Math.floor(10 + Math.random() * 89)}`;
         }
+        const urlGambar = normalisasiUrlGambarSoal(it.urlGambar || '');
         await dbCreate(COLLECTIONS.bankSoal, {
           kodeSoal: kodeUnik,
+          kategoriSoal,
           sumberPaket,
           mapelId,
           tingkat,
           tipeSoal: it.tipeSoal,
           pertanyaan: it.pertanyaan.trim(),
-          urlGambar: it.urlGambar || '',
+          urlGambar,
+          urlGambarAsli: it.urlGambarAsli || '',
+          gambarTerverifikasi: Boolean(urlGambar && it.gambarTerverifikasi),
           opsiJawaban: adalahTipeBeropsi(it.tipeSoal) ? it.opsiJawaban : [],
           kunciJawaban: it.tipeSoal === 'Pilihan Ganda'
             ? String(it.kunciJawaban).toUpperCase().slice(0, 1)
@@ -4167,9 +4172,9 @@ function bukaModalImporWord() {
         tersimpan++;
       }
       tutupModalFormDnc();
-      resetCacheMenu(['DNC-M1', 'DNC-M3', 'DNC-M4']);
+      resetCacheMenu(['DNC-M1', 'DNC-M3', 'DNC-M4', 'DNC-M5']);
       await muatM3BankSoal(true);
-      tampilkanToast(`${tersimpan} butir soal berhasil disimpan dalam paket "${sumberPaket}".`);
+      tampilkanToast(`${tersimpan} butir soal (${kategoriSoal}) berhasil disimpan dalam paket "${sumberPaket}".`);
     }
   });
 }
