@@ -2236,9 +2236,36 @@ async function hapusMapelDenganProteksi(id) {
 // ===== BLOK: DNC_M3_BANK_SOAL =====
 async function muatM3BankSoal(paksa = false) {
   if (!sudahDimuat['DNC-M3'] || paksa) {
-    await Promise.all([muatDataDasar(), muatDataBankSoal()]);
+    await Promise.all([muatDataDasar(), muatDataPengguna(), muatDataBankSoal()]);
     sudahDimuat['DNC-M3'] = true;
   }
+
+  const btnAturPemilik = document.getElementById('btn-tetapkan-pemilik-soal');
+  if (btnAturPemilik) {
+    btnAturPemilik.classList.toggle('dnc-disembunyikan', penggunaAktif?.role !== 'Admin');
+  }
+
+  const selPemilik = document.getElementById('filter-pemilik-soal');
+  if (selPemilik) {
+    const nilaiLama = selPemilik.value;
+    if (adalahRoleGuru(penggunaAktif?.role)) {
+      selPemilik.innerHTML = `
+        <option value="milik_saya">Bank Soal Saya</option>
+        <option value="referensi">Soal Guru Lain / Admin (Hanya Baca)</option>`;
+      selPemilik.value = nilaiLama === 'referensi' ? 'referensi' : 'milik_saya';
+    } else {
+      const daftarPemilik = stateMemori.pengguna
+        .filter(u => !adalahRoleSiswa(normalisasiRoleDnc(u.role)))
+        .sort((a, b) => teks(a.namaLengkap).localeCompare(teks(b.namaLengkap)));
+      selPemilik.innerHTML = `
+        <option value="">Semua Pemilik</option>
+        <option value="tanpa_pemilik">Belum Ditetapkan Pemiliknya</option>
+        ${daftarPemilik.map(u => `<option value="${esc(u.id)}">${esc(u.namaLengkap)} (${esc(normalisasiRoleDnc(u.role))})</option>`).join('')}`;
+      if ([...selPemilik.options].some(o => o.value === nilaiLama)) selPemilik.value = nilaiLama;
+      else selPemilik.value = '';
+    }
+  }
+
   const mapelOpsi = daftarMapelDiizinkan().map(m => ({ value: m.id, label: `${m.kodeMapel} - ${m.namaMapel}` }));
   isiSelectOpsi('filter-mapel-soal', mapelOpsi, 'Semua Mapel');
   renderTabelSoal();
