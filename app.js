@@ -5050,7 +5050,7 @@ function bukaFormPaket(item = null) {
         <div class="dnc-form-grup dnc-form-full">
           <label class="dnc-label">Kelas Sasaran * (pilih minimal satu)</label>
           <div class="dnc-checklist-box" style="max-height:115px">
-            ${stateMemori.kelas.map(k => `
+            ${kelasListDiizinkan.map(k => `
               <label class="dnc-checklist-item">
                 <input type="checkbox" name="f-kelas-id" value="${esc(k.id)}" ${kelasTerpilih.has(k.id) ? 'checked' : ''}>
                 <span><strong>${esc(k.kodeKelas)}</strong> — ${esc(k.namaKelas)} (${esc(labelTingkat(k.tingkat))})</span>
@@ -5122,7 +5122,9 @@ function bukaFormPaket(item = null) {
       if (!judulPaket || !tahunAjaran || !mapelId) throw new Error('Judul paket, tahun ajaran, dan mata pelajaran wajib diisi.');
       if (!bolehAksesMapel(mapelId)) throw new Error('Anda tidak memiliki akses pada mata pelajaran tersebut.');
       if (!kelasIds.length) throw new Error('Pilih minimal satu kelas sasaran.');
+      if (kelasIds.some(kid => !bolehAksesKelas(kid))) throw new Error('Terdapat kelas sasaran yang tidak termasuk kelas ampu Anda.');
       if (!daftarSoalIds.length) throw new Error('Pilih minimal satu butir soal untuk paket ASAS.');
+      if (daftarSoalIds.some(sid => !bolehKelolaSoal(cariById('bankSoal', sid)))) throw new Error('Terdapat butir soal yang bukan milik akun Anda.');
       if (!waktuMulaiVal || !waktuSelesaiVal) throw new Error('Waktu mulai dan waktu selesai wajib diisi.');
       const dMulai = new Date(waktuMulaiVal);
       const dSelesai = new Date(waktuSelesaiVal);
