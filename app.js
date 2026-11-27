@@ -277,6 +277,99 @@ async function muatPdfJs() {
   return lib;
 }
 
+function normalisasiNilaiBenarSalah(kataRaw) {
+  const k = teks(String(kataRaw || '').trim()).replace(/\s+/g, ' ');
+  if (['benar', 'b', 'true', 'ya', 'sesuai', 'tepat', 'setuju'].includes(k)) return 'Benar';
+  if (['salah', 's', 'false', 'tidak', 'tidak sesuai', 'tidak tepat', 'tidak setuju'].includes(k)) return 'Salah';
+  return '';
+}
+
+function parseKunciBenarSalah(val) {
+  const str = String(val || '').trim();
+  if (!str) return [];
+  const peta = new Map();
+
+  const reBernomor = /(\d+)\s*(?:[\.\)\:\-\=]\s*|\s+)(tidak\s+sesuai|tidak\s+tepat|tidak\s+setuju|benar|salah|true|false|sesuai|tepat|setuju|ya|tidak|[bs])(?=\s|$|[,;|.\)])/gi;
+  let m;
+  while ((m = reBernomor.exec(str)) !== null) {
+    const no = Number(m[1]);
+    const nilai = normalisasiNilaiBenarSalah(m[2]);
+    if (no > 0 && nilai) peta.set(no, nilai);
+  }
+
+  if (peta.size > 0) {
+    return [...peta.entries()]
+      .sort((a, b) => a[0] - b[0])
+      .map(([no, nilai]) => ({ no, nilai }));
+  }
+
+  const potong = str.split(/[,;|\n]+/).map(x => x.trim()).filter(Boolean);
+  const hasil = [];
+  potong.forEach((p, idx) => {
+    const nilai = normalisasiNilaiBenarSalah(p);
+    if (nilai) hasil.push({ no: idx + 1, nilai });
+  });
+  return hasil;
+}
+
+function normalisasiKunciBenarSalah(val) {
+  const items = parseKunciBenarSalah(val);
+  return items.length ? items.map(it => `${it.no}. ${it.nilai}`).join(', ') : String(val || '').trim();
+}
+
+function parseJawabanBenarSalahMap(val) {
+  const map = {};
+  parseKunciBenarSalah(val).forEach(it => {
+    map[String(it.no)] = it.nilai;
+  });
+  return map;
+}
+
+function formatJawabanBenarSalahMap(peta) {
+  return Object.entries(peta || {})
+    .filter(([, v]) => v === 'Benar' || v === 'Salah')
+    .sort((a, b) => Number(a[0]) - Number(b[0]))
+    .map(([no, v]) => `${no}. ${v}`)
+    .join(', ');
+}
+
+const muatTesseractJs = () => muatSkripCdn(
+  'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js',
+  () => window.Tesseract,
+  'Gagal memuat mesin OCR pembaca gambar (Tesseract.js).'
+);
+
+async function bacaTeksOcrDariGambar(sumberGambar, onProgress = null) {
+  if (!sumberGambar) throw new Error('Sumber gambar untuk OCR kosong.');
+  const TesseractLib = await muatTesseractJs();
+  const res = await TesseractLib.recognize(sumberGambar, 'ind+eng', {
+    logger: info => {
+      if (typeof onProgress === 'function' && info?.status === 'recognizing text') {
+        onProgress(Math.round((info.progress || 0) * 100));
+      }
+    }
+  });
+  return String(res?.data?.text || '')
+    .replace(/\r/g, '')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+function bacaFileSebagaiDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(new Error('Gagal membaca file gambar lokal.'));
+    reader.readAsDataURL(file);
+  });
+}
+
+async function kompresFileGambarLokal(file, maksLebar = 1024) {
+  const dataUrl = await bacaFileSebagaiDataUrl(file);
+  return await kompresDataGambar(dataUrl, maksLebar, 0.85);
+}
+
 async function ekstrakTeksBarisPdf(file) {
   const pdfjsLib = await muatPdfJs();
   const buf = await file.arrayBuffer();
@@ -313,6 +406,179 @@ async function ekstrakTeksBarisPdf(file) {
     });
   }
   return semuaBaris;
+}
+
+function kalikanMatriksPdf(m1, m2) {
+  return [
+    m1[0] * m2[0] + m1[2] * m2[1],
+    m1[1] * m2[0] + m1[3] * m2[1],
+    m1[0] * m2[2] + m1[2] * m2[3],
+    m1[1] * m2[2] + m1[3] * m2[3],
+    m1[0] * m2[4] + m1[2] * m2[5] + m1[4],
+    m1[1] * m2[4] + m1[3] * m2[5] + m1[5]
+  ];
+}
+
+function ambilObjGambarPdf(page, nama) {
+  return new Promise(resolve => {
+    let selesai = false;
+    const done = val => { if (!selesai) { selesai = true; resolve(val || null); } };
+    const timer = setTimeout(() => done(null), 1200);
+    try {
+      const sumber = String(nama || '').startsWith('g_') ? page.commonObjs : page.objs;
+      if (typeof sumber.has === 'function' && sumber.has(nama)) {
+        clearTimeout(timer);
+        done(sumber.get(nama));
+        return;
+      }
+      sumber.get(nama, obj => {
+        clearTimeout(timer);
+        done(obj);
+      });
+    } catch (_) {
+      clearTimeout(timer);
+      done(null);
+    }
+  });
+}
+
+async function konversiObjGambarPdfKeDataUrl(imgObj) {
+  if (!imgObj) return '';
+  const w = Number(imgObj.width || imgObj.bitmap?.width || 0);
+  const h = Number(imgObj.height || imgObj.bitmap?.height || 0);
+  if (w < 60 || h < 35) return '';
+  const c = document.createElement('canvas');
+  c.width = w;
+  c.height = h;
+  const ctx = c.getContext('2d');
+  if (imgObj.bitmap) {
+    ctx.drawImage(imgObj.bitmap, 0, 0);
+  } else if (imgObj.data) {
+    const imgData = ctx.createImageData(w, h);
+    const src = imgObj.data;
+    const dst = imgData.data;
+    if (src.length === w * h * 4) {
+      dst.set(src);
+    } else if (src.length === w * h * 3) {
+      for (let s = 0, d = 0; s < src.length; s += 3, d += 4) {
+        dst[d] = src[s];
+        dst[d + 1] = src[s + 1];
+        dst[d + 2] = src[s + 2];
+        dst[d + 3] = 255;
+      }
+    } else if (src.length === w * h) {
+      for (let s = 0, d = 0; s < src.length; s++, d += 4) {
+        dst[d] = dst[d + 1] = dst[d + 2] = src[s];
+        dst[d + 3] = 255;
+      }
+    } else {
+      return '';
+    }
+    ctx.putImageData(imgData, 0, 0);
+  } else {
+    return '';
+  }
+  return await kompresDataGambar(c.toDataURL('image/png'), 1024, 0.85);
+}
+
+async function ekstrakBarisDanGambarPdf(file) {
+  const pdfjsLib = await muatPdfJs();
+  const buf = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buf) }).promise;
+  const hasilAkhir = [];
+  const OPS = pdfjsLib.OPS || {};
+
+  for (let hal = 1; hal <= pdf.numPages; hal++) {
+    const page = await pdf.getPage(hal);
+    const tc = await page.getTextContent();
+    const kelompokY = [];
+    let totalKarakter = 0;
+
+    tc.items.forEach(it => {
+      const str = String(it.str || '').trim();
+      if (!str) return;
+      totalKarakter += str.length;
+      const y = Math.round(it.transform[5] / 4) * 4;
+      const x = it.transform[4];
+      let baris = kelompokY.find(b => Math.abs(b.y - y) <= 4);
+      if (!baris) {
+        baris = { y, sel: [] };
+        kelompokY.push(baris);
+      }
+      baris.sel.push({ x, str });
+    });
+
+    const itemHalaman = [];
+    kelompokY.forEach(b => {
+      b.sel.sort((a, b2) => a.x - b2.x);
+      let gabung = '';
+      for (let i = 0; i < b.sel.length; i++) {
+        if (i > 0) {
+          const jarak = b.sel[i].x - b.sel[i - 1].x;
+          gabung += jarak > 45 ? '\t' : ' ';
+        }
+        gabung += b.sel[i].str;
+      }
+      if (gabung.trim()) {
+        itemHalaman.push({ y: b.y, teks: gabung.trim(), img: '', bold: false });
+      }
+    });
+
+    // Jika halaman PDF berupa hasil scan gambar (minim teks), render halaman agar bisa di-OCR / disimpan
+    if (totalKarakter < 25) {
+      try {
+        const viewport = page.getViewport({ scale: 1.6 });
+        const c = document.createElement('canvas');
+        c.width = Math.round(viewport.width);
+        c.height = Math.round(viewport.height);
+        await page.render({ canvasContext: c.getContext('2d'), viewport }).promise;
+        const scanUrl = await kompresDataGambar(c.toDataURL('image/png'), 1024, 0.85);
+        if (scanUrl) {
+          hasilAkhir.push({ teks: '', img: scanUrl, imgAsli: '', labelGambar: `Halaman Scan ${hal}`, bold: false, isHalamanScan: true, halaman: hal });
+        }
+      } catch (_) {}
+      continue;
+    }
+
+    // Ekstrak gambar tertanam beserta posisi vertikalnya agar menyisip tepat di soal terkait
+    try {
+      const opList = await page.getOperatorList();
+      const stack = [];
+      let ctm = [1, 0, 0, 1, 0, 0];
+      const gambarKandidat = [];
+      for (let i = 0; i < opList.fnArray.length; i++) {
+        const fn = opList.fnArray[i];
+        const args = opList.argsArray[i];
+        if (fn === OPS.save) stack.push([...ctm]);
+        else if (fn === OPS.restore) ctm = stack.length ? stack.pop() : [1, 0, 0, 1, 0, 0];
+        else if (fn === OPS.transform && Array.isArray(args)) ctm = kalikanMatriksPdf(ctm, args);
+        else if (fn === OPS.paintImageXObject || fn === OPS.paintJpegXObject) {
+          gambarKandidat.push({ y: ctm[5] + Math.abs(ctm[3]) / 2, nama: args[0], inlineObj: null });
+        } else if (fn === OPS.paintInlineImageXObject && args?.[0]) {
+          gambarKandidat.push({ y: ctm[5] + Math.abs(ctm[3]) / 2, nama: '', inlineObj: args[0] });
+        }
+      }
+
+      for (const gk of gambarKandidat) {
+        const obj = gk.inlineObj || await ambilObjGambarPdf(page, gk.nama);
+        const dataUrl = await konversiObjGambarPdfKeDataUrl(obj);
+        if (dataUrl) {
+          itemHalaman.push({ y: gk.y, teks: '', img: dataUrl, imgAsli: '', labelGambar: `Gambar PDF Hal ${hal}`, bold: false });
+        }
+      }
+    } catch (_) {}
+
+    itemHalaman.sort((a, b) => b.y - a.y);
+    itemHalaman.forEach(it => hasilAkhir.push({
+      teks: it.teks,
+      img: it.img,
+      imgAsli: it.imgAsli || '',
+      labelGambar: it.labelGambar || '',
+      bold: it.bold
+    }));
+  }
+
+  return hasilAkhir;
 }
 
 const stateMemori = {
