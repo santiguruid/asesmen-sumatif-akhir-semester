@@ -867,6 +867,7 @@ function badgeStatus(teksStatus) {
 function badgeTipeSoal(tipe) {
   if (tipe === 'Pilihan Ganda') return `<span class="dnc-badge dnc-badge-biru">Pilihan Ganda</span>`;
   if (tipe === 'Pilihan Ganda Kompleks') return `<span class="dnc-badge dnc-badge-ungu">PG Kompleks</span>`;
+  if (tipe === 'Benar/Salah') return `<span class="dnc-badge dnc-badge-bs">Benar/Salah</span>`;
   if (tipe === 'Isian Singkat') return `<span class="dnc-badge dnc-badge-amber">Isian Singkat</span>`;
   return `<span class="dnc-badge dnc-badge-abu">Uraian</span>`;
 }
