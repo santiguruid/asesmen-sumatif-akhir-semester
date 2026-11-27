@@ -6057,7 +6057,7 @@ function renderTabelHasil() {
 function bukaModalKoreksiHasil(hasilId, hanyaBaca = false) {
   const hasil = cariById('hasilUjian', hasilId);
   if (!hasil) return;
-  const paket = cariById('paketAsas', hasil.paketId);
+  const paket = cariInfoPaketHasil(hasil);
   const siswa = cariById('pengguna', hasil.penggunaId) || penggunaAktif;
   const mapel = cariById('mataPelajaran', hasil.mapelId);
   const kkm = Number(mapel?.kkm ?? 75);
@@ -6187,15 +6187,238 @@ function resetSesiHasilUjian(hasilId) {
   const siswa = cariById('pengguna', h.penggunaId);
   bukaKonfirmasi({
     judul: 'Reset Sesi Ujian Peserta Didik',
-    pesan: `Menghapus rekaman sesi ujian milik ${siswa?.namaLengkap || h.penggunaId} agar dapat mengulang ujian dengan token aktif. Lanjutkan?`,
+    pesan: `Menghapus rekaman sesi ujian milik ${siswa?.namaLengkap || h.penggunaId} agar dapat mengulang ujian kembali. Lanjutkan?`,
     labelYa: 'Ya, Reset Sesi',
     onYa: async () => {
       await dbDelete(COLLECTIONS.hasilUjian, hasilId);
       resetCacheMenu(['DNC-M1', 'DNC-M5', 'DNC-M6']);
       await muatM6HasilNilai(true);
-      tampilkanToast('Sesi ujian berhasil direset. Siswa dapat masuk kembali menggunakan token.');
+      tampilkanToast('Sesi ujian berhasil direset.');
     }
   });
+}
+
+function analisisNomorBenarSalahHasil(hasil, daftarSoalIdsKanonik) {
+  const petaJwb = new Map();
+  (hasil?.jawabanSiswa || []).forEach(j => {
+    if (j?.soalId) petaJwb.set(j.soalId, j);
+  });
+
+  const ids = (Array.isArray(daftarSoalIdsKanonik) && daftarSoalIdsKanonik.length)
+    ? daftarSoalIdsKanonik
+    : (Array.isArray(hasil?.urutanSoalIds) && hasil.urutanSoalIds.length
+      ? hasil.urutanSoalIds
+      : (hasil?.jawabanSiswa || []).map(j => j.soalId));
+
+  const benar = [];
+  const salah = [];
+
+  ids.forEach((soalId, idx) => {
+    const no = idx + 1;
+    const soal = cariById('bankSoal', soalId);
+    const j = petaJwb.get(soalId);
+    const bobot = Number(soal?.bobotNilai || 0);
+    let skorButir = 0;
+
+    if (j) {
+      if (hasil?.statusUjian === 'Sedang Dikerjakan') {
+        skorButir = soal && soal.tipeSoal !== 'Uraian'
+          ? hitungSkorButirOtomatis(soal, j.jawaban)
+          : Number(j.skor || 0);
+      } else if (typeof j.skor === 'number') {
+        skorButir = j.skor;
+      } else if (soal && soal.tipeSoal !== 'Uraian') {
+        skorButir = hitungSkorButirOtomatis(soal, j.jawaban);
+      }
+    }
+
+    if (bobot > 0 && skorButir >= bobot) {
+      benar.push(String(no));
+    } else if (bobot > 0 && skorButir > 0) {
+      salah.push(`${no} (parsial)`);
+    } else {
+      salah.push(String(no));
+    }
+  });
+
+  return {
+    totalSoal: ids.length,
+    benar,
+    salah
+  };
+}
+
+function cetakRekapTabelPaketM6(paketIdTarget = '') {
+  const sumber = paketIdTarget
+    ? dataHasilTersaring.filter(h => h.paketId === paketIdTarget)
+    : [...dataHasilTersaring];
+
+  if (!sumber.length) {
+    tampilkanToast('Tidak ada data hasil ujian untuk dicetak.', 'error');
+    return;
+  }
+
+  const petaGrup = new Map();
+  sumber.forEach(h => {
+    const kunci = h.paketId || '__tanpa_paket__';
+    if (!petaGrup.has(kunci)) {
+      const paketObj = cariInfoPaketHasil(h);
+      petaGrup.set(kunci, { kunci, paketObj, mapelId: paketObj?.mapelId || h.mapelId, list: [] });
+    }
+    petaGrup.get(kunci).list.push(h);
+  });
+
+  const waktuCetak = formatTanggal(new Date(), true);
+  const namaPencetak = penggunaAktif?.namaLengkap || '-';
+
+  const blokPaketHtml = [...petaGrup.values()].map((g, gIdx) => {
+    const judulPaket = g.paketObj?.judulPaket || 'Paket ASAS';
+    const namaMapel = namaMapelById(g.mapelId);
+    const kelasSasaran = (g.paketObj?.kelasIds || []).map(id => cariById('kelas', id)?.kodeKelas || id).join(', ');
+    const daftarSoalIds = g.paketObj?.daftarSoalIds || [];
+
+    // Otomatis urut dari nilai tertinggi ke nilai terendah
+    const barisUrut = [...g.list].sort((a, b) => {
+      const selNilai = Number(b.skorAkhir || 0) - Number(a.skorAkhir || 0);
+      if (selNilai !== 0) return selNilai;
+      const na = cariById('pengguna', a.penggunaId)?.namaLengkap || a.penggunaId;
+      const nb = cariById('pengguna', b.penggunaId)?.namaLengkap || b.penggunaId;
+      return String(na).localeCompare(String(nb), 'id', { sensitivity: 'base' });
+    });
+
+    const nilaiList = barisUrut.map(x => Number(x.skorAkhir || 0));
+    const rata = nilaiList.length ? bulatDua(nilaiList.reduce((s, n) => s + n, 0) / nilaiList.length) : 0;
+    const tertinggi = nilaiList.length ? Math.max(...nilaiList) : 0;
+    const terendah = nilaiList.length ? Math.min(...nilaiList) : 0;
+
+    const rowsHtml = barisUrut.map((h, idx) => {
+      const s = cariById('pengguna', h.penggunaId);
+      const kelasTeks = h.kelasId
+        ? (cariById('kelas', h.kelasId)?.kodeKelas || '-')
+        : `${h.kelasTeks || s?.kelasTeks || '-'}${h.asalSekolah || s?.asalSekolah ? ` — ${h.asalSekolah || s?.asalSekolah}` : ''}`;
+      const analisis = analisisNomorBenarSalahHasil(h, daftarSoalIds);
+      const teksBenar = analisis.benar.length ? analisis.benar.join(', ') : '-';
+      const teksSalah = analisis.salah.length ? analisis.salah.join(', ') : '-';
+      return `
+        <tr>
+          <td class="t-center">${idx + 1}</td>
+          <td>
+            <strong>${esc(s?.namaLengkap || h.penggunaId)}</strong>
+            <div class="sub-info">${esc(s?.nomorInduk || '-')} • ${esc(kelasTeks)}</div>
+          </td>
+          <td class="t-center"><strong>${esc(h.skorAkhir ?? 0)}</strong></td>
+          <td>
+            <div class="jml-info">Benar: ${analisis.benar.length} dari ${analisis.totalSoal}</div>
+            <div>No: ${esc(teksBenar)}</div>
+          </td>
+          <td>
+            <div class="jml-info">Salah/Belum: ${analisis.salah.length} dari ${analisis.totalSoal}</div>
+            <div>No: ${esc(teksSalah)}</div>
+          </td>
+        </tr>`;
+    }).join('');
+
+    return `
+      <section class="paket-cetak ${gIdx > 0 ? 'page-break' : ''}">
+        <header class="kop-cetak">
+          <h1>REKAPITULASI NILAI &amp; ANALISIS BUTIR JAWABAN</h1>
+          <h2>${esc(judulPaket)}</h2>
+          <p>
+            Mata Pelajaran: <strong>${esc(namaMapel)}</strong>
+            ${g.paketObj?.modeBimbel ? ` | Kategori: <strong>${esc(normalisasiKategoriSoal(g.paketObj?.kategoriSoal))} (Bimbel)</strong>` : ''}
+            ${kelasSasaran ? ` | Kelas: <strong>${esc(kelasSasaran)}</strong>` : ''}
+            | Jumlah Soal: <strong>${daftarSoalIds.length || '-'}</strong>
+          </p>
+          <p class="meta-cetak">
+            Peserta: ${barisUrut.length} | Rata-rata: ${rata} | Tertinggi: ${tertinggi} | Terendah: ${terendah} | Diurutkan: Nilai Tertinggi ke Terendah
+          </p>
+        </header>
+        <table>
+          <thead>
+            <tr>
+              <th style="width:44px" class="t-center">No</th>
+              <th style="width:24%">Nama Siswa</th>
+              <th style="width:72px" class="t-center">Nilai</th>
+              <th style="width:32%">Nomor Soal Benar</th>
+              <th style="width:32%">Nomor Soal Salah</th>
+            </tr>
+          </thead>
+          <tbody>${rowsHtml}</tbody>
+        </table>
+        <footer class="kaki-cetak">
+          <span>Dicetak pada ${esc(waktuCetak)} oleh ${esc(namaPencetak)}</span>
+          <span>DigitalNetCare@copyright</span>
+        </footer>
+      </section>`;
+  }).join('');
+
+  const dokumenHtml = `<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>Rekap Nilai Tabel Per Paket - DigitalNetCare</title>
+  <style>
+    @page { size: A4 landscape; margin: 12mm; }
+    * { box-sizing: border-box; }
+    body { font-family: Arial, Helvetica, sans-serif; color: #0F172A; font-size: 11px; line-height: 1.45; margin: 0; padding: 14px; background: #FFFFFF; }
+    .bar-aksi { margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px solid #CBD5E1; display: flex; gap: 8px; justify-content: flex-end; }
+    .btn-cetak { padding: 7px 14px; border: 1px solid #2563EB; background: #2563EB; color: #FFFFFF; font-weight: 700; border-radius: 6px; cursor: pointer; font-size: 12px; }
+    .btn-tutup { padding: 7px 14px; border: 1px solid #CBD5E1; background: #FFFFFF; color: #0F172A; font-weight: 700; border-radius: 6px; cursor: pointer; font-size: 12px; }
+    .kop-cetak { text-align: center; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 2px solid #0F172A; }
+    .kop-cetak h1 { font-size: 15px; margin: 0 0 3px; letter-spacing: 0.03em; }
+    .kop-cetak h2 { font-size: 13px; margin: 0 0 4px; color: #1E40AF; }
+    .kop-cetak p { margin: 2px 0; font-size: 11px; }
+    .meta-cetak { color: #475569; }
+    table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+    th, td { border: 1px solid #334155; padding: 6px 8px; vertical-align: top; text-align: left; word-break: break-word; }
+    thead th { background: #F1F5F9; font-size: 11px; text-transform: uppercase; letter-spacing: 0.03em; }
+    .t-center { text-align: center; }
+    .sub-info { font-size: 10px; color: #475569; margin-top: 2px; }
+    .jml-info { font-size: 10px; font-weight: 700; color: #334155; margin-bottom: 2px; }
+    .kaki-cetak { margin-top: 12px; padding-top: 6px; border-top: 1px solid #CBD5E1; display: flex; justify-content: space-between; font-size: 10px; color: #475569; }
+    .page-break { page-break-before: always; margin-top: 20px; }
+    @media print {
+      body { padding: 0; }
+      .bar-aksi { display: none !important; }
+      .page-break { margin-top: 0; }
+      tr { page-break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <div class="bar-aksi">
+    <button type="button" class="btn-cetak" onclick="window.print()">Cetak / Simpan PDF Tabel</button>
+    <button type="button" class="btn-tutup" onclick="window.close()">Tutup</button>
+  </div>
+  ${blokPaketHtml}
+  <script>window.addEventListener('load',function(){setTimeout(function(){window.print();},250);});<\/script>
+</body>
+</html>`;
+
+  const jendela = window.open('', '_blank', 'width=1100,height=760');
+  if (jendela) {
+    jendela.document.open();
+    jendela.document.write(dokumenHtml);
+    jendela.document.close();
+    return;
+  }
+
+  // Fallback jika browser memblokir popup: cetak lewat iframe tersembunyi
+  const iframe = document.createElement('iframe');
+  iframe.style.position = 'fixed';
+  iframe.style.right = '0';
+  iframe.style.bottom = '0';
+  iframe.style.width = '0';
+  iframe.style.height = '0';
+  iframe.style.border = '0';
+  document.body.appendChild(iframe);
+  iframe.contentDocument.open();
+  iframe.contentDocument.write(dokumenHtml);
+  iframe.contentDocument.close();
+  setTimeout(() => {
+    try { iframe.contentWindow.focus(); iframe.contentWindow.print(); } catch (_) {}
+    setTimeout(() => iframe.remove(), 2000);
+  }, 300);
 }
 
 function eksporRekapNilaiCsv() {
@@ -6203,15 +6426,16 @@ function eksporRekapNilaiCsv() {
     tampilkanToast('Tidak ada data hasil ujian untuk diekspor.', 'error');
     return;
   }
-  const header = ['NomorInduk', 'NamaLengkap', 'Kelas', 'PaketASAS', 'MataPelajaran', 'StatusUjian', 'SkorOtomatis', 'SkorUraian', 'SkorAkhir', 'Ketuntasan'];
+  const header = ['NomorInduk', 'NamaLengkap', 'KelasAtauAsal', 'PaketSoal', 'MataPelajaran', 'StatusUjian', 'SkorOtomatis', 'SkorUraian', 'SkorAkhir', 'Ketuntasan'];
   const qCsv = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
   const baris = [header.join(',')];
   dataHasilTersaring.forEach(h => {
     const s = cariById('pengguna', h.penggunaId);
-    const p = cariById('paketAsas', h.paketId);
+    const p = cariInfoPaketHasil(h);
     const k = cariById('kelas', h.kelasId);
+    const infoKelas = k ? k.kodeKelas : `${h.kelasTeks || s?.kelasTeks || ''}${h.asalSekolah || s?.asalSekolah ? ` (${h.asalSekolah || s?.asalSekolah})` : ''}`;
     baris.push([
-      s?.nomorInduk || '', s?.namaLengkap || '', k?.kodeKelas || '',
+      s?.nomorInduk || '', s?.namaLengkap || '', infoKelas,
       p?.judulPaket || '', namaMapelById(h.mapelId), h.statusUjian || '',
       h.skorPg ?? 0, h.skorUraian ?? 0, h.skorAkhir ?? 0, h.statusKetuntasan || ''
     ].map(qCsv).join(','));
