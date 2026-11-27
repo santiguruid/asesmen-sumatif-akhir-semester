@@ -7628,7 +7628,7 @@ async function inisialisasiAplikasiDnc() {
   document.getElementById('btn-impor-word')?.addEventListener('click', bukaModalImporWord);
   document.getElementById('btn-impor-csv-soal')?.addEventListener('click', bukaModalImporCsvSoal);
   document.getElementById('cari-soal')?.addEventListener('input', debounceDnc(renderTabelSoal, 250));
-  ['filter-mapel-soal', 'filter-tingkat-soal', 'filter-tipe-soal', 'filter-status-soal'].forEach(id => {
+  ['filter-kategori-soal', 'filter-mapel-soal', 'filter-tingkat-soal', 'filter-tipe-soal', 'filter-status-soal'].forEach(id => {
     document.getElementById(id)?.addEventListener('change', renderTabelSoal);
   });
   document.getElementById('wadah-paket-soal-m3')?.addEventListener('click', e => {
