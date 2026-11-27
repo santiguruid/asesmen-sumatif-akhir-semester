@@ -22,18 +22,23 @@ const COLLECTIONS = {
   hasilUjian: 'hasil_ujian'
 };
 
+const GAS_EMAIL_WEBHOOK_URL = 'PASTE_URL_WEB_APP_GAS_DI_SINI'; // Tempel URL /exec hasil deploy EmailWebhook.gs di Tahap 4
+const GAS_EMAIL_SECRET = 'DNC_ASAS_BIMBEL_2026_KEY'; // Harus sama persis dengan SECRET_KEY di EmailWebhook.gs
+
 const MENU_DAFTAR = [
-  { id: 'DNC-M1', label: 'Dashboard', pendek: 'Beranda', icon: 'icon-dashboard', roles: ['Admin', 'Guru'] },
+  { id: 'DNC-M1', label: 'Dashboard', pendek: 'Beranda', icon: 'icon-dashboard', roles: ['Admin', 'Guru', 'Guru Bimbel'] },
   { id: 'DNC-M2', label: 'Master Kelas & Mapel', pendek: 'Master', icon: 'icon-master', roles: ['Admin'] },
-  { id: 'DNC-M3', label: 'Bank Soal', pendek: 'Soal', icon: 'icon-bank', roles: ['Admin', 'Guru'] },
+  { id: 'DNC-M3', label: 'Bank Soal', pendek: 'Soal', icon: 'icon-bank', roles: ['Admin', 'Guru', 'Guru Bimbel'] },
   { id: 'DNC-M4', label: 'Jadwal & Paket ASAS', pendek: 'Paket', icon: 'icon-jadwal', roles: ['Admin', 'Guru'] },
-  { id: 'DNC-M5', label: 'Ruang Ujian ASAS', pendek: 'Ujian', icon: 'icon-ujian', roles: ['Siswa'] },
-  { id: 'DNC-M6', label: 'Hasil & Rekap Nilai', pendek: 'Nilai', icon: 'icon-hasil', roles: ['Admin', 'Guru', 'Siswa'] },
-  { id: 'DNC-M7', label: 'Manajemen Pengguna', pendek: 'Pengguna', icon: 'icon-users', roles: ['Admin'] }
+  { id: 'DNC-M5', label: 'Ruang Ujian ASAS', pendek: 'Ujian', icon: 'icon-ujian', roles: ['Siswa', 'Siswa Bimbel'] },
+  { id: 'DNC-M6', label: 'Hasil & Rekap Nilai', pendek: 'Nilai', icon: 'icon-hasil', roles: ['Admin', 'Guru', 'Guru Bimbel', 'Siswa', 'Siswa Bimbel'] },
+  { id: 'DNC-M7', label: 'Manajemen Pengguna', pendek: 'Pengguna', icon: 'icon-users', roles: ['Admin'] },
+  { id: 'DNC-M8', label: 'Profil & Sandi', pendek: 'Profil', icon: 'icon-users', roles: ['Siswa Bimbel'] }
 ];
 
 const TINGKAT_LIST = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
 const TIPE_SOAL_LIST = ['Pilihan Ganda', 'Pilihan Ganda Kompleks', 'Isian Singkat', 'Uraian'];
+const KATEGORI_SOAL_LIST = ['ASAS', 'TKA'];
 // ===== AKHIR BLOK: DNC_CONFIG =====
 
 // ===== BLOK: DNC_PWA =====
