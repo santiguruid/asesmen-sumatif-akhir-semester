@@ -22,7 +22,7 @@ const COLLECTIONS = {
   hasilUjian: 'hasil_ujian'
 };
 
-const GAS_EMAIL_WEBHOOK_URL = 'PASTE_URL_WEB_APP_GAS_DI_SINI'; // Tempel URL /exec hasil deploy EmailWebhook.gs di Tahap 4
+const GAS_EMAIL_WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbxyX9EZRF0DDijgsEqA_wV8DcXLlYbi_mne6Fh_y1yb8NuRHVvxMabBfureKYfS0aYb9w/exec'; // Tempel URL /exec hasil deploy EmailWebhook.gs di Tahap 4
 const GAS_EMAIL_SECRET = 'DNC_ASAS_BIMBEL_2026_KEY'; // Harus sama persis dengan SECRET_KEY di EmailWebhook.gs
 
 const MENU_DAFTAR = [
