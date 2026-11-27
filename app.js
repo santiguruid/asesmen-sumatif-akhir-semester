@@ -1316,10 +1316,10 @@ async function masukKeAplikasi(userObj) {
   bangunNavigasiRole();
   await muatDataDasar();
 
-  if (userObj.role === 'Siswa') aktifkanLockdownSiswa();
+  if (adalahRoleSiswa(userObj.role)) aktifkanLockdownSiswa();
   else nonaktifkanLockdownSiswa();
 
-  const menuAwal = userObj.role === 'Siswa' ? 'DNC-M5' : 'DNC-M1';
+  const menuAwal = adalahRoleSiswa(userObj.role) ? 'DNC-M5' : 'DNC-M1';
   await bukaMenu(menuAwal);
 }
 
@@ -1338,6 +1338,88 @@ async function keluarAplikasi() {
   document.getElementById('dnc-halaman-login').classList.remove('dnc-disembunyikan');
   document.getElementById('input-login-password').value = '';
   tampilkanToast('Anda telah keluar dari Portal ASAS.', 'info');
+}
+
+function bangunNavigasiRole() {
+  const diizinkan = MENU_DAFTAR
+    .filter(m => m.roles.includes(penggunaAktif.role))
+    .map(m => {
+      if (m.id === 'DNC-M5' && penggunaAktif.role === 'Siswa Bimbel') {
+        return { ...m, label: 'Bank Soal', pendek: 'Soal', icon: 'icon-bank' };
+      }
+      return m;
+    });
+
+  const navDesktop = document.getElementById('dnc-sidebar-nav');
+  navDesktop.innerHTML = diizinkan.map(m => `
+    <button type="button" class="dnc-nav-item" data-menu="${m.id}">
+      <svg class="dnc-ikon"><use href="#${m.icon}"></use></svg>
+      <span>${esc(m.label)}</span>
+    </button>`).join('');
+
+  navDesktop.querySelectorAll('[data-menu]').forEach(btn => {
+    btn.addEventListener('click', () => bukaMenu(btn.getAttribute('data-menu')));
+  });
+
+  const tabbar = document.getElementById('dnc-tabbar-hp');
+  const butuhLainnya = diizinkan.length > 5;
+  const utamaHp = butuhLainnya ? diizinkan.slice(0, 4) : diizinkan;
+  const sisaHp = butuhLainnya ? diizinkan.slice(4) : [];
+
+  tabbar.style.gridTemplateColumns = `repeat(${utamaHp.length + (butuhLainnya ? 1 : 0)}, 1fr)`;
+  tabbar.innerHTML = utamaHp.map(m => `
+    <button type="button" class="dnc-tab-item" data-menu="${m.id}">
+      <svg class="dnc-ikon"><use href="#${m.icon}"></use></svg>
+      <span>${esc(m.pendek)}</span>
+    </button>`).join('') + (butuhLainnya ? `
+    <button type="button" class="dnc-tab-item" id="btn-tab-lainnya">
+      <svg class="dnc-ikon"><use href="#icon-more"></use></svg>
+      <span>Lainnya</span>
+    </button>` : '');
+
+  tabbar.querySelectorAll('[data-menu]').forEach(btn => {
+    btn.addEventListener('click', () => bukaMenu(btn.getAttribute('data-menu')));
+  });
+
+  if (butuhLainnya) {
+    const sheetList = document.getElementById('dnc-sheet-menu-list');
+    sheetList.innerHTML = sisaHp.map(m => `
+      <button type="button" class="dnc-sheet-item" data-sheet-menu="${m.id}">
+        <svg class="dnc-ikon"><use href="#${m.icon}"></use></svg>
+        <span>${esc(m.label)}</span>
+      </button>`).join('');
+    sheetList.querySelectorAll('[data-sheet-menu]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.getElementById('dnc-sheet-lainnya').classList.add('dnc-disembunyikan');
+        bukaMenu(btn.getAttribute('data-sheet-menu'));
+      });
+    });
+    document.getElementById('btn-tab-lainnya')?.addEventListener('click', () => {
+      document.getElementById('dnc-sheet-lainnya').classList.remove('dnc-disembunyikan');
+    });
+  }
+}
+
+async function bukaMenu(kodeMenu) {
+  const izin = MENU_DAFTAR.find(m => m.id === kodeMenu && m.roles.includes(penggunaAktif?.role));
+  if (!izin) return;
+
+  menuAktif = kodeMenu;
+  document.querySelectorAll('.dnc-section').forEach(s => s.classList.remove('aktif'));
+  document.getElementById(`sec-${kodeMenu}`)?.classList.add('aktif');
+
+  document.querySelectorAll('.dnc-nav-item, .dnc-tab-item').forEach(el => {
+    el.classList.toggle('aktif', el.getAttribute('data-menu') === kodeMenu);
+  });
+
+  if (kodeMenu === 'DNC-M1') await muatM1Dashboard();
+  if (kodeMenu === 'DNC-M2') await muatM2Master();
+  if (kodeMenu === 'DNC-M3') await muatM3BankSoal();
+  if (kodeMenu === 'DNC-M4') await muatM4PaketAsas();
+  if (kodeMenu === 'DNC-M5') await muatM5RuangUjian();
+  if (kodeMenu === 'DNC-M6') await muatM6HasilNilai();
+  if (kodeMenu === 'DNC-M7') await muatM7Pengguna();
+  if (kodeMenu === 'DNC-M8') await muatM8Profil();
 }
 
 function bangunNavigasiRole() {
