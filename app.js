@@ -444,6 +444,80 @@ function bolehAksesMapel(mapelId) {
 function daftarTipeSoalDiizinkanForm() {
   return TIPE_SOAL_LIST;
 }
+
+function punyaKelasAmpuGuru(userObj = penggunaAktif) {
+  return Array.isArray(userObj?.kelasIds) && userObj.kelasIds.filter(Boolean).length > 0;
+}
+
+function daftarKelasDiizinkan() {
+  if (!penggunaAktif) return [];
+  if (adalahRoleGuru(penggunaAktif.role) && punyaKelasAmpuGuru(penggunaAktif)) {
+    const ampu = penggunaAktif.kelasIds;
+    return stateMemori.kelas.filter(k => ampu.includes(k.id));
+  }
+  return stateMemori.kelas;
+}
+
+function bolehAksesKelas(kelasId) {
+  if (!penggunaAktif) return false;
+  if (penggunaAktif.role === 'Admin') return true;
+  if (adalahRoleGuru(penggunaAktif.role)) {
+    if (!punyaKelasAmpuGuru(penggunaAktif)) return true;
+    return Boolean(kelasId && penggunaAktif.kelasIds.includes(kelasId));
+  }
+  return false;
+}
+
+function bolehKelolaSoal(soal) {
+  if (!penggunaAktif || !soal) return false;
+  if (penggunaAktif.role === 'Admin') return true;
+  if (adalahRoleGuru(penggunaAktif.role)) {
+    return bolehAksesMapel(soal.mapelId) && soal.dibuatOleh === penggunaAktif.id;
+  }
+  return false;
+}
+
+function bolehKelolaPaket(paket) {
+  if (!penggunaAktif || !paket) return false;
+  if (penggunaAktif.role === 'Admin') return true;
+  if (adalahRoleGuru(penggunaAktif.role)) {
+    return bolehAksesMapel(paket.mapelId) && paket.dibuatOleh === penggunaAktif.id;
+  }
+  return false;
+}
+
+function bolehAksesHasilGuru(hasil) {
+  if (!penggunaAktif || !hasil) return false;
+  if (penggunaAktif.role === 'Admin') return true;
+  if (!adalahRoleGuru(penggunaAktif.role)) return false;
+  if (!bolehAksesMapel(hasil.mapelId)) return false;
+
+  const adalahBimbel = hasil.jenisSesi === 'Bimbel' || String(hasil.paketId || '').startsWith('bmb_');
+  if (adalahBimbel) {
+    const soalIds = Array.isArray(hasil.daftarSoalIds) && hasil.daftarSoalIds.length
+      ? hasil.daftarSoalIds
+      : (Array.isArray(hasil.urutanSoalIds) ? hasil.urutanSoalIds : []);
+    if (soalIds.length && stateMemori.bankSoal.length) {
+      return soalIds.some(sid => cariById('bankSoal', sid)?.dibuatOleh === penggunaAktif.id);
+    }
+    return penggunaAktif.role === 'Guru Bimbel';
+  }
+
+  const paketMilikGuru = cariById('paketAsas', hasil.paketId);
+  if (!paketMilikGuru) return false;
+  if (punyaKelasAmpuGuru(penggunaAktif)) {
+    return Boolean(hasil.kelasId && penggunaAktif.kelasIds.includes(hasil.kelasId));
+  }
+  return true;
+}
+
+function namaPemilikSoal(userId) {
+  if (!userId) return 'Belum Ditetapkan';
+  const u = cariById('pengguna', userId);
+  if (u) return u.namaLengkap || u.email || userId;
+  if (penggunaAktif && penggunaAktif.id === userId) return penggunaAktif.namaLengkap || 'Saya';
+  return 'Pengguna Lain';
+}
 // ===== AKHIR BLOK: DNC_CORE =====
 
 // ===== BLOK: DNC_UI_HELPER =====
