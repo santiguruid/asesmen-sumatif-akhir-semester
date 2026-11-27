@@ -1504,14 +1504,15 @@ async function muatM1Dashboard(paksa = false) {
   }
 
   const sub = document.getElementById('subjudul-m1');
-  if (penggunaAktif.role === 'Guru') {
+  if (adalahRoleGuru(penggunaAktif.role)) {
     const namaAmpu = daftarMapelDiizinkan().map(m => m.namaMapel).join(', ') || 'belum ditetapkan';
-    sub.textContent = `Cakupan Guru — Mata Pelajaran Ampu: ${namaAmpu}.`;
+    sub.textContent = `Cakupan ${penggunaAktif.role} — Mata Pelajaran Ampu: ${namaAmpu}.`;
   } else {
     sub.textContent = 'Ringkasan capaian pelaksanaan, bank soal, dan status ketuntasan seluruh mata pelajaran.';
   }
 
-  const siswaAktif = stateMemori.pengguna.filter(u => u.role === 'Siswa' && u.statusAktif !== false);
+  const siswaAsasAktif = stateMemori.pengguna.filter(u => u.role === 'Siswa' && u.statusAktif !== false);
+  const siswaAktif = stateMemori.pengguna.filter(u => adalahRoleSiswa(u.role) && u.statusAktif !== false);
   const paketAktif = stateMemori.paketAsas.filter(p => p.statusPaket === 'Aktif');
   const hasilSelesai = stateMemori.hasilUjian.filter(h => h.statusUjian === 'Selesai');
   const rataSkor = hasilSelesai.length
@@ -1525,7 +1526,7 @@ async function muatM1Dashboard(paksa = false) {
 
   const peringatanSiswa = [];
   const barisJadwal = paketAktif.map(p => {
-    const targetSiswa = siswaAktif.filter(s => Array.isArray(p.kelasIds) && p.kelasIds.includes(s.kelasId));
+    const targetSiswa = siswaAsasAktif.filter(s => Array.isArray(p.kelasIds) && p.kelasIds.includes(s.kelasId));
     const hasilPaket = stateMemori.hasilUjian.filter(h => h.paketId === p.id);
     const selesaiIds = new Set(hasilPaket.filter(h => h.statusUjian !== 'Sedang Dikerjakan').map(h => h.penggunaId));
     const belum = targetSiswa.filter(s => !selesaiIds.has(s.id));
