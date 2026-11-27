@@ -331,7 +331,8 @@ const sudahDimuat = {
   'DNC-M4': false,
   'DNC-M5': false,
   'DNC-M6': false,
-  'DNC-M7': false
+  'DNC-M7': false,
+  'DNC-M8': false
 };
 
 let menuAktif = '';
@@ -339,6 +340,69 @@ let penggunaAktif = null;
 let roleLoginDipilih = 'Admin';
 let chartBarInstance = null;
 let chartDonutInstance = null;
+
+function adalahRoleGuru(role) {
+  return role === 'Guru' || role === 'Guru Bimbel';
+}
+
+function adalahRoleSiswa(role) {
+  return role === 'Siswa' || role === 'Siswa Bimbel';
+}
+
+function normalisasiKategoriSoal(val) {
+  return String(val || '').trim().toUpperCase() === 'TKA' ? 'TKA' : 'ASAS';
+}
+
+function badgeKategoriSoal(kat) {
+  const k = normalisasiKategoriSoal(kat);
+  return k === 'TKA'
+    ? '<span class="dnc-badge dnc-badge-tka">TKA</span>'
+    : '<span class="dnc-badge dnc-badge-asas">ASAS</span>';
+}
+
+function buatSandiSementaraBimbel(panjang = 8) {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+  let hasil = '';
+  for (let i = 0; i < panjang; i++) hasil += chars[Math.floor(Math.random() * chars.length)];
+  return hasil;
+}
+
+async function kirimEmailSandiBimbelOtomatis({ email, namaLengkap, sandiSementara, asalSekolah = '', kelasTeks = '' }) {
+  if (IS_PREVIEW) return { terkirim: true, modePreview: true };
+  const url = String(GAS_EMAIL_WEBHOOK_URL || '').trim();
+  if (!url || url.includes('PASTE_URL_WEB_APP_GAS')) {
+    return {
+      terkirim: false,
+      pesan: 'URL Mini-Webhook GAS (GAS_EMAIL_WEBHOOK_URL) di app.js belum diisi.'
+    };
+  }
+  try {
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({
+        secret: GAS_EMAIL_SECRET,
+        to: email,
+        namaLengkap,
+        sandiSementara,
+        asalSekolah,
+        kelasTeks,
+        urlAplikasi: location.origin + location.pathname
+      })
+    });
+    const hasil = await resp.json().catch(() => null);
+    if (hasil && hasil.status === 'ok') return { terkirim: true };
+    return {
+      terkirim: false,
+      pesan: hasil?.message || 'Mini-Webhook GAS mengembalikan status gagal.'
+    };
+  } catch (err) {
+    return {
+      terkirim: false,
+      pesan: err?.message || 'Gagal menghubungi Mini-Webhook GAS pengirim email.'
+    };
+  }
+}
 
 function resetCacheMenu(daftarMenu = null) {
   const target = daftarMenu || Object.keys(sudahDimuat);
@@ -361,7 +425,7 @@ function namaMapelById(id) {
 
 function daftarMapelDiizinkan() {
   if (!penggunaAktif) return [];
-  if (penggunaAktif.role === 'Guru') {
+  if (adalahRoleGuru(penggunaAktif.role)) {
     const ampu = Array.isArray(penggunaAktif.mapelIds) ? penggunaAktif.mapelIds : [];
     return stateMemori.mataPelajaran.filter(m => ampu.includes(m.id));
   }
@@ -371,7 +435,7 @@ function daftarMapelDiizinkan() {
 function bolehAksesMapel(mapelId) {
   if (!penggunaAktif) return false;
   if (penggunaAktif.role === 'Admin') return true;
-  if (penggunaAktif.role === 'Guru') {
+  if (adalahRoleGuru(penggunaAktif.role)) {
     return Array.isArray(penggunaAktif.mapelIds) && penggunaAktif.mapelIds.includes(mapelId);
   }
   return false;
