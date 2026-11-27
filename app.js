@@ -2050,10 +2050,210 @@ function namaSumberPaketSoal(s) {
   return `Soal_Manual_${mapel}_Tingkat_${s?.tingkat || 'Umum'}`;
 }
 
+const STOPWORD_GAMBAR_DNC = new Set([
+  'http', 'https', 'www', 'com', 'org', 'net', 'edu', 'gov', 'id', 'co', 'io', 'app',
+  'drive', 'google', 'docs', 'file', 'view', 'open', 'uc', 'thumbnail', 'export', 'usp', 'sharing',
+  'dropbox', 'raw', 'dl', 'github', 'githubusercontent', 'blob', 'main', 'master',
+  'firebasestorage', 'googleapis', 'storage', 'media', 'upload', 'uploads', 'wikimedia', 'wikipedia',
+  'commons', 'thumb', 'images', 'image', 'img', 'foto', 'photo', 'pic', 'picture', 'gambar', 'ilustrasi',
+  'assets', 'static', 'content', 'public', 'cdn', 'files', 'soal', 'asas', 'tka', 'bank', 'paket',
+  'jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'avif', 'px', 'w1000', 'sz', 'alt', 'token',
+  'dan', 'yang', 'dari', 'untuk', 'pada', 'atau', 'dengan', 'ini', 'itu', 'adalah', 'dalam', 'oleh',
+  'sumber', 'link', 'url', 'perhatikan', 'berikut', 'di', 'ke', 'sebagai', 'tersebut', 'bawah'
+]);
+
+function normalisasiUrlGambarSoal(urlRaw) {
+  let u = String(urlRaw || '').trim();
+  if (!u) return '';
+  if (u.startsWith('data:image/')) return u;
+  u = u.replace(/^[<(\["']+/, '').replace(/[>)\]"'\.,;]+$/, '').trim();
+  if (!/^https?:\/\//i.test(u)) return u;
+
+  // Konversi link Google Drive menjadi URL gambar langsung
+  const mDriveFile = u.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/i);
+  const mDriveId = u.match(/drive\.google\.com\/(?:open|uc|thumbnail)\?[^#]*\bid=([a-zA-Z0-9_-]+)/i);
+  const driveId = mDriveFile?.[1] || mDriveId?.[1] || '';
+  if (driveId) {
+    return `https://drive.google.com/thumbnail?id=${driveId}&sz=w1000`;
+  }
+
+  // Konversi link Dropbox menjadi URL raw langsung
+  if (/dropbox\.com/i.test(u)) {
+    try {
+      const parsed = new URL(u);
+      parsed.searchParams.delete('dl');
+      parsed.searchParams.set('raw', '1');
+      return parsed.toString();
+    } catch (_) {}
+  }
+
+  // Konversi link GitHub blob menjadi raw.githubusercontent
+  const mGh = u.match(/^https?:\/\/github\.com\/([^/]+)\/([^/]+)\/blob\/(.+)$/i);
+  if (mGh) {
+    return `https://raw.githubusercontent.com/${mGh[1]}/${mGh[2]}/${mGh[3]}`;
+  }
+
+  return u;
+}
+
+function adalahUrlGambarPotensial(urlRaw) {
+  const u = String(urlRaw || '').trim();
+  if (!u) return false;
+  if (u.startsWith('data:image/')) return true;
+  if (!/^https?:\/\//i.test(u)) return false;
+  if (/\.(?:png|jpe?g|gif|webp|svg|bmp|avif)(?:[?#].*)?$/i.test(u)) return true;
+  return /(?:drive\.google\.com|googleusercontent\.com|dropbox\.com|imgur\.com|ibb\.co|postimg\.cc|upload\.wikimedia\.org|firebasestorage\.googleapis\.com|cloudinary\.com|unsplash\.com|pixabay\.com|pexels\.com)/i.test(u);
+}
+
+function ekstrakLinkGambarDariTeks(teksRaw) {
+  let teksBersih = String(teksRaw || '');
+  let urlAsli = '';
+  let labelTeksGambar = '';
+
+  const reBerlabel = /(?:[\(\[]\s*)?(?:sumber\s+gambar|link\s+gambar|url\s+gambar|gambar|ilustrasi|foto)\s*[:=\-]?\s*(https?:\/\/[^\s<>"'\)\]]+)(?:\s*[\)\]])?/i;
+  const mLabel = teksBersih.match(reBerlabel);
+  if (mLabel) {
+    urlAsli = mLabel[1].replace(/[.,;)\]]+$/, '');
+    labelTeksGambar = mLabel[0].replace(mLabel[1], '').trim();
+    teksBersih = teksBersih.replace(mLabel[0], ' ');
+  } else {
+    const semuaUrl = teksBersih.match(/https?:\/\/[^\s<>"'\)\]]+/gi) || [];
+    const kandidat = semuaUrl.map(x => x.replace(/[.,;)\]]+$/, '')).find(adalahUrlGambarPotensial);
+    if (kandidat) {
+      urlAsli = kandidat;
+      teksBersih = teksBersih.replace(kandidat, ' ');
+    }
+  }
+
+  teksBersih = teksBersih
+    .replace(/[\(\[]\s*(?:sumber\s+gambar|link\s+gambar|gambar)?\s*[:=\-]?\s*[\)\]]/gi, '')
+    .replace(/[ \t]{2,}/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
+  return {
+    teksBersih,
+    urlAsli,
+    urlGambar: urlAsli ? normalisasiUrlGambarSoal(urlAsli) : '',
+    labelTeksGambar
+  };
+}
+
+function ekstrakTokenKataKunciDnc(teksRaw) {
+  let s = String(teksRaw || '');
+  try { s = decodeURIComponent(s); } catch (_) {}
+  const kata = s.toLowerCase().replace(/[^a-z0-9]+/g, ' ').split(/\s+/).filter(Boolean);
+  return [...new Set(kata.filter(k => k.length >= 3 && !/^\d+$/.test(k) && !STOPWORD_GAMBAR_DNC.has(k)))];
+}
+
+function ambilInfoKunciJawabanSoal(soal) {
+  const tipe = soal?.tipeSoal || 'Pilihan Ganda';
+  const opsi = Array.isArray(soal?.opsiJawaban) ? soal.opsiJawaban : [];
+  const kunciRaw = String(soal?.kunciJawaban || '').trim();
+
+  if (tipe === 'Pilihan Ganda') {
+    const kode = kunciRaw.toUpperCase().replace(/[^A-E]/g, '').slice(0, 1);
+    const cocok = opsi.find(o => o.kode === kode);
+    const pengecoh = opsi.filter(o => o.kode !== kode).map(o => o.teks).join(' ');
+    return {
+      ringkas: cocok ? `${kode}. ${cocok.teks}` : (kode || 'Belum diisi'),
+      teksBenar: cocok ? cocok.teks : kunciRaw,
+      teksPengecoh: pengecoh
+    };
+  }
+  if (tipe === 'Pilihan Ganda Kompleks') {
+    const setK = parseKunciKompleksSet(kunciRaw);
+    const benarList = opsi.filter(o => setK.has(o.kode));
+    const pengecoh = opsi.filter(o => !setK.has(o.kode)).map(o => o.teks).join(' ');
+    return {
+      ringkas: benarList.length ? benarList.map(o => `${o.kode}. ${o.teks}`).join(' | ') : (kunciRaw || 'Belum diisi'),
+      teksBenar: benarList.map(o => o.teks).join(' '),
+      teksPengecoh: pengecoh
+    };
+  }
+  return {
+    ringkas: kunciRaw || 'Belum diisi',
+    teksBenar: kunciRaw,
+    teksPengecoh: ''
+  };
+}
+
+function analisisKesesuaianGambarSoal(soal, statusMuat = 'belum') {
+  const url = normalisasiUrlGambarSoal(soal?.urlGambar || '');
+  if (!url) return null;
+  const infoKunci = ambilInfoKunciJawabanSoal(soal);
+
+  if (statusMuat === 'gagal') {
+    return {
+      kelas: 'bahaya',
+      status: 'Link Gambar Rusak / Tidak Tampil',
+      pesan: 'Gambar gagal dimuat. Periksa link sumber, dan bila memakai Google Drive pastikan akses dibagikan ke "Siapa saja yang memiliki link" (Pelihat).',
+      ringkasKunci: infoKunci.ringkas,
+      urlTampil: url
+    };
+  }
+
+  if (soal?.gambarTerverifikasi) {
+    return {
+      kelas: 'cocok',
+      status: 'Terverifikasi Sesuai Guru',
+      pesan: 'Kesesuaian gambar dengan kunci jawaban telah dikonfirmasi secara visual.',
+      ringkasKunci: infoKunci.ringkas,
+      urlTampil: url
+    };
+  }
+
+  const sumberMeta = `${soal?.urlGambarAsli || url} ${soal?.labelGambar || ''}`;
+  const tokenGambar = url.startsWith('data:image/') ? [] : ekstrakTokenKataKunciDnc(sumberMeta);
+  const tokenKunci = new Set(ekstrakTokenKataKunciDnc(infoKunci.teksBenar));
+  const tokenTanya = new Set(ekstrakTokenKataKunciDnc(soal?.pertanyaan || ''));
+  const tokenPengecoh = new Set(ekstrakTokenKataKunciDnc(infoKunci.teksPengecoh));
+
+  const cocokKunci = tokenGambar.filter(t => tokenKunci.has(t));
+  const cocokTanya = tokenGambar.filter(t => tokenTanya.has(t));
+  const cocokPengecoh = tokenGambar.filter(t => tokenPengecoh.has(t) && !tokenKunci.has(t));
+
+  if (cocokKunci.length > 0) {
+    return {
+      kelas: 'cocok',
+      status: 'Relevan & Cocok Kunci',
+      pesan: `Metadata link gambar ("${cocokKunci.slice(0, 3).join(', ')}") cocok dengan isi Kunci Jawaban.`,
+      ringkasKunci: infoKunci.ringkas,
+      urlTampil: url
+    };
+  }
+  if (cocokPengecoh.length > 0) {
+    return {
+      kelas: 'bahaya',
+      status: 'Indikasi Tidak Sesuai Kunci!',
+      pesan: `Link gambar justru mengandung kata "${cocokPengecoh.slice(0, 3).join(', ')}" yang ada di opsi pengecoh, bukan di Kunci Jawaban. Periksa ulang kunci atau gambar!`,
+      ringkasKunci: infoKunci.ringkas,
+      urlTampil: url
+    };
+  }
+  if (cocokTanya.length > 0) {
+    return {
+      kelas: 'cocok',
+      status: 'Relevan dengan Topik Soal',
+      pesan: `Metadata gambar ("${cocokTanya.slice(0, 3).join(', ')}") sesuai topik soal. Pastikan gambar selaras secara visual dengan Kunci Jawaban.`,
+      ringkasKunci: infoKunci.ringkas,
+      urlTampil: url
+    };
+  }
+
+  return {
+    kelas: 'peringatan',
+    status: 'Perlu Cek Visual Kunci',
+    pesan: 'URL/gambar tidak memuat kata kunci deskriptif (mis. ID acak Drive/dokumen). Bandingkan thumbnail gambar dengan isi Kunci Jawaban di samping.',
+    ringkasKunci: infoKunci.ringkas,
+    urlTampil: url
+  };
+}
+
 const paketSoalTerbukaM3 = new Set();
 
 function kunciGrupSoalM3(s) {
-  return `${namaSumberPaketSoal(s)}||${s.mapelId || ''}`;
+  return `${namaSumberPaketSoal(s)}||${s.mapelId || ''}||${normalisasiKategoriSoal(s.kategoriSoal)}`;
 }
 
 function togglePaketSoalM3(kunci) {
@@ -2068,18 +2268,21 @@ function renderTabelSoal() {
   if (!wadah) return;
 
   const q = teks(document.getElementById('cari-soal')?.value || '');
+  const fKategori = document.getElementById('filter-kategori-soal')?.value || '';
   const fMapel = document.getElementById('filter-mapel-soal')?.value || '';
   const fTingkat = document.getElementById('filter-tingkat-soal')?.value || '';
   const fTipe = document.getElementById('filter-tipe-soal')?.value || '';
   const fStatus = document.getElementById('filter-status-soal')?.value || '';
 
   const data = stateMemori.bankSoal.filter(s => {
+    const kat = normalisasiKategoriSoal(s.kategoriSoal);
+    if (fKategori && kat !== fKategori) return false;
     if (fMapel && s.mapelId !== fMapel) return false;
     if (fTingkat && s.tingkat !== fTingkat) return false;
     if (fTipe && s.tipeSoal !== fTipe) return false;
     if (fStatus === 'aktif' && !s.statusAktif) return false;
     if (fStatus === 'nonaktif' && s.statusAktif) return false;
-    if (q && !`${teks(s.kodeSoal)} ${teks(namaSumberPaketSoal(s))} ${teks(s.pertanyaan)} ${teks(s.kunciJawaban)}`.includes(q)) return false;
+    if (q && !`${teks(s.kodeSoal)} ${teks(kat)} ${teks(namaSumberPaketSoal(s))} ${teks(s.pertanyaan)} ${teks(s.kunciJawaban)}`.includes(q)) return false;
     return true;
   });
 
@@ -2096,6 +2299,7 @@ function renderTabelSoal() {
         kunci,
         namaGrup: namaSumberPaketSoal(s),
         mapelId: s.mapelId,
+        kategoriSoal: normalisasiKategoriSoal(s.kategoriSoal),
         list: []
       });
     }
@@ -2113,6 +2317,7 @@ function renderTabelSoal() {
     const terbuka = paketSoalTerbukaM3.has(g.kunci);
     const totalBobot = bulatDua(g.list.reduce((acc, s) => acc + Number(s.bobotNilai || 0), 0));
     const jmlAktif = g.list.filter(s => s.statusAktif !== false).length;
+    const jmlBergambar = g.list.filter(s => Boolean(s.urlGambar)).length;
     const daftarTingkat = [...new Set(g.list.map(s => s.tingkat).filter(Boolean))].join(', ');
     const daftarTipe = [...new Set(g.list.map(s => s.tipeSoal).filter(Boolean))].join(', ');
 
@@ -2137,10 +2342,14 @@ function renderTabelSoal() {
                 const kunciHtml = s.tipeSoal === 'Pilihan Ganda' || s.tipeSoal === 'Pilihan Ganda Kompleks'
                   ? `<strong class="dnc-mono">${esc(s.kunciJawaban || '-')}</strong>`
                   : `<div class="dnc-teks-potong" style="max-width:160px" title="${esc(s.kunciJawaban || '')}">${esc(s.kunciJawaban || 'Rubrik')}</div>`;
+                const cekGbr = s.urlGambar ? analisisKesesuaianGambarSoal(s) : null;
+                const badgeGbr = cekGbr
+                  ? `<span class="dnc-badge ${cekGbr.kelas === 'bahaya' ? 'dnc-badge-merah' : (cekGbr.kelas === 'cocok' ? 'dnc-badge-hijau' : 'dnc-badge-amber')}" title="${esc(cekGbr.pesan)}">Bergambar</span>`
+                  : '';
                 return `
                   <tr>
                     <td data-label="No"><strong>${idx + 1}</strong></td>
-                    <td data-label="Kode Soal"><span class="dnc-mono">${esc(s.kodeSoal)}</span></td>
+                    <td data-label="Kode Soal"><span class="dnc-mono">${esc(s.kodeSoal)}</span>${badgeGbr ? `<div style="margin-top:3px">${badgeGbr}</div>` : ''}</td>
                     <td data-label="Tipe Soal">${badgeTipeSoal(s.tipeSoal)}</td>
                     <td data-label="Pertanyaan"><div class="dnc-teks-potong" title="${esc(s.pertanyaan)}">${esc(s.pertanyaan)}</div></td>
                     <td data-label="Kunci Jawaban">${kunciHtml}</td>
@@ -2168,8 +2377,10 @@ function renderTabelSoal() {
             <div style="min-width:0">
               <div class="dnc-grup-halaman-judul">${esc(g.namaGrup)}</div>
               <div class="dnc-grup-halaman-meta">
+                ${badgeKategoriSoal(g.kategoriSoal)}
                 <span class="dnc-badge dnc-badge-biru">${esc(namaMapelById(g.mapelId))}</span>
                 ${daftarTingkat ? `<span class="dnc-badge dnc-badge-abu">Tingkat ${esc(daftarTingkat)}</span>` : ''}
+                ${jmlBergambar ? `<span class="dnc-badge dnc-badge-ungu">${jmlBergambar} Bergambar</span>` : ''}
                 <span>${g.list.length} butir soal • Total Bobot ${totalBobot} • Aktif ${jmlAktif}/${g.list.length}</span>
                 ${daftarTipe ? `<span>• ${esc(daftarTipe)}</span>` : ''}
               </div>
