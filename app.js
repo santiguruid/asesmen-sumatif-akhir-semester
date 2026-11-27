@@ -7541,11 +7541,9 @@ async function inisialisasiAplikasiDnc() {
     await inisialisasiDataPreview();
   }
   renderSlotPreviewLogin();
-  setRoleLogin('Admin');
+  setRoleLogin('Auto');
 
-  document.querySelectorAll('[data-login-role]').forEach(btn => {
-    btn.addEventListener('click', () => setRoleLogin(btn.getAttribute('data-login-role')));
-  });
+  document.getElementById('btn-daftar-bimbel')?.addEventListener('click', bukaModalDaftarSiswaBimbel);
 
   document.getElementById('btn-intip-password')?.addEventListener('click', e => {
     togglePassword('input-login-password', e.currentTarget);
