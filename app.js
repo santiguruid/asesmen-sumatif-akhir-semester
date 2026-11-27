@@ -4265,6 +4265,7 @@ function ekstrakSoalPintarDariSumber({ baris, tabel }, kodeMapelPrefix) {
   let modeKunci = false;
   let bagianAktif = '';
   let aktif = null;
+  let pendingGambar = null;
   let nomorUrut = 0;
   const barisModeKunci = [];
 
@@ -4282,7 +4283,7 @@ function ekstrakSoalPintarDariSumber({ baris, tabel }, kodeMapelPrefix) {
 
   const dorongAktif = () => {
     if (!aktif) return;
-    if (!aktif.pertanyaan.trim()) { aktif = null; return; }
+    if (!aktif.pertanyaan.trim() && !aktif.urlGambar) { aktif = null; return; }
     // Ekstrak link gambar yang masih menempel di dalam teks pertanyaan
     const eksTanya = ekstrakLinkGambarDariTeks(aktif.pertanyaan);
     if (eksTanya.urlGambar) {
@@ -4300,7 +4301,7 @@ function ekstrakSoalPintarDariSumber({ baris, tabel }, kodeMapelPrefix) {
     aktif.gambarTerverifikasi = false;
 
     // Pemindaian ulang terakhir: jika opsi masih menempel di dalam teks pertanyaan
-    if (aktif.opsiJawaban.length < 2) {
+    if (aktif.opsiJawaban.length < 2 && aktif.tipeSoal !== 'Benar/Salah') {
       const pecahUlang = pecahOpsiInlineDariTeks(aktif.pertanyaan.replace(/\n+/g, ' '));
       if (pecahUlang && pecahUlang.opsi.length >= 2) {
         if (pecahUlang.teksSebelum) aktif.pertanyaan = pecahUlang.teksSebelum;
@@ -4324,15 +4325,20 @@ function ekstrakSoalPintarDariSumber({ baris, tabel }, kodeMapelPrefix) {
     const labelGbr = item.labelGambar || '';
     const isBold = Boolean(item.bold);
 
-    if (!txt && imgSrc && aktif && !aktif.urlGambar) {
-      aktif.urlGambar = imgSrc;
-      aktif.urlGambarAsli = imgAsli;
-      aktif.labelGambar = labelGbr;
+    if (!txt && imgSrc) {
+      if (aktif && !aktif.urlGambar) {
+        aktif.urlGambar = imgSrc;
+        aktif.urlGambarAsli = imgAsli;
+        aktif.labelGambar = labelGbr;
+      } else if (!aktif) {
+        pendingGambar = { img: imgSrc, imgAsli, labelGbr };
+      }
       return;
     }
     if (!txt) return;
 
-    if (/^(?:(?:[IVX]+|[A-E])[\.\)]\s*)?(?:kunci\s+jawaban|pedoman\s+penskoran|rubrik\s+penilaian|pembahasan\s+dan\s+kunci|daftar\s+kunci)/i.test(txt)) {
+    const adalahKunciInlineSoal = Boolean(aktif) && /^kunci\s+jawaban\s*[:=\-]\s*\S+/i.test(txt);
+    if (!adalahKunciInlineSoal && /^(?:(?:[IVX]+|[A-E])[\.\)]\s*)?(?:kunci\s+jawaban|pedoman\s+penskoran|rubrik\s+penilaian|pembahasan\s+dan\s+kunci|daftar\s+kunci)/i.test(txt)) {
       dorongAktif();
       modeKunci = true;
       barisModeKunci.push(txt);
@@ -4341,6 +4347,17 @@ function ekstrakSoalPintarDariSumber({ baris, tabel }, kodeMapelPrefix) {
 
     if (modeKunci) {
       barisModeKunci.push(txt);
+      return;
+    }
+
+    if (item.isPernyataanBs && aktif) {
+      aktif.pertanyaan += `\n${txt}`;
+      if (!aktif.tipeSoal) aktif.tipeSoal = 'Benar/Salah';
+      if (imgSrc && !aktif.urlGambar) {
+        aktif.urlGambar = imgSrc;
+        aktif.urlGambarAsli = imgAsli;
+        aktif.labelGambar = labelGbr;
+      }
       return;
     }
 
@@ -4385,6 +4402,11 @@ function ekstrakSoalPintarDariSumber({ baris, tabel }, kodeMapelPrefix) {
         teksPertanyaan = teksPertanyaan.slice(0, mKunciAkhir.index).trim();
       }
 
+      const gbrAwal = imgSrc || pendingGambar?.img || '';
+      const gbrAsliAwal = imgSrc ? imgAsli : (pendingGambar?.imgAsli || '');
+      const gbrLabelAwal = imgSrc ? labelGbr : (pendingGambar?.labelGbr || '');
+      pendingGambar = null;
+
       aktif = {
         dipilih: true,
         nomorAsli: noAsli,
@@ -4393,9 +4415,9 @@ function ekstrakSoalPintarDariSumber({ baris, tabel }, kodeMapelPrefix) {
         kodeSoal: `${kodeMapelPrefix}-W${cap}-${String(nomorUrut).padStart(2, '0')}`,
         tipeSoal: bagianAktif || '',
         pertanyaan: teksPertanyaan,
-        urlGambar: imgSrc,
-        urlGambarAsli: imgAsli,
-        labelGambar: labelGbr,
+        urlGambar: gbrAwal,
+        urlGambarAsli: gbrAsliAwal,
+        labelGambar: gbrLabelAwal,
         opsiJawaban: [],
         opsiTebal: [],
         kunciDariTanda: [],
@@ -4502,6 +4524,9 @@ function terapkanKunciDanBobot(s, kunciGlobal, kunciPerBagian, bobotDefaultTipe)
 
   if (adalahTipeBeropsi(s.tipeSoal)) {
     s.kunciJawaban = selesaikanKunciOpsiDariTeks(s.kunciJawaban, s.opsiJawaban, s.tipeSoal);
+  } else if (s.tipeSoal === 'Benar/Salah') {
+    s.opsiJawaban = [];
+    s.kunciJawaban = normalisasiKunciBenarSalah(s.kunciJawaban);
   } else {
     s.opsiJawaban = [];
   }
