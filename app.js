@@ -4859,9 +4859,14 @@ async function hentikanSesiUjianOlehGuru(paketId) {
 }
 
 function bukaFormPaket(item = null) {
+  if (item && !bolehKelolaPaket(item)) {
+    tampilkanToast('Anda tidak memiliki izin mengubah paket ASAS milik guru lain.', 'error');
+    return;
+  }
   const mapelList = daftarMapelDiizinkan();
+  const kelasListDiizinkan = daftarKelasDiizinkan();
   if (!mapelList.length) { tampilkanToast('Tambahkan mata pelajaran terlebih dahulu.', 'error'); return; }
-  if (!stateMemori.kelas.length) { tampilkanToast('Tambahkan data kelas terlebih dahulu.', 'error'); return; }
+  if (!kelasListDiizinkan.length) { tampilkanToast('Tambahkan data kelas atau tetapkan kelas ampu guru terlebih dahulu.', 'error'); return; }
 
   const mapelAwal = item?.mapelId || mapelList[0].id;
   const mulaiDefault = item?.waktuMulai ? keInputDatetimeLocal(item.waktuMulai) : keInputDatetimeLocal(new Date());
@@ -4877,13 +4882,14 @@ function bukaFormPaket(item = null) {
     if (!wadah) return;
 
     const soalTersedia = stateMemori.bankSoal.filter(s => {
+      if (!bolehKelolaSoal(s)) return false;
       if (s.mapelId !== mapelId || s.statusAktif === false) return false;
       if (modeTipe === 'pg_pgk') return adalahTipeBeropsi(s.tipeSoal);
       return true;
     });
 
     if (!soalTersedia.length) {
-      wadah.innerHTML = '<div class="dnc-teks-muted" style="padding:8px">Belum ada paket soal aktif sesuai filter tipe untuk mata pelajaran ini.</div>';
+      wadah.innerHTML = '<div class="dnc-teks-muted" style="padding:8px">Belum ada paket soal aktif milik akun Anda sesuai filter tipe untuk mata pelajaran ini. Tambah/impor soal atau salin dari referensi di Bank Soal.</div>';
       infoBobot.textContent = '0 paket (0 soal) • Bobot: 0';
       sinkronStatusGrupPaket = () => {};
       return;
