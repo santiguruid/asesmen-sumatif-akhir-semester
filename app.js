@@ -8470,14 +8470,15 @@ function bukaFormPengguna(item = null) {
           </div>
         </div>
         <div id="grup-mapel-user" class="dnc-form-grup dnc-form-full ${!adalahRoleGuru(roleAwal) ? 'dnc-disembunyikan' : ''}">
-          <label class="dnc-label">Mata Pelajaran yang Diampu (Guru / Guru Bimbel) * (minimal 1)</label>
+          <label class="dnc-label">Mata Pelajaran yang Diampu (Opsional — Guru dapat menambah mapel &amp; KKM sendiri)</label>
           <div class="dnc-checklist-box" style="max-height:130px">
             ${stateMemori.mataPelajaran.map(m => `
               <label class="dnc-checklist-item">
                 <input type="checkbox" name="f-mapel-guru" value="${esc(m.id)}" ${mapelSet.has(m.id) ? 'checked' : ''}>
-                <span><strong>${esc(m.kodeMapel)}</strong> — ${esc(m.namaMapel)}</span>
+                <span><strong>${esc(m.kodeMapel)}</strong> — ${esc(m.namaMapel)} (KKM ${esc(m.kkm)}${m.dibuatOleh ? ` • ${esc(namaPemilikSoal(m.dibuatOleh))}` : ''})</span>
               </label>`).join('')}
           </div>
+          <span class="dnc-form-bantuan">Biarkan kosong untuk guru baru yang akan membuat mata pelajaran dan batas KKM miliknya sendiri pada menu Mata Pelajaran &amp; KKM.</span>
         </div>
         <div id="grup-kelas-guru" class="dnc-form-grup dnc-form-full ${!adalahRoleGuru(roleAwal) ? 'dnc-disembunyikan' : ''}">
           <label class="dnc-label">Kelas yang Diampu Guru (Opsional — kosongkan jika semua kelas)</label>
@@ -8488,7 +8489,7 @@ function bukaFormPengguna(item = null) {
                 <span><strong>${esc(k.kodeKelas)}</strong> — ${esc(k.namaKelas)} (${esc(labelTingkat(k.tingkat))})</span>
               </label>`).join('')}
           </div>
-          <span class="dnc-form-bantuan">Jika dicentang (mis. khusus Kelas VI), guru hanya dapat memilih kelas tersebut di Paket ASAS serta memantau hasil nilai kelas ampunya saja.</span>
+          <span class="dnc-form-bantuan">Jika dicentang (mis. khusus Kelas VI), guru hanya dapat memilih kelas tersebut di Paket RAD serta memantau hasil nilai kelas ampunya saja.</span>
         </div>
         <div class="dnc-form-grup dnc-form-full">
           <label class="dnc-check-label">
@@ -8523,12 +8524,11 @@ function bukaFormPengguna(item = null) {
       const statusAktif = document.getElementById('f-statusUser').checked;
 
       if (!nomorInduk || !namaLengkap || !email) throw new Error('Nomor induk, nama lengkap, dan email wajib diisi.');
-      if (role === 'Siswa' && !kelasId) throw new Error('Siswa ASAS wajib ditempatkan pada satu kelas.');
+      if (role === 'Siswa' && !kelasId) throw new Error('Siswa RAD wajib ditempatkan pada satu kelas.');
       if (role === 'Siswa Bimbel') {
         if (!asalSekolah || !kelasTeks) throw new Error('Asal sekolah dan kelas wajib diisi untuk Siswa Bimbel.');
         if (!/^[a-z0-9._%+-]+@gmail\.com$/i.test(email)) throw new Error('Email Siswa Bimbel wajib menggunakan akun Gmail (@gmail.com).');
       }
-      if (adalahRoleGuru(role) && !mapelIds.length) throw new Error(`${role} wajib mengampu minimal satu mata pelajaran.`);
       if (!item && password.length < 6) throw new Error('Password akun baru minimal 6 karakter.');
       if (item && password && password.length < 6) throw new Error('Password baru minimal 6 karakter.');
 
