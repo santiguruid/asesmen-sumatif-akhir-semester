@@ -421,8 +421,15 @@
               <div class="dnc-toolbar">
                 <div class="dnc-cari-wrap">
                   <svg class="dnc-ikon"><use href="#icon-search"></use></svg>
-                  <input id="cari-mapel" class="dnc-input" type="search" placeholder="Cari kode atau nama mata pelajaran...">
+                  <input id="cari-mapel" class="dnc-input" type="search" placeholder="Cari kode, nama mata pelajaran, atau pemilik...">
                 </div>
+                <select id="filter-pemilik-mapel" class="dnc-select dnc-select-filter dnc-disembunyikan" aria-label="Filter Pemilik Mata Pelajaran">
+                  <option value="">Semua Pemilik</option>
+                </select>
+                <button type="button" id="btn-tetapkan-pemilik-mapel" class="dnc-tombol dnc-tombol-sekunder dnc-disembunyikan">
+                  <svg class="dnc-ikon"><use href="#icon-users"></use></svg>
+                  <span>Atur Pemilik Mapel</span>
+                </button>
                 <button type="button" id="btn-tambah-mapel" class="dnc-tombol dnc-tombol-primer">
                   <svg class="dnc-ikon"><use href="#icon-plus"></use></svg>
                   <span>Tambah Mata Pelajaran</span>
@@ -435,6 +442,7 @@
                       <th>Kode Mapel</th>
                       <th>Nama Mata Pelajaran</th>
                       <th>KKM</th>
+                      <th>Pemilik</th>
                       <th>Aksi</th>
                     </tr>
                   </thead>
