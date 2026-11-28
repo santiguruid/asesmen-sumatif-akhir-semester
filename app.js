@@ -3963,9 +3963,10 @@ function ekstrakAngkaSkorTeks(teksBaris) {
 }
 
 function validasiItemSoalPintar(item) {
+  item.bobotNilai = bobotOtomatisTipeSoal(item.tipeSoal, item.bobotNilai);
   const masalah = [];
   if (!item.pertanyaan || !item.pertanyaan.trim()) masalah.push('Pertanyaan kosong');
-  if (!Number(item.bobotNilai) || Number(item.bobotNilai) <= 0) masalah.push('Bobot/skor tidak valid');
+  if (!Number(item.bobotNilai) || Number(item.bobotNilai) <= 0) masalah.push('Poin soal tidak valid');
 
   if (item.tipeSoal === 'Pilihan Ganda') {
     if (!item.opsiJawaban || item.opsiJawaban.length < 2) masalah.push('Opsi PG kurang dari 2');
