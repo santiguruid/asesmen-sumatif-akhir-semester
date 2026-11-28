@@ -1839,6 +1839,9 @@ function bangunNavigasiRole() {
   const diizinkan = MENU_DAFTAR
     .filter(m => m.roles.includes(penggunaAktif.role))
     .map(m => {
+      if (m.id === 'DNC-M2' && adalahRoleGuru(penggunaAktif.role)) {
+        return { ...m, label: 'Mata Pelajaran & KKM', pendek: 'Mapel' };
+      }
       if (m.id === 'DNC-M5' && penggunaAktif.role === 'Siswa Bimbel') {
         return { ...m, label: 'Bank Soal', pendek: 'Soal', icon: 'icon-bank' };
       }
