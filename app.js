@@ -8940,6 +8940,14 @@ async function inisialisasiAplikasiDnc() {
   // --- Event DNC-M1 ---
   document.getElementById('btn-muat-ulang-m1')?.addEventListener('click', () => muatM1Dashboard(true));
 
+  // --- Event Poin Otomatis & Hitung Ulang Nilai RAD (DNC-M3 & DNC-M4) ---
+  document.getElementById('btn-sinkron-bobot-m3')?.addEventListener('click', sinkronkanBobotBankSoalOtomatis);
+  document.getElementById('btn-hitung-ulang-nilai-m4')?.addEventListener('click', () => hitungUlangNilaiPaketRad(''));
+  document.getElementById('tbody-paket')?.addEventListener('click', e => {
+    const btnRehitung = e.target.closest('[data-rehitung-paket]');
+    if (btnRehitung) hitungUlangNilaiPaketRad(btnRehitung.dataset.rehitungPaket);
+  });
+
   // --- Event DNC-M2 ---
   document.getElementById('btn-muat-ulang-m2')?.addEventListener('click', () => muatM2Master(true));
   document.querySelectorAll('[data-m2-tab]').forEach(tab => {
