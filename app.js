@@ -5726,13 +5726,13 @@ function bukaFormPaket(item = null) {
   };
 
   bukaModalFormDnc({
-    judul: item ? 'Ubah Paket ASAS' : 'Buat Jadwal & Paket ASAS',
+    judul: item ? 'Ubah Paket Ruang Asesmen Digital (RAD)' : 'Buat Jadwal & Paket Ruang Asesmen Digital (RAD)',
     lebar: true,
     htmlKonten: `
       <div class="dnc-form-grid">
         <div class="dnc-form-grup dnc-form-full">
           <label class="dnc-label" for="f-judulPaket">Judul Paket *</label>
-          <input id="f-judulPaket" class="dnc-input" type="text" placeholder="Contoh: ASAS Ganjil Matematika Kelas VI" value="${esc(item?.judulPaket || '')}" required>
+          <input id="f-judulPaket" class="dnc-input" type="text" placeholder="Contoh: Asesmen Ganjil Matematika Kelas VI" value="${esc(item?.judulPaket || '')}" required>
         </div>
         <div class="dnc-form-grup">
           <label class="dnc-label" for="f-semester">Semester *</label>
