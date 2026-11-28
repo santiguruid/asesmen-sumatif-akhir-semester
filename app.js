@@ -3224,6 +3224,20 @@ function bukaFormSoal(item = null) {
         document.getElementById('wadah-opsi-pg').classList.toggle('dnc-disembunyikan', !adalahTipeBeropsi(tp));
         document.getElementById('wadah-kunci-kompleks').classList.toggle('dnc-disembunyikan', tp !== 'Pilihan Ganda Kompleks');
         document.getElementById('wadah-kunci-teks').classList.toggle('dnc-disembunyikan', tp === 'Pilihan Ganda Kompleks');
+
+        const inpBobot = document.getElementById('f-bobotNilai');
+        const bantuanBobot = document.getElementById('bantuan-bobot-form');
+        if (inpBobot) {
+          const autoPoin = adalahTipePoinOtomatis(tp);
+          inpBobot.readOnly = autoPoin;
+          inpBobot.value = bobotOtomatisTipeSoal(tp, autoPoin ? 0 : (inpBobot.value || item?.bobotNilai));
+          if (bantuanBobot) {
+            bantuanBobot.textContent = autoPoin
+              ? `Poin otomatis tipe ${tp}: Benar = ${inpBobot.value}, Salah = 0.`
+              : 'Tipe Uraian: masukkan poin maksimal rubrik (bawaan 5).';
+          }
+        }
+
         const lblKunci = document.getElementById('lbl-kunci-teks-form');
         const bantuanKunci = document.getElementById('bantuan-kunci-teks-form');
         if (lblKunci && bantuanKunci) {
@@ -3291,7 +3305,7 @@ function bukaFormSoal(item = null) {
       }
       const urlGambar = normalisasiUrlGambarSoal(urlGambarAsli);
       let kunciJawaban = document.getElementById('f-kunciJawaban').value.trim();
-      const bobotNilai = Number(document.getElementById('f-bobotNilai').value);
+      const bobotNilai = bobotOtomatisTipeSoal(tipeSoal, document.getElementById('f-bobotNilai').value);
       const statusAktif = document.getElementById('f-statusAktifSoal').checked;
 
       if (!kodeSoal || !mapelId || !pertanyaan) throw new Error('Kode soal, mata pelajaran, dan pertanyaan wajib diisi.');
