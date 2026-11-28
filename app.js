@@ -2066,10 +2066,59 @@ async function muatM1Dashboard(paksa = false) {
 // ===== BLOK: DNC_M2_MASTER =====
 async function muatM2Master(paksa = false) {
   if (!sudahDimuat['DNC-M2'] || paksa) {
-    await muatDataDasar();
+    await Promise.all([muatDataDasar(), muatDataPengguna()]);
     sudahDimuat['DNC-M2'] = true;
   }
-  renderTabelKelas();
+
+  const adalahGuru = adalahRoleGuru(penggunaAktif?.role);
+  const adalahAdmin = penggunaAktif?.role === 'Admin';
+  const elJudul = document.getElementById('judul-m2');
+  const elSub = document.getElementById('subjudul-m2');
+  const elSubtabs = document.getElementById('subtabs-m2');
+  const panelKelas = document.getElementById('panel-m2-kelas');
+  const panelMapel = document.getElementById('panel-m2-mapel');
+  const tabKelas = document.getElementById('tab-m2-kelas');
+  const tabMapel = document.getElementById('tab-m2-mapel');
+  const btnPemilik = document.getElementById('btn-tetapkan-pemilik-mapel');
+  const selPemilik = document.getElementById('filter-pemilik-mapel');
+
+  if (adalahGuru) {
+    if (elJudul) elJudul.textContent = 'Mata Pelajaran & Batas KKM';
+    if (elSub) elSub.textContent = 'Kelola daftar mata pelajaran dan batas nilai KKM sesuai kewenangan Anda.';
+    elSubtabs?.classList.add('dnc-disembunyikan');
+    panelKelas?.classList.remove('aktif');
+    panelKelas?.classList.add('dnc-disembunyikan');
+    panelMapel?.classList.add('aktif');
+    tabKelas?.classList.remove('aktif');
+    tabMapel?.classList.add('aktif');
+    btnPemilik?.classList.add('dnc-disembunyikan');
+    selPemilik?.classList.add('dnc-disembunyikan');
+  } else {
+    if (elJudul) elJudul.textContent = 'Master Kelas & Mata Pelajaran';
+    if (elSub) elSub.textContent = 'Kelola rombongan belajar jenjang SD–SMA (manual atau impor PDF, Excel, Word), mata pelajaran ujian, dan batas KKM.';
+    elSubtabs?.classList.remove('dnc-disembunyikan');
+    panelKelas?.classList.remove('dnc-disembunyikan');
+    if (panelKelas && panelMapel && !panelKelas.classList.contains('aktif') && !panelMapel.classList.contains('aktif')) {
+      panelKelas.classList.add('aktif');
+      tabKelas?.classList.add('aktif');
+    }
+    btnPemilik?.classList.toggle('dnc-disembunyikan', !adalahAdmin);
+    if (selPemilik) {
+      selPemilik.classList.toggle('dnc-disembunyikan', !adalahAdmin);
+      const nilaiLama = selPemilik.value;
+      const daftarPemilik = stateMemori.pengguna
+        .filter(u => !adalahRoleSiswa(normalisasiRoleDnc(u.role)))
+        .sort((a, b) => teks(a.namaLengkap).localeCompare(teks(b.namaLengkap)));
+      selPemilik.innerHTML = `
+        <option value="">Semua Pemilik</option>
+        <option value="tanpa_pemilik">Belum Ditetapkan Pemiliknya</option>
+        ${daftarPemilik.map(u => `<option value="${esc(u.id)}">${esc(u.namaLengkap)} (${esc(normalisasiRoleDnc(u.role))})</option>`).join('')}`;
+      if ([...selPemilik.options].some(o => o.value === nilaiLama)) selPemilik.value = nilaiLama;
+      else selPemilik.value = '';
+    }
+    renderTabelKelas();
+  }
+
   renderTabelMapel();
 }
 
