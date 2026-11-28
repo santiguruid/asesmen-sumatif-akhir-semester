@@ -4943,18 +4943,71 @@ function bukaModalImporWord() {
       });
 
       document.getElementById('w-file-docx').addEventListener('change', async e => {
-        const file = e.target.files[0];
+        const files = [...(e.target.files || [])];
+        const file = files[0];
         if (!file) return;
         const inpPaket = document.getElementById('w-sumberPaket');
         if (inpPaket) inpPaket.value = bersihkanNamaPaketSoal(file.name);
         const info = document.getElementById('info-ringkas-word');
         const ext = teks(file.name.split('.').pop());
-        info.textContent = `Menganalisis struktur soal, opsi, kunci jawaban, dan bobot penskoran dari ${file.name}...`;
+        const daftarExtGambar = ['png', 'jpg', 'jpeg', 'webp', 'bmp'];
+        info.textContent = `Menganalisis struktur soal, gambar, opsi, kunci jawaban, dan bobot penskoran dari ${file.name}...`;
         try {
           const mapelObj = cariById('mataPelajaran', document.getElementById('w-mapelId').value);
           const prefix = (mapelObj?.kodeMapel || 'SOAL').replace(/[^A-Za-z0-9]/g, '').slice(0, 8);
 
-          if (ext === 'docx') {
+          if (daftarExtGambar.includes(ext)) {
+            const hasilGambar = [];
+            const capImg = Date.now().toString().slice(-4);
+            for (let fi = 0; fi < files.length; fi++) {
+              const fg = files[fi];
+              info.textContent = `Memproses gambar ${fi + 1}/${files.length} (${fg.name}) — mengompres & menjalankan OCR...`;
+              const imgUrl = await kompresFileGambarLokal(fg, 1024);
+              let teksOcr = '';
+              try {
+                teksOcr = await bacaTeksOcrDariGambar(imgUrl, pct => {
+                  info.textContent = `Membaca teks gambar ${fi + 1}/${files.length} (${fg.name}) — OCR ${pct}%...`;
+                });
+              } catch (_) {}
+
+              const linesOcr = teksOcr.split(/\r?\n/).map(t => t.trim()).filter(Boolean);
+              const parsed = linesOcr.length
+                ? ekstrakSoalPintarDariSumber({
+                    baris: linesOcr.map((t, idx) => ({ teks: t, img: idx === 0 ? imgUrl : '', imgAsli: '', labelGambar: fg.name, bold: false })),
+                    tabel: []
+                  }, prefix)
+                : [];
+
+              if (parsed.length) {
+                parsed.forEach((p, idxP) => {
+                  if (idxP === 0 && !p.urlGambar) p.urlGambar = imgUrl;
+                  p.urlGambarAsli = '';
+                  p.statusMuatGambar = 'sukses';
+                  p.kodeSoal = `${prefix}-IMG${capImg}-${String(hasilGambar.length + 1).padStart(2, '0')}`;
+                  hasilGambar.push(validasiItemSoalPintar(p));
+                });
+              } else {
+                const tipeAuto = deteksiTipeDariTeks('', 0, '', teksOcr);
+                hasilGambar.push(validasiItemSoalPintar({
+                  dipilih: true,
+                  nomorAsli: hasilGambar.length + 1,
+                  urutanGlobal: hasilGambar.length + 1,
+                  kodeSoal: `${prefix}-IMG${capImg}-${String(hasilGambar.length + 1).padStart(2, '0')}`,
+                  tipeSoal: tipeAuto,
+                  pertanyaan: teksOcr || 'Perhatikan gambar soal berikut!',
+                  urlGambar: imgUrl,
+                  urlGambarAsli: '',
+                  labelGambar: fg.name,
+                  statusMuatGambar: 'sukses',
+                  gambarTerverifikasi: false,
+                  opsiJawaban: [],
+                  kunciJawaban: '',
+                  bobotNilai: 10
+                }));
+              }
+            }
+            daftarEkstrak = hasilGambar;
+          } else if (ext === 'docx') {
             const mammothLib = await muatMammothJs();
             const hasilHtml = await mammothLib.convertToHtml(
               { arrayBuffer: await file.arrayBuffer() },
@@ -4962,7 +5015,7 @@ function bukaModalImporWord() {
                 convertImage: mammothLib.images.imgElement(async image => {
                   const b64 = await image.read('base64');
                   const dataUrl = `data:${image.contentType};base64,${b64}`;
-                  const terkompres = await kompresDataGambar(dataUrl);
+                  const terkompres = await kompresDataGambar(dataUrl, 1024, 0.85);
                   return { src: terkompres };
                 })
               }
@@ -4970,11 +5023,61 @@ function bukaModalImporWord() {
             const sumber = ubahHtmlWordKeBarisTerstruktur(hasilHtml.value);
             daftarEkstrak = ekstrakSoalPintarDariSumber(sumber, prefix);
           } else if (ext === 'pdf') {
-            const barisPdf = await ekstrakTeksBarisPdf(file);
-            daftarEkstrak = ekstrakSoalPintarDariSumber({
-              baris: barisPdf.map(t => ({ teks: t, img: '', bold: false })),
-              tabel: []
-            }, prefix);
+            info.textContent = `Membaca teks & mengekstrak gambar tertanam dari ${file.name}...`;
+            const barisPdf = await ekstrakBarisDanGambarPdf(file);
+            const barisSiap = [];
+            for (const item of barisPdf) {
+              if (item.isHalamanScan && item.img) {
+                info.textContent = `Halaman ${item.halaman} berupa scan gambar — menjalankan OCR otomatis...`;
+                let teksOcr = '';
+                try {
+                  teksOcr = await bacaTeksOcrDariGambar(item.img, pct => {
+                    info.textContent = `Membaca scan Halaman ${item.halaman} (OCR ${pct}%)...`;
+                  });
+                } catch (_) {}
+                const linesOcr = teksOcr.split(/\r?\n/).map(t => t.trim()).filter(Boolean);
+                if (linesOcr.length) {
+                  linesOcr.forEach((t, idx) => barisSiap.push({
+                    teks: t,
+                    img: idx === 0 ? item.img : '',
+                    imgAsli: '',
+                    labelGambar: idx === 0 ? item.labelGambar : '',
+                    bold: false
+                  }));
+                } else {
+                  barisSiap.push({
+                    teks: `${barisSiap.length + 1}. Perhatikan gambar soal berikut!`,
+                    img: item.img,
+                    imgAsli: '',
+                    labelGambar: item.labelGambar,
+                    bold: false
+                  });
+                }
+              } else {
+                barisSiap.push(item);
+              }
+            }
+            daftarEkstrak = ekstrakSoalPintarDariSumber({ baris: barisSiap, tabel: [] }, prefix);
+            if (!daftarEkstrak.length) {
+              const halGbr = barisPdf.filter(x => x.img);
+              const capPdf = Date.now().toString().slice(-4);
+              daftarEkstrak = halGbr.map((x, idx) => validasiItemSoalPintar({
+                dipilih: true,
+                nomorAsli: idx + 1,
+                urutanGlobal: idx + 1,
+                kodeSoal: `${prefix}-PDF${capPdf}-${String(idx + 1).padStart(2, '0')}`,
+                tipeSoal: 'Pilihan Ganda',
+                pertanyaan: 'Perhatikan gambar soal berikut!',
+                urlGambar: x.img,
+                urlGambarAsli: '',
+                labelGambar: x.labelGambar || `Gambar PDF ${idx + 1}`,
+                statusMuatGambar: 'sukses',
+                gambarTerverifikasi: false,
+                opsiJawaban: [],
+                kunciJawaban: '',
+                bobotNilai: 10
+              }));
+            }
           } else if (ext === 'xlsx' || ext === 'xls') {
             const XLSX = await muatSheetJs();
             const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' });
@@ -4993,7 +5096,7 @@ function bukaModalImporWord() {
               tabel: []
             }, prefix);
           } else {
-            throw new Error('Gunakan file Word (.docx), PDF (.pdf), Excel (.xlsx/.xls), CSV, atau TXT.');
+            throw new Error('Gunakan file Word (.docx), PDF (.pdf), Excel (.xlsx/.xls), CSV, TXT, atau Gambar (.png/.jpg/.webp).');
           }
 
           const teksKunciTambahan = document.getElementById('w-teks-kunci-opsional')?.value || '';
@@ -5024,6 +5127,12 @@ function bukaModalImporWord() {
           kodeUnik = `${kodeUnik}-${Math.floor(10 + Math.random() * 89)}`;
         }
         const urlGambar = normalisasiUrlGambarSoal(it.urlGambar || '');
+        const kunciSimpan = it.tipeSoal === 'Pilihan Ganda'
+          ? String(it.kunciJawaban).toUpperCase().slice(0, 1)
+          : (it.tipeSoal === 'Pilihan Ganda Kompleks'
+            ? normalisasiKunciKompleks(it.kunciJawaban)
+            : (it.tipeSoal === 'Benar/Salah' ? normalisasiKunciBenarSalah(it.kunciJawaban) : it.kunciJawaban));
+
         await dbCreate(COLLECTIONS.bankSoal, {
           kodeSoal: kodeUnik,
           kategoriSoal,
@@ -5033,12 +5142,10 @@ function bukaModalImporWord() {
           tipeSoal: it.tipeSoal,
           pertanyaan: it.pertanyaan.trim(),
           urlGambar,
-          urlGambarAsli: it.urlGambarAsli || '',
+          urlGambarAsli: urlGambar.startsWith('data:image/') ? '' : (it.urlGambarAsli || ''),
           gambarTerverifikasi: Boolean(urlGambar && it.gambarTerverifikasi),
           opsiJawaban: adalahTipeBeropsi(it.tipeSoal) ? it.opsiJawaban : [],
-          kunciJawaban: it.tipeSoal === 'Pilihan Ganda'
-            ? String(it.kunciJawaban).toUpperCase().slice(0, 1)
-            : (it.tipeSoal === 'Pilihan Ganda Kompleks' ? normalisasiKunciKompleks(it.kunciJawaban) : it.kunciJawaban),
+          kunciJawaban: kunciSimpan,
           bobotNilai: Number(it.bobotNilai),
           statusAktif: true,
           dibuatOleh: penggunaAktif.id
