@@ -6147,7 +6147,7 @@ function buatDaftarPaketBimbel() {
       String(a.kodeSoal || '').localeCompare(String(b.kodeSoal || ''), undefined, { numeric: true, sensitivity: 'base' })
     );
     const daftarTingkat = [...new Set(g.list.map(s => s.tingkat).filter(Boolean))].join(', ');
-    const totalBobot = bulatDua(g.list.reduce((acc, s) => acc + Number(s.bobotNilai || 0), 0));
+    const totalBobot = bulatDua(g.list.reduce((acc, s) => acc + poinEfektifSoal(s), 0));
     return {
       id: g.id,
       judulPaket: g.judulPaket,
@@ -6186,13 +6186,13 @@ async function muatM5RuangUjian(paksa = false) {
   if (penggunaAktif?.role === 'Siswa Bimbel') {
     if (elJudul) elJudul.textContent = 'Bank Soal';
     if (elSub) {
-      elSub.textContent = `${penggunaAktif.asalSekolah || 'Siswa Bimbel'} (${penggunaAktif.kelasTeks || '-'}) — Pilih paket soal kategori ASAS atau TKA yang ingin dikerjakan terlebih dahulu.`;
+      elSub.textContent = `${penggunaAktif.asalSekolah || 'Siswa Bimbel'} (${penggunaAktif.kelasTeks || '-'}) — Pilih paket soal yang ingin dikerjakan terlebih dahulu.`;
     }
     renderBankSoalBimbel();
     return;
   }
 
-  if (elJudul) elJudul.textContent = 'Ruang Ujian ASAS';
+  if (elJudul) elJudul.textContent = 'Ruang Asesmen Digital (RAD)';
   if (elSub) {
     elSub.textContent = `Kelas Anda: ${namaKelasById(penggunaAktif.kelasId)}. Ujian hanya bisa dimulai ketika Guru menekan tombol Mulai Ujian.`;
   }
