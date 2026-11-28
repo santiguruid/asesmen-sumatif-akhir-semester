@@ -714,18 +714,44 @@ function daftarMapelDiizinkan() {
   if (!penggunaAktif) return [];
   if (adalahRoleGuru(penggunaAktif.role)) {
     const ampu = Array.isArray(penggunaAktif.mapelIds) ? penggunaAktif.mapelIds : [];
-    return stateMemori.mataPelajaran.filter(m => ampu.includes(m.id));
+    return stateMemori.mataPelajaran.filter(m =>
+      m.dibuatOleh === penggunaAktif.id || ampu.includes(m.id)
+    );
   }
   return stateMemori.mataPelajaran;
 }
 
 function bolehAksesMapel(mapelId) {
-  if (!penggunaAktif) return false;
+  if (!penggunaAktif || !mapelId) return false;
   if (penggunaAktif.role === 'Admin') return true;
   if (adalahRoleGuru(penggunaAktif.role)) {
+    const m = cariById('mataPelajaran', mapelId);
+    if (m && m.dibuatOleh === penggunaAktif.id) return true;
     return Array.isArray(penggunaAktif.mapelIds) && penggunaAktif.mapelIds.includes(mapelId);
   }
   return false;
+}
+
+function bolehKelolaMapel(mapel) {
+  if (!penggunaAktif || !mapel) return false;
+  if (penggunaAktif.role === 'Admin') return true;
+  if (adalahRoleGuru(penggunaAktif.role)) {
+    if (mapel.dibuatOleh) return mapel.dibuatOleh === penggunaAktif.id;
+    return Array.isArray(penggunaAktif.mapelIds) && penggunaAktif.mapelIds.includes(mapel.id);
+  }
+  return false;
+}
+
+async function cekUnikKodeMapelPerPemilik(kodeMapel, pemilikId = '', kecualiId = null) {
+  const target = teks(String(kodeMapel || '').trim());
+  if (!target) return true;
+  const semua = await dbList(COLLECTIONS.mataPelajaran);
+  const duplikat = semua.find(item =>
+    item.id !== kecualiId &&
+    teks(String(item.kodeMapel || '').trim()) === target &&
+    String(item.dibuatOleh || '') === String(pemilikId || '')
+  );
+  return !duplikat;
 }
 
 function daftarTipeSoalDiizinkanForm() {
