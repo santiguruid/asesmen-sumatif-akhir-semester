@@ -2860,7 +2860,7 @@ function renderTabelSoal() {
   wadah.innerHTML = daftarGrup.map(g => {
     const terbuka = paketSoalTerbukaM3.has(g.kunci);
     const bolehKelolaGrup = g.list.every(s => bolehKelolaSoal(s));
-    const totalBobot = bulatDua(g.list.reduce((acc, s) => acc + Number(s.bobotNilai || 0), 0));
+    const totalBobot = bulatDua(g.list.reduce((acc, s) => acc + poinEfektifSoal(s), 0));
     const jmlAktif = g.list.filter(s => s.statusAktif !== false).length;
     const jmlBergambar = g.list.filter(s => Boolean(s.urlGambar)).length;
     const daftarTingkat = [...new Set(g.list.map(s => s.tingkat).filter(Boolean))].join(', ');
@@ -2877,7 +2877,7 @@ function renderTabelSoal() {
                 <th>Tipe Soal</th>
                 <th>Pertanyaan</th>
                 <th>Kunci Jawaban</th>
-                <th>Bobot</th>
+                <th>Poin</th>
                 <th>Status</th>
                 <th>Aksi</th>
               </tr>
@@ -2885,6 +2885,7 @@ function renderTabelSoal() {
             <tbody>
               ${g.list.map((s, idx) => {
                 const bolehEdit = bolehKelolaSoal(s);
+                const poinButir = poinEfektifSoal(s);
                 const kunciHtml = s.tipeSoal === 'Pilihan Ganda' || s.tipeSoal === 'Pilihan Ganda Kompleks'
                   ? `<strong class="dnc-mono">${esc(s.kunciJawaban || '-')}</strong>`
                   : `<div class="dnc-teks-potong" style="max-width:160px" title="${esc(s.kunciJawaban || '')}">${esc(s.kunciJawaban || 'Rubrik')}</div>`;
@@ -2906,7 +2907,7 @@ function renderTabelSoal() {
                     <td data-label="Tipe Soal">${badgeTipeSoal(s.tipeSoal)}</td>
                     <td data-label="Pertanyaan"><div class="dnc-teks-potong" title="${esc(s.pertanyaan)}">${esc(s.pertanyaan)}</div></td>
                     <td data-label="Kunci Jawaban">${kunciHtml}</td>
-                    <td data-label="Bobot"><strong>${esc(s.bobotNilai)}</strong></td>
+                    <td data-label="Poin"><strong>${esc(poinButir)}</strong></td>
                     <td data-label="Status">${badgeStatus(s.statusAktif ? 'Aktif' : 'Nonaktif')}</td>
                     <td class="dnc-sel-aksi">
                       <div class="dnc-aksi-baris">${tombolBarisHtml}</div>
@@ -2944,7 +2945,7 @@ function renderTabelSoal() {
                 ${adalahGuru && !bolehKelolaGrup ? '<span class="dnc-badge dnc-badge-amber">Hanya Baca</span>' : ''}
                 ${daftarTingkat ? `<span class="dnc-badge dnc-badge-abu">Tingkat ${esc(daftarTingkat)}</span>` : ''}
                 ${jmlBergambar ? `<span class="dnc-badge dnc-badge-ungu">${jmlBergambar} Bergambar</span>` : ''}
-                <span>${g.list.length} butir soal • Total Bobot ${totalBobot} • Aktif ${jmlAktif}/${g.list.length}</span>
+                <span>${g.list.length} butir soal • Total Poin Maks ${totalBobot} • Aktif ${jmlAktif}/${g.list.length}</span>
                 ${daftarTipe ? `<span>• ${esc(daftarTipe)}</span>` : ''}
               </div>
             </div>
@@ -2955,6 +2956,37 @@ function renderTabelSoal() {
         ${isiTabelHtml}
       </div>`;
   }).join('');
+}
+
+function sinkronkanBobotBankSoalOtomatis() {
+  const daftarKelola = stateMemori.bankSoal.filter(s => bolehKelolaSoal(s));
+  if (!daftarKelola.length) {
+    tampilkanToast('Belum ada butir Bank Soal yang dapat disinkronkan.', 'error');
+    return;
+  }
+
+  const perluUpdate = daftarKelola.filter(s => Number(s.bobotNilai) !== poinEfektifSoal(s));
+  if (!perluUpdate.length) {
+    tampilkanToast('Seluruh butir Bank Soal sudah sesuai poin otomatis standar RAD (PG/PGK/BS = 1, Isian = 2).', 'info');
+    return;
+  }
+
+  bukaKonfirmasi({
+    judul: 'Sinkronkan Poin Bank Soal Lama',
+    pesan: `Ditemukan ${perluUpdate.length} dari ${daftarKelola.length} butir soal yang masih memakai bobot lama. Ubah seluruhnya ke poin otomatis standar RAD (PG = 1, PG Kompleks = 1, Benar/Salah = 1, Isian Singkat = 2)?`,
+    labelYa: 'Ya, Sinkronkan Poin',
+    kelasTombol: 'dnc-tombol-primer',
+    onYa: async () => {
+      let berhasil = 0;
+      for (const s of perluUpdate) {
+        await dbUpdate(COLLECTIONS.bankSoal, s.id, { bobotNilai: poinEfektifSoal(s) });
+        berhasil++;
+      }
+      resetCacheMenu(['DNC-M1', 'DNC-M3', 'DNC-M4', 'DNC-M5', 'DNC-M6']);
+      await muatM3BankSoal(true);
+      tampilkanToast(`${berhasil} butir soal berhasil disinkronkan ke poin otomatis RAD. Buka menu Jadwal & Paket RAD lalu klik "Hitung Ulang Nilai" untuk memperbarui hasil ujian yang sudah berjalan.`);
+    }
+  });
 }
 
 function opsiMapToObj(list) {
