@@ -5370,7 +5370,7 @@ function bukaModalImporCsvSoal() {
   if (!mapelList.length) { tampilkanToast('Belum ada mata pelajaran tersedia.', 'error'); return; }
 
   bukaModalFormDnc({
-    judul: 'Impor Bank Soal dari CSV',
+    judul: 'Impor Bank Soal RAD dari CSV (Poin Otomatis)',
     lebar: true,
     labelSimpan: 'Impor Soal CSV',
     htmlKonten: `
@@ -5391,7 +5391,7 @@ function bukaModalImporCsvSoal() {
         </div>
         <div class="dnc-form-grup">
           <label class="dnc-label" for="csv-sumberPaket">Nama Paket / Grup Soal * (otomatis dari nama file CSV)</label>
-          <input id="csv-sumberPaket" class="dnc-input" type="text" placeholder="Contoh: Bank_Soal_ASAS_Matematika_Kelas_6_Semester_1">
+          <input id="csv-sumberPaket" class="dnc-input" type="text" placeholder="Contoh: Bank_Soal_RAD_Matematika_Kelas_6_Semester_1">
         </div>
         <div class="dnc-form-grup dnc-form-full">
           <div class="dnc-flex-between">
@@ -5399,17 +5399,17 @@ function bukaModalImporCsvSoal() {
             <button type="button" id="btn-unduh-templat-csv" class="dnc-tombol dnc-tombol-sekunder dnc-tombol-kecil">Unduh Templat CSV</button>
           </div>
           <input id="csv-file-soal" class="dnc-input" type="file" accept=".csv,text/csv" style="padding-top:7px">
-          <span class="dnc-form-bantuan">Header kolom: kodeSoal,tipeSoal,pertanyaan,opsiA,opsiB,opsiC,opsiD,opsiE,kunciJawaban,bobotNilai,urlGambar (opsional)</span>
+          <span class="dnc-form-bantuan">Header kolom tanpa bobot manual: kodeSoal,tipeSoal,pertanyaan,opsiA,opsiB,opsiC,opsiD,opsiE,kunciJawaban,urlGambar (opsional). Poin ditetapkan otomatis (PG/PGK/BS = 1, Isian = 2).</span>
         </div>
       </div>`,
     onMount: () => {
       document.getElementById('btn-unduh-templat-csv').addEventListener('click', () => {
-        const isi = 'kodeSoal,tipeSoal,pertanyaan,opsiA,opsiB,opsiC,opsiD,opsiE,kunciJawaban,bobotNilai,urlGambar\n' +
-          'SOAL-01,Pilihan Ganda,"Hasil dari 12 x 5 adalah ...",50,55,60,65,,C,10,\n' +
-          'SOAL-02,Pilihan Ganda Kompleks,"Pilih bilangan prima berikut:",2,9,11,15,,"A, C",20,\n' +
-          'SOAL-03,Isian Singkat,"Ibukota Provinsi DIY adalah ....",,,,,,Yogyakarta,20,\n' +
-          'SOAL-04,Uraian,"Jelaskan pengertian gagasan utama dalam paragraf!",,,,,,Ide pokok inti pembahasan paragraf.,50,\n';
-        unduhBlobFile(new Blob([isi], { type: 'text/csv;charset=utf-8' }), 'Templat_Bank_Soal_ASAS_DNC.csv');
+        const isi = 'kodeSoal,tipeSoal,pertanyaan,opsiA,opsiB,opsiC,opsiD,opsiE,kunciJawaban,urlGambar\n' +
+          'SOAL-01,Pilihan Ganda,"Hasil dari 12 x 5 adalah ...",50,55,60,65,,C,\n' +
+          'SOAL-02,Pilihan Ganda Kompleks,"Pilih bilangan prima berikut:",2,9,11,15,,"A, C",\n' +
+          'SOAL-03,Benar/Salah,"Tentukan Benar atau Salah! Pernyataan 1: Matahari terbit dari timur. Pernyataan 2: Air membeku di 100 C.",,,,,,"1. Benar, 2. Salah",\n' +
+          'SOAL-04,Isian Singkat,"Ibukota Provinsi DIY adalah ....",,,,,,Yogyakarta,\n';
+        unduhBlobFile(new Blob([isi], { type: 'text/csv;charset=utf-8' }), 'Templat_Bank_Soal_RAD_DNC.csv');
       });
       document.getElementById('csv-file-soal').addEventListener('change', e => {
         const file = e.target.files[0];
@@ -5430,10 +5430,16 @@ function bukaModalImporCsvSoal() {
       const baris = parseCsvBaris(await file.text());
       if (baris.length < 2) throw new Error('File CSV tidak berisi baris soal.');
 
+      const headerCsv = (baris[0] || []).map(h => teks(h));
+      const punyaKolomBobotLama = headerCsv.some(h => h.includes('bobot') || h.includes('skor'));
+
       let tersimpan = 0;
       const waktuTag = Date.now().toString().slice(-4);
       for (let i = 1; i < baris.length; i++) {
-        const [kodeRaw, tipeRaw, pertanyaanRaw, a, b, c, d, e, kunciRaw, bobotRaw, gambarRaw] = baris[i];
+        const row = baris[i];
+        const [kodeRaw, tipeRaw, pertanyaanRaw, a, b, c, d, e, kunciRaw] = row;
+        const bobotRaw = punyaKolomBobotLama ? row[9] : '';
+        const gambarRaw = punyaKolomBobotLama ? row[10] : row[9];
         if (!pertanyaanRaw) continue;
         let pertanyaan = pertanyaanRaw.trim();
         let urlGambarAsli = String(gambarRaw || '').trim();
@@ -5449,14 +5455,17 @@ function bukaModalImporCsvSoal() {
         const tipeSoal = deteksiTipeDariTeks(tipeRaw, opsiTemp.length, kunciRaw, pertanyaan);
         const opsiJawaban = adalahTipeBeropsi(tipeSoal) ? opsiTemp : [];
         const kodeSoal = kodeRaw || `${(mapelObj?.kodeMapel || 'SL')}-${waktuTag}-${String(i).padStart(2, '0')}`;
-        const bobotNilai = Number(bobotRaw) > 0 ? Number(bobotRaw) : 10;
+        const bobotNilai = bobotOtomatisTipeSoal(tipeSoal, bobotRaw);
         const kunciJawaban = tipeSoal === 'Pilihan Ganda'
           ? String(kunciRaw || 'A').trim().toUpperCase().slice(0, 1)
-          : (tipeSoal === 'Pilihan Ganda Kompleks' ? normalisasiKunciKompleks(kunciRaw) : String(kunciRaw || '').trim());
+          : (tipeSoal === 'Pilihan Ganda Kompleks'
+            ? normalisasiKunciKompleks(kunciRaw)
+            : (tipeSoal === 'Benar/Salah' ? normalisasiKunciBenarSalah(kunciRaw) : String(kunciRaw || '').trim()));
         if (adalahTipeBeropsi(tipeSoal) && opsiJawaban.length < 2) continue;
         await dbCreate(COLLECTIONS.bankSoal, {
           kodeSoal, kategoriSoal, sumberPaket, mapelId, tingkat, tipeSoal, pertanyaan,
-          urlGambar, urlGambarAsli, gambarTerverifikasi: false,
+          urlGambar, urlGambarAsli: urlGambar.startsWith('data:image/') ? '' : urlGambarAsli,
+          gambarTerverifikasi: false,
           opsiJawaban, kunciJawaban, bobotNilai, statusAktif: true, dibuatOleh: penggunaAktif.id
         });
         tersimpan++;
@@ -5465,7 +5474,7 @@ function bukaModalImporCsvSoal() {
       tutupModalFormDnc();
       resetCacheMenu(['DNC-M1', 'DNC-M3', 'DNC-M4', 'DNC-M5']);
       await muatM3BankSoal(true);
-      tampilkanToast(`${tersimpan} butir soal (${kategoriSoal}) berhasil diimpor dalam paket "${sumberPaket}".`);
+      tampilkanToast(`${tersimpan} butir soal (${kategoriSoal}) berhasil diimpor dengan poin otomatis dalam paket "${sumberPaket}".`);
     }
   });
 }
