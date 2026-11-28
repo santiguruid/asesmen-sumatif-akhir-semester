@@ -7043,19 +7043,22 @@ function bukaModalKoreksiHasil(hasilId, hanyaBaca = false) {
     const soal = cariById('bankSoal', j.soalId);
     if (!soal) return '';
 
-    if (soal.tipeSoal === 'Pilihan Ganda' || soal.tipeSoal === 'Pilihan Ganda Kompleks') {
+    if (soal.tipeSoal === 'Pilihan Ganda' || soal.tipeSoal === 'Pilihan Ganda Kompleks' || soal.tipeSoal === 'Benar/Salah') {
       const skorButir = Number(j.skor ?? hitungSkorButirOtomatis(soal, j.jawaban));
       const badgeNilai = skorButir >= soal.bobotNilai
         ? badgeStatus(`Benar (+${skorButir}/${soal.bobotNilai})`)
         : (skorButir > 0 ? `<span class="dnc-badge dnc-badge-amber">Parsial (+${skorButir}/${soal.bobotNilai})</span>` : badgeStatus('Salah (0)'));
+      const urlGbrKoreksi = normalisasiUrlGambarSoal(soal.urlGambar || '');
+      const labelJawaban = soal.tipeSoal === 'Benar/Salah' ? 'Jawaban Siswa' : 'Jawaban Siswa (kode asli)';
       return `
         <div class="dnc-koreksi-item">
           <div class="dnc-koreksi-header">
             <strong>Soal #${idx + 1} (${esc(soal.kodeSoal)}) — ${esc(soal.tipeSoal)}</strong>
             ${badgeNilai}
           </div>
-          <div style="font-size:13px;margin-bottom:6px">${esc(soal.pertanyaan)}</div>
-          <div class="dnc-form-bantuan">Jawaban Siswa (kode asli): <strong>${esc(j.jawaban || '-')}</strong> | Kunci: <strong>${esc(soal.kunciJawaban)}</strong></div>
+          <div style="font-size:13px;margin-bottom:6px;white-space:pre-wrap">${esc(soal.pertanyaan)}</div>
+          ${urlGbrKoreksi ? `<img src="${esc(urlGbrKoreksi)}" alt="Gambar soal" class="dnc-soal-gambar" style="max-height:180px">` : ''}
+          <div class="dnc-form-bantuan">${labelJawaban}: <strong>${esc(j.jawaban || '-')}</strong> | Kunci: <strong>${esc(soal.kunciJawaban)}</strong></div>
         </div>`;
     }
 
