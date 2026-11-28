@@ -1968,7 +1968,7 @@ async function muatM1Dashboard(paksa = false) {
         ? `<span class="dnc-badge dnc-badge-hijau"><span class="dnc-dot-live"></span>Sedang Dibuka</span>`
         : `<span class="dnc-badge dnc-badge-amber">Menunggu Mulai</span>`
     }
-  ], 'Belum ada paket ASAS berstatus Aktif');
+  ], 'Belum ada paket Ruang Asesmen Digital (RAD) berstatus Aktif');
 
   const teksPeringatan = document.getElementById('teks-peringatan-m1');
   if (peringatanSiswa.length) {
