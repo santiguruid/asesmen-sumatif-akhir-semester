@@ -3364,6 +3364,18 @@ function bukaFormSoal(item = null) {
   });
 }
 
+function bukaZoomGambarDnc(urlGambar) {
+  if (!urlGambar) return;
+  const w = window.open('', '_blank', 'width=980,height=720');
+  if (!w) {
+    if (!urlGambar.startsWith('data:image/')) window.open(urlGambar, '_blank', 'noopener');
+    return;
+  }
+  w.document.open();
+  w.document.write(`<!DOCTYPE html><html lang="id"><head><meta charset="UTF-8"><title>Pratinjau Gambar Soal</title></head><body style="margin:0;background:#0F172A;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:16px;box-sizing:border-box"><img src="${esc(urlGambar)}" alt="Gambar soal" style="max-width:100%;max-height:94vh;background:#FFFFFF;border-radius:8px;box-shadow:0 8px 30px rgba(0,0,0,0.4)"></body></html>`);
+  w.document.close();
+}
+
 function bukaPratinjauSoal(id) {
   const s = cariById('bankSoal', id);
   if (!s) return;
