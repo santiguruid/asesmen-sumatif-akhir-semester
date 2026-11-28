@@ -27,7 +27,7 @@ const GAS_EMAIL_SECRET = 'DNC_ASAS_BIMBEL_2026_KEY'; // Harus sama persis dengan
 
 const MENU_DAFTAR = [
   { id: 'DNC-M1', label: 'Dashboard', pendek: 'Beranda', icon: 'icon-dashboard', roles: ['Admin', 'Guru', 'Guru Bimbel'] },
-  { id: 'DNC-M2', label: 'Master Kelas & Mapel', pendek: 'Master', icon: 'icon-master', roles: ['Admin'] },
+  { id: 'DNC-M2', label: 'Master Kelas & Mapel', pendek: 'Master', icon: 'icon-master', roles: ['Admin', 'Guru', 'Guru Bimbel'] },
   { id: 'DNC-M3', label: 'Bank Soal', pendek: 'Soal', icon: 'icon-bank', roles: ['Admin', 'Guru', 'Guru Bimbel'] },
   { id: 'DNC-M4', label: 'Jadwal & Paket Ruang Asesmen Digital (RAD)', pendek: 'Paket', icon: 'icon-jadwal', roles: ['Admin', 'Guru'] },
   { id: 'DNC-M5', label: 'Ruang Asesmen Digital (RAD)', pendek: 'Ujian', icon: 'icon-ujian', roles: ['Siswa', 'Siswa Bimbel'] },
