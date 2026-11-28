@@ -7727,7 +7727,7 @@ function eksporRekapNilaiCsv() {
     tampilkanToast('Tidak ada data hasil ujian untuk diekspor.', 'error');
     return;
   }
-  const header = ['NomorInduk', 'NamaLengkap', 'KelasAtauAsal', 'PaketSoal', 'MataPelajaran', 'StatusUjian', 'SkorOtomatis', 'SkorUraian', 'SkorAkhir', 'Ketuntasan'];
+  const header = ['NomorInduk', 'NamaLengkap', 'KelasAtauAsal', 'PaketSoal', 'MataPelajaran', 'StatusUjian', 'PerolehanOtomatis', 'PoinUraian', 'NilaiAkhir', 'Ketuntasan'];
   const qCsv = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
   const baris = [header.join(',')];
   dataHasilTersaring.forEach(h => {
@@ -7741,8 +7741,8 @@ function eksporRekapNilaiCsv() {
       h.skorPg ?? 0, h.skorUraian ?? 0, h.skorAkhir ?? 0, h.statusKetuntasan || ''
     ].map(qCsv).join(','));
   });
-  unduhBlobFile(new Blob([baris.join('\n')], { type: 'text/csv;charset=utf-8' }), `Rekap_Nilai_ASAS_${formatTanggal(new Date()).replace(/\//g, '-')}.csv`);
-  tampilkanToast('Rekap nilai CSV berhasil diunduh.');
+  unduhBlobFile(new Blob([baris.join('\n')], { type: 'text/csv;charset=utf-8' }), `Rekap_Nilai_RAD_${formatTanggal(new Date()).replace(/\//g, '-')}.csv`);
+  tampilkanToast('Rekap nilai CSV Ruang Asesmen Digital (RAD) berhasil diunduh.');
 }
 // ===== AKHIR BLOK: DNC_M6_HASIL_NILAI =====
 
