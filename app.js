@@ -3364,18 +3364,6 @@ function bukaFormSoal(item = null) {
   });
 }
 
-function bukaZoomGambarDnc(urlGambar) {
-  if (!urlGambar) return;
-  const w = window.open('', '_blank', 'width=980,height=720');
-  if (!w) {
-    if (!urlGambar.startsWith('data:image/')) window.open(urlGambar, '_blank', 'noopener');
-    return;
-  }
-  w.document.open();
-  w.document.write(`<!DOCTYPE html><html lang="id"><head><meta charset="UTF-8"><title>Pratinjau Gambar Soal</title></head><body style="margin:0;background:#0F172A;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:16px;box-sizing:border-box"><img src="${esc(urlGambar)}" alt="Gambar soal" style="max-width:100%;max-height:94vh;background:#FFFFFF;border-radius:8px;box-shadow:0 8px 30px rgba(0,0,0,0.4)"></body></html>`);
-  w.document.close();
-}
-
 function bukaPratinjauSoal(id) {
   const s = cariById('bankSoal', id);
   if (!s) return;
@@ -3421,7 +3409,7 @@ function bukaPratinjauSoal(id) {
             ${badgeKategoriSoal(s.kategoriSoal)}
             <span class="dnc-badge dnc-badge-biru">${esc(namaMapelById(s.mapelId))} • ${esc(labelTingkat(s.tingkat))}</span>
           </div>
-          <div class="dnc-flex-gap">${badgeTipeSoal(s.tipeSoal)}<span class="dnc-badge dnc-badge-abu">Bobot ${esc(s.bobotNilai)}</span></div>
+          <div class="dnc-flex-gap">${badgeTipeSoal(s.tipeSoal)}<span class="dnc-badge dnc-badge-abu">Poin ${esc(poinEfektifSoal(s))}</span></div>
         </div>
         ${urlImg ? `<img id="dnc-img-pratinjau-zoom" src="${esc(urlImg)}" alt="Gambar soal" class="dnc-soal-gambar" title="Klik untuk perbesar gambar">` : ''}
         ${cekGbr ? `<div class="dnc-img-cek-box ${cekGbr.kelas} dnc-mb-12"><div class="dnc-img-cek-info"><strong>Status Gambar &amp; Kunci: ${esc(cekGbr.status)}</strong><div class="dnc-img-cek-kunci"><strong>Kunci:</strong> ${esc(cekGbr.ringkasKunci)}</div><div class="dnc-teks-muted">${esc(cekGbr.pesan)}</div></div></div>` : ''}
