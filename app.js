@@ -2524,9 +2524,41 @@ function bukaModalImporKelas() {
   });
 }
 
+async function sinkronMapelKeAkunGuru(userId, mapelId, mode = 'tambah') {
+  if (!userId || !mapelId) return;
+  const userObj = cariById('pengguna', userId) ||
+    (penggunaAktif?.id === userId ? penggunaAktif : await dbGetById(COLLECTIONS.pengguna, userId));
+  if (!userObj || !adalahRoleGuru(normalisasiRoleDnc(userObj.role))) return;
+  const lama = Array.isArray(userObj.mapelIds) ? userObj.mapelIds : [];
+  const baru = mode === 'hapus'
+    ? lama.filter(x => x !== mapelId)
+    : [...new Set([...lama, mapelId])];
+  if (baru.length === lama.length && baru.every((v, i) => v === lama[i])) return;
+  await dbUpdate(COLLECTIONS.pengguna, userId, { mapelIds: baru });
+  userObj.mapelIds = baru;
+  if (penggunaAktif?.id === userId) penggunaAktif.mapelIds = baru;
+}
+
 function bukaFormMapel(item = null) {
+  if (item && !bolehKelolaMapel(item)) {
+    tampilkanToast('Anda tidak memiliki izin mengubah mata pelajaran milik guru lain.', 'error');
+    return;
+  }
+
+  const adalahAdmin = penggunaAktif?.role === 'Admin';
+  const daftarPemilik = adalahAdmin
+    ? stateMemori.pengguna
+      .filter(u => !adalahRoleSiswa(normalisasiRoleDnc(u.role)) && u.statusAktif !== false)
+      .sort((a, b) => {
+        const p = r => (adalahRoleGuru(r) ? 0 : 1);
+        const s = p(normalisasiRoleDnc(a.role)) - p(normalisasiRoleDnc(b.role));
+        return s !== 0 ? s : teks(a.namaLengkap).localeCompare(teks(b.namaLengkap));
+      })
+    : [];
+  const pemilikAwal = item?.dibuatOleh || penggunaAktif.id;
+
   bukaModalFormDnc({
-    judul: item ? 'Ubah Mata Pelajaran' : 'Tambah Mata Pelajaran',
+    judul: item ? 'Ubah Mata Pelajaran & KKM' : 'Tambah Mata Pelajaran & KKM',
     htmlKonten: `
       <div class="dnc-form-grid">
         <div class="dnc-form-grup">
@@ -2534,32 +2566,54 @@ function bukaFormMapel(item = null) {
           <input id="f-kodeMapel" class="dnc-input" type="text" placeholder="Contoh: MTK-06" value="${esc(item?.kodeMapel || '')}" required>
         </div>
         <div class="dnc-form-grup">
-          <label class="dnc-label" for="f-kkm">KKM (0–100) *</label>
+          <label class="dnc-label" for="f-kkm">Batas Nilai KKM (0–100) *</label>
           <input id="f-kkm" class="dnc-input" type="number" min="0" max="100" value="${esc(item?.kkm ?? 75)}" required>
         </div>
         <div class="dnc-form-grup dnc-form-full">
           <label class="dnc-label" for="f-namaMapel">Nama Mata Pelajaran *</label>
           <input id="f-namaMapel" class="dnc-input" type="text" placeholder="Contoh: Matematika" value="${esc(item?.namaMapel || '')}" required>
         </div>
+        ${adalahAdmin ? `
+          <div class="dnc-form-grup dnc-form-full">
+            <label class="dnc-label" for="f-pemilikMapel">Pemilik Mata Pelajaran &amp; KKM *</label>
+            <select id="f-pemilikMapel" class="dnc-select" required>
+              ${daftarPemilik.map(u => `<option value="${esc(u.id)}" ${pemilikAwal === u.id ? 'selected' : ''}>${esc(u.namaLengkap)} — ${esc(normalisasiRoleDnc(u.role))} (${esc(u.email)})</option>`).join('')}
+            </select>
+            <span class="dnc-form-bantuan">Mata pelajaran ini akan otomatis masuk ke daftar kewenangan dan KKM milik akun yang dipilih.</span>
+          </div>` : ''}
       </div>`,
     onSubmit: async () => {
       const kkm = Number(document.getElementById('f-kkm').value);
+      const pemilikId = adalahAdmin
+        ? (document.getElementById('f-pemilikMapel')?.value || penggunaAktif.id)
+        : penggunaAktif.id;
       const payload = {
         kodeMapel: document.getElementById('f-kodeMapel').value.trim(),
         namaMapel: document.getElementById('f-namaMapel').value.trim(),
-        kkm
+        kkm,
+        dibuatOleh: pemilikId
       };
       if (!payload.kodeMapel || !payload.namaMapel) throw new Error('Kode dan nama mata pelajaran wajib diisi.');
       if (isNaN(kkm) || kkm < 0 || kkm > 100) throw new Error('Nilai KKM harus berada pada rentang 0 sampai 100.');
-      if (!(await cekUnik(COLLECTIONS.mataPelajaran, 'kodeMapel', payload.kodeMapel, item?.id))) {
-        throw new Error(`Kode mata pelajaran "${payload.kodeMapel}" sudah digunakan.`);
+      if (!(await cekUnikKodeMapelPerPemilik(payload.kodeMapel, pemilikId, item?.id))) {
+        throw new Error(`Kode mata pelajaran "${payload.kodeMapel}" sudah digunakan pada akun pemilik ini.`);
       }
-      if (item) await dbUpdate(COLLECTIONS.mataPelajaran, item.id, payload);
-      else await dbCreate(COLLECTIONS.mataPelajaran, payload);
+
+      if (item) {
+        await dbUpdate(COLLECTIONS.mataPelajaran, item.id, payload);
+        if (item.dibuatOleh && item.dibuatOleh !== pemilikId) {
+          await sinkronMapelKeAkunGuru(item.dibuatOleh, item.id, 'hapus');
+        }
+        await sinkronMapelKeAkunGuru(pemilikId, item.id, 'tambah');
+      } else {
+        const baru = await dbCreate(COLLECTIONS.mataPelajaran, payload);
+        await sinkronMapelKeAkunGuru(pemilikId, baru.id, 'tambah');
+      }
+
       tutupModalFormDnc();
       resetCacheMenu(['DNC-M1', 'DNC-M2', 'DNC-M3', 'DNC-M4', 'DNC-M6', 'DNC-M7']);
       await muatM2Master(true);
-      tampilkanToast(item ? 'Mata pelajaran diperbarui.' : 'Mata pelajaran ditambahkan.');
+      tampilkanToast(item ? 'Mata pelajaran & KKM berhasil diperbarui.' : 'Mata pelajaran & KKM berhasil ditambahkan.');
     }
   });
 }
