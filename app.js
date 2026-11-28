@@ -7942,7 +7942,7 @@ function renderTabelPengguna() {
 
     htmlBagian += `
       <div class="dnc-subbagian-judul">
-        <span>Akun Siswa ASAS Berdasarkan Kelas (Klik kelas untuk melihat data siswa)</span>
+        <span>Akun Siswa Ruang Asesmen Digital (RAD) Berdasarkan Kelas (Klik kelas untuk melihat data siswa)</span>
         <span class="dnc-badge dnc-badge-biru">${daftarGrupKelas.length} kelas • ${siswaList.length} siswa</span>
       </div>
       <div class="dnc-grup-halaman-list dnc-mb-12">
