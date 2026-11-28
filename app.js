@@ -4877,15 +4877,15 @@ function bukaModalImporWord() {
         </div>
         <div class="dnc-form-grup dnc-form-full">
           <div class="dnc-flex-between dnc-mb-12">
-            <label class="dnc-label" for="w-file-docx">Dokumen Soal Format Bebas (.docx, .pdf, .xlsx, .xls, .csv, .txt) *</label>
+            <label class="dnc-label" for="w-file-docx">Dokumen / Gambar Soal (.docx, .pdf, .xlsx, .xls, .csv, .txt, .png, .jpg, .webp) *</label>
             <button type="button" id="btn-unduh-templat-word" class="dnc-tombol dnc-tombol-sekunder dnc-tombol-kecil">
               <svg class="dnc-ikon"><use href="#icon-download"></use></svg>
               <span>Contoh Word (Opsional)</span>
             </button>
           </div>
           <div class="dnc-file-drop">
-            <input id="w-file-docx" class="dnc-input" type="file" accept=".docx,.pdf,.xlsx,.xls,.csv,.txt" style="padding-top:7px">
-            <div id="info-ringkas-word" class="dnc-form-bantuan dnc-mt-12">Mesin pembaca otomatis mendeteksi soal, opsi sejajar/berbaris, PG, PG Kompleks, Isian, Uraian, kunci jawaban, dan bobot penskoran dari template apa pun.</div>
+            <input id="w-file-docx" class="dnc-input" type="file" multiple accept=".docx,.pdf,.xlsx,.xls,.csv,.txt,.png,.jpg,.jpeg,.webp" style="padding-top:7px">
+            <div id="info-ringkas-word" class="dnc-form-bantuan dnc-mt-12">Mendukung soal bergambar di Word (.docx), gambar tertanam/scan PDF (.pdf), unggahan gambar langsung (.png/.jpg/.webp via OCR), PG, PG Kompleks, Benar/Salah, Isian, dan Uraian.</div>
           </div>
         </div>
         <div class="dnc-form-grup dnc-form-full">
