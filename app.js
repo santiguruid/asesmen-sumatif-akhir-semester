@@ -3285,13 +3285,150 @@ function bukaFormSoal(item = null) {
         opsiJawaban, kunciJawaban, bobotNilai, statusAktif,
         dibuatOleh: item?.dibuatOleh || penggunaAktif.id
       };
+      if (item) await dbUpdate(COLLECTIONS.bankSoal, item.id, payload);
+      else await dbCreate(COLLECTIONS.bankSoal, payload);
+
+      tutupModalFormDnc();
+      resetCacheMenu(['DNC-M1', 'DNC-M3', 'DNC-M4', 'DNC-M5']);
+      await muatM3BankSoal(true);
+      tampilkanToast(item ? 'Butir soal berhasil diperbarui.' : 'Butir soal berhasil disimpan.');
+    }
+  });
+}
+
+function bukaZoomGambarDnc(urlGambar) {
+  if (!urlGambar) return;
+  const w = window.open('', '_blank', 'width=980,height=720');
+  if (!w) {
+    if (!urlGambar.startsWith('data:image/')) window.open(urlGambar, '_blank', 'noopener');
+    return;
+  }
+  w.document.open();
+  w.document.write(`<!DOCTYPE html><html lang="id"><head><meta charset="UTF-8"><title>Pratinjau Gambar Soal</title></head><body style="margin:0;background:#0F172A;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:16px;box-sizing:border-box"><img src="${esc(urlGambar)}" alt="Gambar soal" style="max-width:100%;max-height:94vh;background:#FFFFFF;border-radius:8px;box-shadow:0 8px 30px rgba(0,0,0,0.4)"></body></html>`);
+  w.document.close();
+}
+
+function bukaPratinjauSoal(id) {
+  const s = cariById('bankSoal', id);
+  if (!s) return;
+  const kunciSet = parseKunciKompleksSet(s.kunciJawaban);
+  const urlImg = normalisasiUrlGambarSoal(s.urlGambar);
+  const cekGbr = urlImg ? analisisKesesuaianGambarSoal(s) : null;
+
+  let opsiHtml = '';
+  if (adalahTipeBeropsi(s.tipeSoal)) {
+    opsiHtml = `<div class="dnc-opsi-list dnc-mt-12">${(s.opsiJawaban || []).map(o => `
+      <div class="dnc-opsi-item ${kunciSet.has(o.kode) ? 'terpilih' : ''}">
+        <span class="dnc-opsi-kode">${esc(o.kode)}</span>
+        <span>${esc(o.teks)}</span>
+      </div>`).join('')}</div>`;
+  } else if (s.tipeSoal === 'Benar/Salah') {
+    const daftarBs = parseKunciBenarSalah(s.kunciJawaban);
+    opsiHtml = `
+      <div class="dnc-bs-tabel-wrap dnc-mt-12">
+        <table class="dnc-bs-tabel">
+          <thead><tr><th style="width:68px">No</th><th>Pernyataan</th><th style="width:120px;text-align:center">Kunci</th></tr></thead>
+          <tbody>
+            ${daftarBs.length ? daftarBs.map(it => `
+              <tr>
+                <td data-label="No"><strong>${it.no}</strong></td>
+                <td data-label="Pernyataan">Pernyataan #${it.no} (sesuai gambar/teks soal)</td>
+                <td data-label="Kunci" style="text-align:center"><span class="dnc-badge ${it.nilai === 'Benar' ? 'dnc-badge-hijau' : 'dnc-badge-merah'}">${esc(it.nilai)}</span></td>
+              </tr>`).join('') : '<tr><td colspan="3" class="dnc-teks-muted">Kunci Benar/Salah belum diisi.</td></tr>'}
+          </tbody>
+        </table>
+      </div>`;
+  } else {
+    opsiHtml = `<div class="dnc-jawaban-box dnc-mt-12"><strong>Kunci / Rubrik (${esc(s.tipeSoal)}):</strong>\n${esc(s.kunciJawaban || 'Belum diisi')}</div>`;
+  }
+
+  bukaModalFormDnc({
+    judul: `Pratinjau Soal — ${s.kodeSoal}`,
+    tampilSimpan: false,
+    labelBatal: 'Tutup',
+    htmlKonten: `
+      <div class="dnc-pratinjau-soal">
+        <div class="dnc-flex-between dnc-mb-12">
+          <div class="dnc-flex-gap">
+            ${badgeKategoriSoal(s.kategoriSoal)}
+            <span class="dnc-badge dnc-badge-biru">${esc(namaMapelById(s.mapelId))} • ${esc(labelTingkat(s.tingkat))}</span>
+          </div>
+          <div class="dnc-flex-gap">${badgeTipeSoal(s.tipeSoal)}<span class="dnc-badge dnc-badge-abu">Bobot ${esc(s.bobotNilai)}</span></div>
+        </div>
+        ${urlImg ? `<img id="dnc-img-pratinjau-zoom" src="${esc(urlImg)}" alt="Gambar soal" class="dnc-soal-gambar" title="Klik untuk perbesar gambar">` : ''}
+        ${cekGbr ? `<div class="dnc-img-cek-box ${cekGbr.kelas} dnc-mb-12"><div class="dnc-img-cek-info"><strong>Status Gambar &amp; Kunci: ${esc(cekGbr.status)}</strong><div class="dnc-img-cek-kunci"><strong>Kunci:</strong> ${esc(cekGbr.ringkasKunci)}</div><div class="dnc-teks-muted">${esc(cekGbr.pesan)}</div></div></div>` : ''}
+        <div class="dnc-soal-teks">${esc(s.pertanyaan)}</div>
+        ${opsiHtml}
+      </div>`,
+    onMount: () => {
+      document.getElementById('dnc-img-pratinjau-zoom')?.addEventListener('click', () => bukaZoomGambarDnc(urlImg));
+    }
+  });
+}
+
+async function duplikatSoal(id) {
+  const s = cariById('bankSoal', id);
+  if (!s) return;
+  const salinDariOrangLain = !bolehKelolaSoal(s);
+  const tagWaktu = Date.now().toString().slice(-3);
+  const kodeBaru = `${s.kodeSoal}-${salinDariOrangLain ? 'SLN' : 'CPY'}${tagWaktu}${Math.floor(10 + Math.random() * 89)}`;
+  const namaPaketAsli = s.sumberPaket || namaSumberPaketSoal(s);
+  const namaPaketBaru = salinDariOrangLain ? `${namaPaketAsli}_Salinan` : namaPaketAsli;
+  const urlImg = normalisasiUrlGambarSoal(s.urlGambar || '');
+
+  await dbCreate(COLLECTIONS.bankSoal, {
+    kodeSoal: kodeBaru,
+    kategoriSoal: normalisasiKategoriSoal(s.kategoriSoal),
+    sumberPaket: namaPaketBaru,
+    mapelId: s.mapelId,
+    tingkat: s.tingkat,
+    tipeSoal: s.tipeSoal,
+    pertanyaan: salinDariOrangLain ? s.pertanyaan : `${s.pertanyaan} (Salinan)`,
+    urlGambar: urlImg,
+    urlGambarAsli: urlImg.startsWith('data:image/') ? '' : (s.urlGambarAsli || ''),
+    gambarTerverifikasi: Boolean(s.gambarTerverifikasi),
+    opsiJawaban: s.opsiJawaban || [],
+    kunciJawaban: s.kunciJawaban || '',
+    bobotNilai: s.bobotNilai,
+    statusAktif: s.statusAktif,
+    dibuatOleh: penggunaAktif.id
+  });
+  resetCacheMenu(['DNC-M1', 'DNC-M3', 'DNC-M4', 'DNC-M5']);
+  await muatM3BankSoal(true);
+  tampilkanToast(salinDariOrangLain
+    ? `Soal berhasil disalin ke "Bank Soal Saya" dengan kode ${kodeBaru}.`
+    : `Soal berhasil diduplikasi dengan kode ${kodeBaru}.`);
+}
+
+function salinPaketSoalKeSaya(kunciGrup) {
+  const soalDalamPaket = stateMemori.bankSoal.filter(s => kunciGrupSoalM3(s) === kunciGrup);
+  if (!soalDalamPaket.length) return;
+  const namaAsli = namaSumberPaketSoal(soalDalamPaket[0]);
+  const namaDepan = String(penggunaAktif?.namaLengkap || 'Guru').split(/\s+/)[0].replace(/[^A-Za-z0-9]/g, '');
+  const namaPaketBaru = `${namaAsli}_Salinan_${namaDepan || 'Saya'}`;
+
+  bukaKonfirmasi({
+    judul: 'Salin Paket Referensi ke Bank Soal Saya',
+    pesan: `Salin seluruh ${soalDalamPaket.length} butir soal dari paket "${namaAsli}" menjadi salinan pribadi milik akun Anda? Soal asli milik guru pembuat tidak akan berubah.`,
+    labelYa: 'Ya, Salin ke Soal Saya',
+    kelasTombol: 'dnc-tombol-primer',
+    onYa: async () => {
+      const cap = Date.now().toString().slice(-4);
+      let tersalin = 0;
+      for (let i = 0; i < soalDalamPaket.length; i++) {
+        const s = soalDalamPaket[i];
+        const kodeBaru = `${s.kodeSoal}-S${cap}-${String(i + 1).padStart(2, '0')}`;
+        const urlImg = normalisasiUrlGambarSoal(s.urlGambar || '');
+        await dbCreate(COLLECTIONS.bankSoal, {
+          kodeSoal: kodeBaru,
+          kategoriSoal: normalisasiKategoriSoal(s.kategoriSoal),
           sumberPaket: namaPaketBaru,
           mapelId: s.mapelId,
           tingkat: s.tingkat,
           tipeSoal: s.tipeSoal,
           pertanyaan: s.pertanyaan,
-          urlGambar: normalisasiUrlGambarSoal(s.urlGambar || ''),
-          urlGambarAsli: s.urlGambarAsli || '',
+          urlGambar: urlImg,
+          urlGambarAsli: urlImg.startsWith('data:image/') ? '' : (s.urlGambarAsli || ''),
           gambarTerverifikasi: Boolean(s.gambarTerverifikasi),
           opsiJawaban: s.opsiJawaban || [],
           kunciJawaban: s.kunciJawaban || '',
