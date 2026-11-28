@@ -2645,9 +2645,13 @@ async function hapusKelasDenganProteksi(id) {
 async function hapusMapelDenganProteksi(id) {
   const m = cariById('mataPelajaran', id);
   if (!m) return;
+  if (!bolehKelolaMapel(m)) {
+    tampilkanToast('Anda tidak memiliki izin menghapus mata pelajaran milik guru lain.', 'error');
+    return;
+  }
   bukaKonfirmasi({
-    judul: 'Hapus Mata Pelajaran',
-    pesan: `Yakin ingin menghapus mata pelajaran ${m.namaMapel}?`,
+    judul: 'Hapus Mata Pelajaran & KKM',
+    pesan: `Yakin ingin menghapus mata pelajaran ${m.namaMapel} (KKM ${m.kkm})?`,
     labelYa: 'Ya, Hapus',
     onYa: async () => {
       const [users, soals, pakets, hasils] = await Promise.all([
@@ -2656,14 +2660,130 @@ async function hapusMapelDenganProteksi(id) {
         dbList(COLLECTIONS.paketAsas),
         dbList(COLLECTIONS.hasilUjian)
       ]);
-      if (users.some(u => Array.isArray(u.mapelIds) && u.mapelIds.includes(id))) throw new Error('Mata pelajaran tidak dapat dihapus karena masih diampu oleh akun Guru.');
       if (soals.some(s => s.mapelId === id)) throw new Error('Mata pelajaran tidak dapat dihapus karena masih memiliki butir Bank Soal.');
-      if (pakets.some(p => p.mapelId === id)) throw new Error('Mata pelajaran tidak dapat dihapus karena masih digunakan pada Paket ASAS.');
+      if (pakets.some(p => p.mapelId === id)) throw new Error('Mata pelajaran tidak dapat dihapus karena masih digunakan pada Paket RAD.');
       if (hasils.some(h => h.mapelId === id)) throw new Error('Mata pelajaran tidak dapat dihapus karena masih memiliki rekaman Hasil Ujian.');
+
+      const guruLainPengampu = users.filter(u =>
+        u.id !== m.dibuatOleh &&
+        u.id !== penggunaAktif.id &&
+        Array.isArray(u.mapelIds) &&
+        u.mapelIds.includes(id)
+      );
+      if (guruLainPengampu.length) {
+        throw new Error('Mata pelajaran tidak dapat dihapus karena masih diampu oleh akun Guru lain.');
+      }
+
+      if (m.dibuatOleh) await sinkronMapelKeAkunGuru(m.dibuatOleh, id, 'hapus');
+      if (penggunaAktif?.id && penggunaAktif.id !== m.dibuatOleh) {
+        await sinkronMapelKeAkunGuru(penggunaAktif.id, id, 'hapus');
+      }
+
       await dbDelete(COLLECTIONS.mataPelajaran, id);
       resetCacheMenu(['DNC-M1', 'DNC-M2', 'DNC-M3', 'DNC-M4', 'DNC-M6', 'DNC-M7']);
       await muatM2Master(true);
       tampilkanToast('Mata pelajaran berhasil dihapus.');
+    }
+  });
+}
+
+function bukaModalAturPemilikMapel() {
+  if (penggunaAktif?.role !== 'Admin') {
+    tampilkanToast('Hanya Admin yang dapat mengatur kepemilikan Mata Pelajaran.', 'error');
+    return;
+  }
+
+  const daftarKandidat = stateMemori.pengguna
+    .filter(u => !adalahRoleSiswa(normalisasiRoleDnc(u.role)) && u.statusAktif !== false)
+    .sort((a, b) => {
+      const prior = r => (adalahRoleGuru(r) ? 0 : 1);
+      const sel = prior(normalisasiRoleDnc(a.role)) - prior(normalisasiRoleDnc(b.role));
+      return sel !== 0 ? sel : teks(a.namaLengkap).localeCompare(teks(b.namaLengkap));
+    });
+
+  if (!daftarKandidat.length) {
+    tampilkanToast('Belum ada akun Guru atau Admin aktif pada Manajemen Pengguna.', 'error');
+    return;
+  }
+
+  const guruSanti = daftarKandidat.find(u =>
+    adalahRoleGuru(normalisasiRoleDnc(u.role)) &&
+    (teks(u.namaLengkap).includes('santi') || teks(u.email).includes('santi'))
+  );
+  const defaultTargetId = guruSanti?.id || daftarKandidat[0].id;
+  const jmlTanpaPemilik = stateMemori.mataPelajaran.filter(m => !m.dibuatOleh).length;
+
+  const opsiCakupan = [
+    `<option value="semua" selected>Semua mata pelajaran &amp; KKM yang ada saat ini (${stateMemori.mataPelajaran.length} mapel)</option>`,
+    `<option value="tanpa_pemilik">Hanya mata pelajaran yang belum ditetapkan pemiliknya (${jmlTanpaPemilik} mapel)</option>`,
+    ...stateMemori.mataPelajaran.map(m =>
+      `<option value="${esc(m.id)}">Mapel: ${esc(m.kodeMapel)} — ${esc(m.namaMapel)} (KKM ${esc(m.kkm)} • Pemilik: ${esc(namaPemilikSoal(m.dibuatOleh))})</option>`
+    )
+  ].join('');
+
+  bukaModalFormDnc({
+    judul: 'Atur / Alihkan Pemilik Mata Pelajaran & KKM',
+    labelSimpan: 'Tetapkan Pemilik Mapel',
+    htmlKonten: `
+      <div class="dnc-pratinjau-soal dnc-mb-12">
+        <strong>Pengaturan Kewenangan Mata Pelajaran &amp; Nilai KKM (Khusus Admin)</strong>
+        <div class="dnc-form-bantuan">Gunakan fitur ini untuk menetapkan seluruh mata pelajaran dan batas nilai KKM yang sudah ada saat ini menjadi hak milik akun <strong>Guru Santi</strong> (atau guru tertentu), sekaligus menyinkronkan daftar mapel ampunya.</div>
+      </div>
+      <div class="dnc-form-grup">
+        <label class="dnc-label" for="f-target-pemilik-mapel">Tetapkan Menjadi Hak Milik Akun *</label>
+        <select id="f-target-pemilik-mapel" class="dnc-select" required>
+          ${daftarKandidat.map(u => `<option value="${esc(u.id)}" ${u.id === defaultTargetId ? 'selected' : ''}>${esc(u.namaLengkap)} — ${esc(normalisasiRoleDnc(u.role))} (${esc(u.email)})</option>`).join('')}
+        </select>
+      </div>
+      <div class="dnc-form-grup">
+        <label class="dnc-label" for="f-cakupan-pemilik-mapel">Cakupan Mata Pelajaran yang Dialihkan *</label>
+        <select id="f-cakupan-pemilik-mapel" class="dnc-select" required>
+          ${opsiCakupan}
+        </select>
+      </div>
+      <div class="dnc-form-grup">
+        <label class="dnc-check-label">
+          <input id="f-sinkron-mapelids-guru" type="checkbox" checked>
+          <span>Sinkronkan otomatis daftar mapel ampu (mapelIds) akun pemilik tujuan</span>
+        </label>
+      </div>`,
+    onSubmit: async () => {
+      const targetUserId = document.getElementById('f-target-pemilik-mapel').value;
+      const cakupan = document.getElementById('f-cakupan-pemilik-mapel').value;
+      const ikutSinkron = document.getElementById('f-sinkron-mapelids-guru').checked;
+      if (!targetUserId) throw new Error('Pilih akun pemilik tujuan terlebih dahulu.');
+
+      let targetMapel = [];
+      if (cakupan === 'semua') {
+        targetMapel = [...stateMemori.mataPelajaran];
+      } else if (cakupan === 'tanpa_pemilik') {
+        targetMapel = stateMemori.mataPelajaran.filter(m => !m.dibuatOleh);
+      } else {
+        targetMapel = stateMemori.mataPelajaran.filter(m => m.id === cakupan);
+      }
+
+      if (!targetMapel.length) throw new Error('Tidak ada mata pelajaran pada cakupan yang dipilih.');
+
+      let jmlDiubah = 0;
+      for (const m of targetMapel) {
+        const pemilikLama = m.dibuatOleh || '';
+        if (pemilikLama !== targetUserId) {
+          await dbUpdate(COLLECTIONS.mataPelajaran, m.id, { dibuatOleh: targetUserId });
+          jmlDiubah++;
+        }
+        if (ikutSinkron) {
+          if (pemilikLama && pemilikLama !== targetUserId) {
+            await sinkronMapelKeAkunGuru(pemilikLama, m.id, 'hapus');
+          }
+          await sinkronMapelKeAkunGuru(targetUserId, m.id, 'tambah');
+        }
+      }
+
+      const targetObj = cariById('pengguna', targetUserId);
+      tutupModalFormDnc();
+      resetCacheMenu(['DNC-M1', 'DNC-M2', 'DNC-M3', 'DNC-M4', 'DNC-M5', 'DNC-M6', 'DNC-M7']);
+      await muatM2Master(true);
+      tampilkanToast(`${targetMapel.length} mata pelajaran & KKM (${jmlDiubah} diperbarui) resmi menjadi hak milik ${targetObj?.namaLengkap || 'pemilik baru'}.`);
     }
   });
 }
