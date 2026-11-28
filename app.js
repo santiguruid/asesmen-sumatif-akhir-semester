@@ -175,6 +175,27 @@ function normalisasiIsian(val) {
   return String(val || '').toLowerCase().replace(/[\s]+/g, ' ').trim();
 }
 
+function adalahTipePoinOtomatis(tipeSoal) {
+  return tipeSoal !== 'Uraian';
+}
+
+function bobotOtomatisTipeSoal(tipeSoal, bobotManual = 0) {
+  if (tipeSoal === 'Pilihan Ganda') return 1;
+  if (tipeSoal === 'Pilihan Ganda Kompleks') return 1;
+  if (tipeSoal === 'Benar/Salah') return 1;
+  if (tipeSoal === 'Isian Singkat') return 2;
+  if (tipeSoal === 'Uraian') {
+    const m = Number(bobotManual);
+    return !isNaN(m) && m > 0 ? m : 5;
+  }
+  return 1;
+}
+
+function poinEfektifSoal(soal) {
+  if (!soal) return 0;
+  return bobotOtomatisTipeSoal(soal.tipeSoal, soal.bobotNilai);
+}
+
 function debounceDnc(fn, jeda = 250) {
   let timer = null;
   return (...args) => {
