@@ -6402,7 +6402,7 @@ function renderSoalAktifM5() {
   if (soal.tipeSoal === 'Pilihan Ganda') {
     konten.innerHTML = `
       <div class="dnc-opsi-petunjuk">Pilihan Ganda — Pilih satu jawaban yang paling tepat.</div>
-      ${soal.urlGambar ? `<img src="${esc(soal.urlGambar)}" alt="Gambar soal" class="dnc-soal-gambar">` : ''}
+      ${soal.urlGambar ? `<img src="${esc(soal.urlGambar)}" alt="Gambar soal" class="dnc-soal-gambar" title="Klik untuk memperbesar gambar">` : ''}
       <div class="dnc-soal-teks">${esc(soal.pertanyaan)}</div>
       <div class="dnc-opsi-list">
         ${soal.opsiTampil.map(o => `
@@ -6422,7 +6422,7 @@ function renderSoalAktifM5() {
     const dipilihSet = parseKunciKompleksSet(jwb.jawaban);
     konten.innerHTML = `
       <div class="dnc-opsi-petunjuk kompleks">Pilihan Ganda Kompleks — Centang lebih dari satu jawaban yang benar.</div>
-      ${soal.urlGambar ? `<img src="${esc(soal.urlGambar)}" alt="Gambar soal" class="dnc-soal-gambar">` : ''}
+      ${soal.urlGambar ? `<img src="${esc(soal.urlGambar)}" alt="Gambar soal" class="dnc-soal-gambar" title="Klik untuk memperbesar gambar">` : ''}
       <div class="dnc-soal-teks">${esc(soal.pertanyaan)}</div>
       <div class="dnc-opsi-list">
         ${soal.opsiTampil.map(o => {
@@ -6446,10 +6446,64 @@ function renderSoalAktifM5() {
         await autosaveJawabanUjian();
       });
     });
+  } else if (soal.tipeSoal === 'Benar/Salah') {
+    const kunciBs = parseKunciBenarSalah(soal.kunciJawaban);
+    const nomorList = kunciBs.length ? kunciBs.map(x => x.no) : [1, 2, 3];
+    const petaJwbBs = parseJawabanBenarSalahMap(jwb.jawaban);
+    const petaLabelPernyataan = {};
+    String(soal.pertanyaan || '').split(/\r?\n/).forEach(line => {
+      const mP = line.trim().match(/^Pernyataan\s+(\d+)\s*[:\.\-]\s*(.+)$/i);
+      if (mP) petaLabelPernyataan[mP[1]] = mP[2].trim();
+    });
+
+    konten.innerHTML = `
+      <div class="dnc-opsi-petunjuk kompleks">Benar / Salah — Pilih Benar atau Salah untuk setiap nomor pernyataan sesuai bacaan/gambar di bawah ini.</div>
+      <div class="dnc-soal-teks">${esc(soal.pertanyaan)}</div>
+      ${soal.urlGambar ? `<img src="${esc(soal.urlGambar)}" alt="Gambar pernyataan soal" class="dnc-soal-gambar" title="Klik untuk memperbesar gambar">` : ''}
+      <div class="dnc-bs-tabel-wrap">
+        <table class="dnc-bs-tabel">
+          <thead>
+            <tr>
+              <th style="width:64px">No</th>
+              <th>Pernyataan</th>
+              <th style="width:190px;text-align:center">Pilihan Anda</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${nomorList.map(no => {
+              const terpilih = petaJwbBs[String(no)] || '';
+              const labelPernyataan = petaLabelPernyataan[String(no)] || `Pernyataan Nomor ${no} (lihat tabel pada gambar/soal)`;
+              return `
+                <tr>
+                  <td data-label="No"><strong>${no}</strong></td>
+                  <td data-label="Pernyataan">${esc(labelPernyataan)}</td>
+                  <td data-label="Pilihan Anda">
+                    <div class="dnc-bs-pilihan-grup">
+                      <button type="button" class="dnc-bs-btn ${terpilih === 'Benar' ? 'aktif-benar' : ''}" data-pilih-bs-no="${no}" data-pilih-bs-val="Benar">Benar</button>
+                      <button type="button" class="dnc-bs-btn ${terpilih === 'Salah' ? 'aktif-salah' : ''}" data-pilih-bs-no="${no}" data-pilih-bs-val="Salah">Salah</button>
+                    </div>
+                  </td>
+                </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>`;
+
+    konten.querySelectorAll('[data-pilih-bs-no]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const no = btn.dataset.pilihBsNo;
+        const val = btn.dataset.pilihBsVal;
+        const petaBaru = parseJawabanBenarSalahMap(jwb.jawaban);
+        petaBaru[String(no)] = val;
+        jwb.jawaban = formatJawabanBenarSalahMap(petaBaru);
+        renderSoalAktifM5();
+        await autosaveJawabanUjian();
+      });
+    });
   } else if (soal.tipeSoal === 'Isian Singkat') {
     konten.innerHTML = `
       <div class="dnc-opsi-petunjuk">Isian Singkat — Tuliskan jawaban singkat dan tepat pada kolom di bawah.</div>
-      ${soal.urlGambar ? `<img src="${esc(soal.urlGambar)}" alt="Gambar soal" class="dnc-soal-gambar">` : ''}
+      ${soal.urlGambar ? `<img src="${esc(soal.urlGambar)}" alt="Gambar soal" class="dnc-soal-gambar" title="Klik untuk memperbesar gambar">` : ''}
       <div class="dnc-soal-teks">${esc(soal.pertanyaan)}</div>
       <div class="dnc-form-grup">
         <label class="dnc-label" for="m5-input-isian">Jawaban Isian Singkat</label>
@@ -6463,7 +6517,7 @@ function renderSoalAktifM5() {
   } else {
     konten.innerHTML = `
       <div class="dnc-opsi-petunjuk">Uraian — Tuliskan penjelasan jawaban secara lengkap.</div>
-      ${soal.urlGambar ? `<img src="${esc(soal.urlGambar)}" alt="Gambar soal" class="dnc-soal-gambar">` : ''}
+      ${soal.urlGambar ? `<img src="${esc(soal.urlGambar)}" alt="Gambar soal" class="dnc-soal-gambar" title="Klik untuk memperbesar gambar">` : ''}
       <div class="dnc-soal-teks">${esc(soal.pertanyaan)}</div>
       <div class="dnc-form-grup">
         <label class="dnc-label" for="m5-input-uraian">Jawaban Uraian Anda</label>
@@ -6475,6 +6529,10 @@ function renderSoalAktifM5() {
       autosaveTeksDebounced();
     });
   }
+
+  konten.querySelector('.dnc-soal-gambar')?.addEventListener('click', () => {
+    bukaZoomGambarDnc(soal.urlGambar);
+  });
 
   renderNavigasiNomorM5();
 }
