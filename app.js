@@ -6715,7 +6715,7 @@ function renderSoalAktifM5() {
   const soal = daftarSoal[indeks];
   const jwb = petaJawaban[soal.id];
 
-  document.getElementById('m5-nomor-label').textContent = `Soal ${indeks + 1} dari ${daftarSoal.length} (Bobot ${soal.bobotNilai})`;
+  document.getElementById('m5-nomor-label').textContent = `Soal ${indeks + 1} dari ${daftarSoal.length} (Poin ${poinEfektifSoal(soal)})`;
   const tipeEl = document.getElementById('m5-tipe-badge');
   tipeEl.outerHTML = badgeTipeSoal(soal.tipeSoal).replace('<span ', '<span id="m5-tipe-badge" ');
 
