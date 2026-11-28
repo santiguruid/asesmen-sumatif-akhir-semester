@@ -7622,10 +7622,10 @@ function cetakRekapTabelPaketM6(paketIdTarget = '') {
     return `
       <section class="paket-cetak ${gIdx > 0 ? 'page-break' : ''}">
         <header class="kop-cetak">
-          <h1>REKAPITULASI NILAI &amp; ANALISIS BUTIR JAWABAN</h1>
+          <h1>REKAPITULASI NILAI &amp; ANALISIS BUTIR JAWABAN — RUANG ASESMEN DIGITAL (RAD)</h1>
           <h2>${esc(judulPaket)}</h2>
           <p>
-            Mata Pelajaran: <strong>${esc(namaMapel)}</strong>
+            <strong>Belajar, Berlatih, Berprestasi</strong> | Mata Pelajaran: <strong>${esc(namaMapel)}</strong>
             ${g.paketObj?.modeBimbel ? ` | Kategori: <strong>${esc(normalisasiKategoriSoal(g.paketObj?.kategoriSoal))} (Bimbel)</strong>` : ''}
             ${kelasSasaran ? ` | Kelas: <strong>${esc(kelasSasaran)}</strong>` : ''}
             | Jumlah Soal: <strong>${daftarSoalIds.length || '-'}</strong>
