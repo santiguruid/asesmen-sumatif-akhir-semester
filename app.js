@@ -4805,12 +4805,12 @@ function bukaModalImporWord() {
       const cek = analisisKesesuaianGambarSoal(x, x.statusMuatGambar || 'belum');
       return cek && cek.kelas === 'bahaya';
     }).length;
-    const totalBobot = bulatDua(daftarEkstrak.filter(x => x.dipilih && x.valid).reduce((acc, x) => acc + Number(x.bobotNilai || 0), 0));
+    const totalBobot = bulatDua(daftarEkstrak.filter(x => x.dipilih && x.valid).reduce((acc, x) => acc + poinEfektifSoal(x), 0));
     const hitungTipe = tp => daftarEkstrak.filter(x => x.tipeSoal === tp).length;
 
     info.textContent = daftarEkstrak.length
-      ? `Terdeteksi ${daftarEkstrak.length} butir soal (${jmlValid} Valid, ${daftarEkstrak.length - jmlValid} Perlu Perbaikan${jmlBergambar ? `, ${jmlBergambar} Bergambar` : ''}${jmlPeringatanGbr ? `, ${jmlPeringatanGbr} Cek Ulang Gambar/Kunci` : ''}).`
-      : 'Unggah file soal format bebas (.docx, .pdf, .xlsx, .xls, .csv, .txt, atau gambar .png/.jpg/.webp) — gambar tertanam, PDF scan, dan link gambar otomatis terbaca.';
+      ? `Terdeteksi ${daftarEkstrak.length} butir soal (${jmlValid} Valid, ${daftarEkstrak.length - jmlValid} Perlu Perbaikan${jmlBergambar ? `, ${jmlBergambar} Bergambar` : ''}${jmlPeringatanGbr ? `, ${jmlPeringatanGbr} Cek Ulang Gambar/Kunci` : ''}). Poin ditetapkan otomatis (PG/PGK/BS = 1, Isian = 2).`
+      : 'Unggah file soal format bebas (.docx, .pdf, .xlsx, .xls, .csv, .txt, atau gambar .png/.jpg/.webp) tanpa perlu bobot manual — poin otomatis PG/PGK/BS = 1, Isian = 2.';
 
     if (!daftarEkstrak.length) {
       wadah.innerHTML = '';
@@ -4821,11 +4821,11 @@ function bukaModalImporWord() {
       <div class="dnc-ringkasan-impor">
         <div>
           <strong>Deteksi Otomatis:</strong>
-          PG: ${hitungTipe('Pilihan Ganda')} | PGK: ${hitungTipe('Pilihan Ganda Kompleks')} | Benar/Salah: ${hitungTipe('Benar/Salah')} | Isian: ${hitungTipe('Isian Singkat')} | Uraian: ${hitungTipe('Uraian')}${jmlBergambar ? ` | Bergambar: ${jmlBergambar}` : ''}
+          PG: ${hitungTipe('Pilihan Ganda')} (@1) | PGK: ${hitungTipe('Pilihan Ganda Kompleks')} (@1) | Benar/Salah: ${hitungTipe('Benar/Salah')} (@1) | Isian: ${hitungTipe('Isian Singkat')} (@2) | Uraian: ${hitungTipe('Uraian')}${jmlBergambar ? ` | Bergambar: ${jmlBergambar}` : ''}
         </div>
         <div class="dnc-flex-gap">
-          <button type="button" id="btn-auto-bobot-100" class="dnc-tombol dnc-tombol-sekunder dnc-tombol-kecil">Bagi Bobot Total = 100</button>
-          <strong>Total Bobot Terpilih: ${totalBobot}</strong>
+          <strong>Total Poin Maks Terpilih: ${totalBobot}</strong>
+          <span class="dnc-badge dnc-badge-biru">Nilai = (Perolehan / ${totalBobot || 1}) × 100</span>
         </div>
       </div>
       <div class="dnc-pembungkus-tabel dnc-mt-12">
@@ -4835,13 +4835,15 @@ function bukaModalImporWord() {
               <th>Pilih</th>
               <th>Kode &amp; Tipe Soal</th>
               <th>Pertanyaan, Gambar &amp; Opsi</th>
-              <th>Kunci Otomatis &amp; Bobot</th>
+              <th>Kunci &amp; Poin Otomatis</th>
               <th>Status Validasi</th>
             </tr>
           </thead>
           <tbody>
             ${daftarEkstrak.map((it, idx) => {
               const petaOpsi = opsiMapToObj(it.opsiJawaban);
+              const autoPoin = adalahTipePoinOtomatis(it.tipeSoal);
+              const poinButir = poinEfektifSoal(it);
               const cekGbr = it.urlGambar ? analisisKesesuaianGambarSoal(it, it.statusMuatGambar || 'belum') : null;
               const htmlGambarEdit = `
                 <div style="margin-top:6px">
@@ -4892,9 +4894,10 @@ function bukaModalImporWord() {
                     ${htmlGambarEdit}
                     ${htmlOpsiEdit}
                   </td>
-                  <td data-label="Kunci &amp; Bobot">
+                  <td data-label="Kunci &amp; Poin">
                     <input class="dnc-input" style="height:30px;margin-bottom:4px" data-w-kunci="${idx}" placeholder="Kunci (B / A, C / 1. Benar, 2. Salah)" value="${esc(it.kunciJawaban)}">
-                    <input class="dnc-input" style="height:30px" type="number" min="0.5" step="0.5" data-w-bobot="${idx}" value="${esc(it.bobotNilai)}">
+                    <input class="dnc-input" style="height:30px" type="number" min="0.5" step="0.5" data-w-bobot="${idx}" value="${esc(poinButir)}" ${autoPoin ? 'readonly title="Poin ditetapkan otomatis sesuai tipe soal"' : ''}>
+                    <div class="dnc-form-bantuan">${autoPoin ? `Poin otomatis: ${poinButir}` : 'Poin rubrik Uraian'}</div>
                   </td>
                   <td data-label="Validasi">
                     ${badgeStatus(it.valid ? 'Valid' : 'Perlu Perbaikan')}
@@ -4905,17 +4908,6 @@ function bukaModalImporWord() {
           </tbody>
         </table>
       </div>`;
-
-    document.getElementById('btn-auto-bobot-100')?.addEventListener('click', () => {
-      if (!daftarEkstrak.length) return;
-      const bobotRata = bulatDua(100 / daftarEkstrak.length);
-      daftarEkstrak.forEach(it => {
-        it.bobotNilai = bobotRata;
-        validasiItemSoalPintar(it);
-      });
-      renderPratinjauWord();
-      tampilkanToast(`Bobot setiap soal disesuaikan rata (${bobotRata}) dengan total ±100.`);
-    });
 
     wadah.querySelectorAll('[data-w-pilih]').forEach(el => {
       el.addEventListener('change', () => {
