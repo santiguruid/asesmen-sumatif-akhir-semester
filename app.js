@@ -3049,8 +3049,9 @@ function bukaFormSoal(item = null) {
           </select>
         </div>
         <div class="dnc-form-grup">
-          <label class="dnc-label" for="f-bobotNilai">Bobot / Skor Soal *</label>
-          <input id="f-bobotNilai" class="dnc-input" type="number" min="0.5" step="0.5" value="${esc(item?.bobotNilai ?? 10)}" required>
+          <label class="dnc-label" for="f-bobotNilai">Poin Soal (Otomatis RAD) *</label>
+          <input id="f-bobotNilai" class="dnc-input" type="number" min="0.5" step="0.5" value="${esc(bobotOtomatisTipeSoal(tipeAwal, item?.bobotNilai))}" ${adalahTipePoinOtomatis(tipeAwal) ? 'readonly' : ''} required>
+          <span id="bantuan-bobot-form" class="dnc-form-bantuan">Otomatis: PG/PGK/BS = 1, Isian Singkat = 2.</span>
         </div>
         <div class="dnc-form-grup dnc-form-full">
           <label class="dnc-label" for="f-sumberPaket">Nama Paket / Grup Soal (Opsional)</label>
