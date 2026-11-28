@@ -7132,8 +7132,8 @@ async function muatM6HasilNilai(paksa = false) {
   document.getElementById('subjudul-m6').textContent = penggunaAktif.role === 'Siswa Bimbel'
     ? 'Riwayat nilai latihan Bank Soal per paket soal.'
     : (adalahSiswa
-      ? 'Riwayat nilai pribadi per paket ASAS yang mengaktifkan penampilan nilai.'
-      : 'Pantau pengerjaan siswa secara live per Judul Paket ASAS & Bank Soal Bimbel, progres soal terjawab/belum, koreksi jawaban, dan cetak rekap tabel per paket.');
+      ? 'Riwayat nilai pribadi per paket Ruang Asesmen Digital (RAD) yang mengaktifkan penampilan nilai.'
+      : 'Pantau pengerjaan siswa secara live per Judul Paket Ruang Asesmen Digital (RAD) & Bank Soal Bimbel, progres soal terjawab/belum, koreksi jawaban, dan cetak rekap tabel per paket.');
 
   const petaOpsiPaket = new Map();
   stateMemori.paketAsas.forEach(p => petaOpsiPaket.set(p.id, p.judulPaket));
