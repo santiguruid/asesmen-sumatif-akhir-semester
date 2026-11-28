@@ -5648,7 +5648,7 @@ function bukaFormPaket(item = null) {
     });
 
     wadah.innerHTML = daftarGrup.map(({ namaGrup, list }, gIdx) => {
-      const bobotGrup = bulatDua(list.reduce((acc, s) => acc + Number(s.bobotNilai || 0), 0));
+      const bobotGrup = bulatDua(list.reduce((acc, s) => acc + poinEfektifSoal(s), 0));
       const daftarTingkat = [...new Set(list.map(s => s.tingkat).filter(Boolean))].join(', ');
       const daftarTipe = [...new Set(list.map(s => s.tipeSoal).filter(Boolean))].join(', ');
       return `
@@ -5658,23 +5658,26 @@ function bukaFormPaket(item = null) {
             <button type="button" class="dnc-grup-soal-toggle" data-grup-toggle="${gIdx}" aria-expanded="false">
               <div>
                 <div class="dnc-grup-soal-judul">${esc(namaGrup)}</div>
-                <div class="dnc-grup-soal-meta">${list.length} butir soal • Total Bobot ${bobotGrup}${daftarTingkat ? ` • Tingkat ${esc(daftarTingkat)}` : ''} • ${esc(daftarTipe)}</div>
+                <div class="dnc-grup-soal-meta">${list.length} butir soal • Total Poin Maks ${bobotGrup}${daftarTingkat ? ` • Tingkat ${esc(daftarTingkat)}` : ''} • ${esc(daftarTipe)}</div>
               </div>
               <span class="dnc-grup-soal-panah" data-grup-panah="${gIdx}">Lihat Butir ▾</span>
             </button>
           </div>
           <div class="dnc-grup-soal-isi dnc-disembunyikan" data-grup-isi="${gIdx}">
-            ${list.map((s, noIdx) => `
+            ${list.map((s, noIdx) => {
+              const poinButir = poinEfektifSoal(s);
+              return `
               <label class="dnc-checklist-item">
-                <input type="checkbox" name="f-soal-id" data-grup-induk="${gIdx}" value="${esc(s.id)}" data-bobot="${Number(s.bobotNilai || 0)}" ${soalTerpilih.has(s.id) ? 'checked' : ''}>
+                <input type="checkbox" name="f-soal-id" data-grup-induk="${gIdx}" value="${esc(s.id)}" data-bobot="${poinButir}" ${soalTerpilih.has(s.id) ? 'checked' : ''}>
                 <div style="flex:1">
                   <div class="dnc-flex-between">
                     <strong>${noIdx + 1}. ${esc(s.kodeSoal)}</strong>
-                    <span class="dnc-form-bantuan">${esc(s.tipeSoal)} • ${esc(labelTingkat(s.tingkat))} • Bobot ${esc(s.bobotNilai)}</span>
+                    <span class="dnc-form-bantuan">${esc(s.tipeSoal)} • ${esc(labelTingkat(s.tingkat))} • Poin ${esc(poinButir)}</span>
                   </div>
                   <div class="dnc-form-bantuan">${esc(s.pertanyaan.slice(0, 110))}${s.pertanyaan.length > 110 ? '...' : ''}</div>
                 </div>
-              </label>`).join('')}
+              </label>`;
+            }).join('')}
           </div>
         </div>`;
     }).join('');
@@ -5695,7 +5698,7 @@ function bukaFormPaket(item = null) {
       });
       const checked = [...wadah.querySelectorAll('input[name="f-soal-id"]:checked')];
       const total = bulatDua(checked.reduce((acc, el) => acc + Number(el.dataset.bobot || 0), 0));
-      infoBobot.textContent = `${jmlPaketTerpilih} paket (${checked.length} soal) • Bobot: ${total}`;
+      infoBobot.textContent = `${jmlPaketTerpilih} paket (${checked.length} soal) • Poin Maks: ${total}`;
     };
 
     wadah.querySelectorAll('[data-grup-toggle]').forEach(btn => {
