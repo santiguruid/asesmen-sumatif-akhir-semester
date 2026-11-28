@@ -3007,6 +3007,10 @@ function bukaFormSoal(item = null) {
           </datalist>
         </div>
         <div class="dnc-form-grup dnc-form-full">
+          <label class="dnc-label" for="f-pertanyaan">Pertanyaan *</label>
+          <textarea id="f-pertanyaan" class="dnc-textarea" placeholder="Tulis pertanyaan soal secara lengkap (jika memuat link gambar akan terdeteksi otomatis)..." required>${esc(item?.pertanyaan || '')}</textarea>
+        </div>
+        <div class="dnc-form-grup dnc-form-full">
           <label class="dnc-label" for="f-urlGambar">Gambar Pendukung (Unggah File Lokal atau Tempel Link Drive / Dropbox / URL)</label>
           <input id="f-urlGambar" class="dnc-input" type="text" placeholder="Tempel link gambar (https://...) atau gunakan tombol Unggah Gambar di bawah" value="${esc((item?.urlGambar || '').startsWith('data:image/') ? '' : (item?.urlGambar || ''))}">
           <div class="dnc-gbr-aksi-row">
