@@ -7359,17 +7359,18 @@ function bukaModalKoreksiHasil(hasilId, hanyaBaca = false) {
   const kkm = Number(mapel?.kkm ?? 75);
 
   const daftarSoalPaket = (paket?.daftarSoalIds || []).map(id => cariById('bankSoal', id)).filter(Boolean);
-  const totalBobotPaket = bulatDua(daftarSoalPaket.reduce((s, x) => s + Number(x.bobotNilai || 0), 0));
+  const totalBobotPaket = bulatDua(daftarSoalPaket.reduce((s, x) => s + poinEfektifSoal(x), 0));
 
   const itemsHtml = (hasil.jawabanSiswa || []).map((j, idx) => {
     const soal = cariById('bankSoal', j.soalId);
     if (!soal) return '';
+    const poinMaks = poinEfektifSoal(soal);
 
     if (soal.tipeSoal === 'Pilihan Ganda' || soal.tipeSoal === 'Pilihan Ganda Kompleks' || soal.tipeSoal === 'Benar/Salah') {
-      const skorButir = Number(j.skor ?? hitungSkorButirOtomatis(soal, j.jawaban));
-      const badgeNilai = skorButir >= soal.bobotNilai
-        ? badgeStatus(`Benar (+${skorButir}/${soal.bobotNilai})`)
-        : (skorButir > 0 ? `<span class="dnc-badge dnc-badge-amber">Parsial (+${skorButir}/${soal.bobotNilai})</span>` : badgeStatus('Salah (0)'));
+      const skorButir = hitungSkorButirOtomatis(soal, j.jawaban);
+      const badgeNilai = skorButir >= poinMaks
+        ? badgeStatus(`Benar (+${skorButir}/${poinMaks})`)
+        : (skorButir > 0 ? `<span class="dnc-badge dnc-badge-amber">Parsial (+${skorButir}/${poinMaks})</span>` : badgeStatus('Salah (0)'));
       const urlGbrKoreksi = normalisasiUrlGambarSoal(soal.urlGambar || '');
       const labelJawaban = soal.tipeSoal === 'Benar/Salah' ? 'Jawaban Siswa' : 'Jawaban Siswa (kode asli)';
       return `
@@ -7385,51 +7386,54 @@ function bukaModalKoreksiHasil(hasilId, hanyaBaca = false) {
     }
 
     if (soal.tipeSoal === 'Isian Singkat') {
-      const skorButir = Number(j.skor ?? hitungSkorButirOtomatis(soal, j.jawaban));
+      const skorButir = typeof j.skor === 'number' && j.skor <= poinMaks
+        ? j.skor
+        : hitungSkorButirOtomatis(soal, j.jawaban);
       return `
         <div class="dnc-koreksi-item">
           <div class="dnc-koreksi-header">
-            <strong>Soal #${idx + 1} (${esc(soal.kodeSoal)}) — Isian Singkat (Bobot ${esc(soal.bobotNilai)})</strong>
-            ${badgeStatus(skorButir > 0 ? `Terpenuhi (+${skorButir})` : 'Perlu Cek (0)')}
+            <strong>Soal #${idx + 1} (${esc(soal.kodeSoal)}) — Isian Singkat (Poin Maks ${esc(poinMaks)})</strong>
+            ${badgeStatus(skorButir >= poinMaks ? `Benar (+${skorButir}/${poinMaks})` : (skorButir > 0 ? `Parsial (+${skorButir}/${poinMaks})` : 'Perlu Cek (0)'))}
           </div>
           <div style="font-size:13px">${esc(soal.pertanyaan)}</div>
           <div class="dnc-jawaban-box"><strong>Jawaban Siswa:</strong> ${esc(j.jawaban || '(Tidak dijawab)')}</div>
           <div class="dnc-form-bantuan dnc-mb-12"><strong>Kunci Isian:</strong> ${esc(soal.kunciJawaban || '-')}</div>
           ${!hanyaBaca ? `
             <div class="dnc-form-grup" style="margin-bottom:0">
-              <label class="dnc-label" for="skor-manual-${esc(soal.id)}">Penyesuaian Skor Isian (0 – ${esc(soal.bobotNilai)})</label>
-              <input id="skor-manual-${esc(soal.id)}" data-koreksi-soal="${esc(soal.id)}" data-tipe="Isian Singkat" data-maks="${esc(soal.bobotNilai)}" class="dnc-input" type="number" min="0" max="${esc(soal.bobotNilai)}" step="0.5" value="${esc(skorButir)}">
+              <label class="dnc-label" for="skor-manual-${esc(soal.id)}">Penyesuaian Poin Isian (0 – ${esc(poinMaks)})</label>
+              <input id="skor-manual-${esc(soal.id)}" data-koreksi-soal="${esc(soal.id)}" data-tipe="Isian Singkat" data-maks="${esc(poinMaks)}" class="dnc-input" type="number" min="0" max="${esc(poinMaks)}" step="0.5" value="${esc(skorButir)}">
             </div>` : ''}
         </div>`;
     }
 
+    const skorUraianTampil = Math.min(poinMaks, Math.max(0, Number(j.skor ?? 0)));
     return `
       <div class="dnc-koreksi-item">
         <div class="dnc-koreksi-header">
-          <strong>Soal #${idx + 1} (${esc(soal.kodeSoal)}) — Uraian (Maks Bobot ${esc(soal.bobotNilai)})</strong>
+          <strong>Soal #${idx + 1} (${esc(soal.kodeSoal)}) — Uraian (Poin Maks ${esc(poinMaks)})</strong>
           <span class="dnc-badge dnc-badge-amber">Koreksi Manual</span>
         </div>
         <div style="font-size:13px">${esc(soal.pertanyaan)}</div>
         <div class="dnc-jawaban-box"><strong>Jawaban Siswa:</strong>\n${esc(j.jawaban || '(Tidak dijawab)')}</div>
         ${!hanyaBaca ? `<div class="dnc-form-bantuan dnc-mb-12"><strong>Rubrik/Kunci:</strong> ${esc(soal.kunciJawaban || '-')}</div>` : ''}
         <div class="dnc-form-grup" style="margin-bottom:0">
-          <label class="dnc-label" for="skor-manual-${esc(soal.id)}">Skor Uraian (0 – ${esc(soal.bobotNilai)})</label>
-          <input id="skor-manual-${esc(soal.id)}" data-koreksi-soal="${esc(soal.id)}" data-tipe="Uraian" data-maks="${esc(soal.bobotNilai)}" class="dnc-input" type="number" min="0" max="${esc(soal.bobotNilai)}" step="0.5" value="${esc(j.skor ?? 0)}" ${hanyaBaca ? 'disabled' : ''}>
+          <label class="dnc-label" for="skor-manual-${esc(soal.id)}">Poin Uraian (0 – ${esc(poinMaks)})</label>
+          <input id="skor-manual-${esc(soal.id)}" data-koreksi-soal="${esc(soal.id)}" data-tipe="Uraian" data-maks="${esc(poinMaks)}" class="dnc-input" type="number" min="0" max="${esc(poinMaks)}" step="0.5" value="${esc(skorUraianTampil)}" ${hanyaBaca ? 'disabled' : ''}>
         </div>
       </div>`;
   }).join('');
 
   bukaModalFormDnc({
-    judul: hanyaBaca ? 'Rincian Hasil Ujian' : 'Koreksi & Rincian Lembar Jawaban',
+    judul: hanyaBaca ? 'Rincian Hasil Ruang Asesmen Digital (RAD)' : 'Koreksi & Rincian Lembar Jawaban RAD',
     lebar: true,
     tampilSimpan: !hanyaBaca,
-    labelSimpan: 'Simpan Koreksi & Hitung Skor',
+    labelSimpan: 'Simpan Koreksi & Hitung Nilai',
     labelBatal: hanyaBaca ? 'Tutup' : 'Batal',
     htmlKonten: `
       <div class="dnc-pratinjau-soal dnc-mb-12">
         <strong>${esc(siswa?.namaLengkap || '-')} (${esc(siswa?.nomorInduk || '-')})</strong>
-        <div class="dnc-form-bantuan">${esc(paket?.judulPaket || '-')} • ${esc(mapel?.namaMapel || '-')} (KKM: ${kkm}) • Total Bobot Paket: ${totalBobotPaket}</div>
-        <div class="dnc-form-bantuan">Skor Otomatis (PG/PGK/Isian): ${esc(hasil.skorPg)} | Skor Uraian: ${esc(hasil.skorUraian)} | Skor Akhir: <strong>${esc(hasil.skorAkhir)}</strong> (${esc(hasil.statusKetuntasan)})</div>
+        <div class="dnc-form-bantuan">${esc(paket?.judulPaket || '-')} • ${esc(mapel?.namaMapel || '-')} (KKM: ${kkm}) • Total Poin Maks Paket: ${totalBobotPaket}</div>
+        <div class="dnc-form-bantuan">Perolehan Otomatis (PG/PGK/BS/Isian): ${esc(hasil.skorPg)} | Poin Uraian: ${esc(hasil.skorUraian)} | Nilai Akhir: <strong>${esc(hasil.skorAkhir)}</strong> (${esc(hasil.statusKetuntasan)})</div>
       </div>
       ${itemsHtml}
       <div class="dnc-form-grup dnc-mt-12">
@@ -7446,7 +7450,7 @@ function bukaModalKoreksiHasil(hasilId, hanyaBaca = false) {
           const maks = Number(inp.dataset.maks || 0);
           const val = Number(inp.value);
           if (isNaN(val) || val < 0 || val > maks) {
-            throw new Error(`Skor koreksi harus berada di rentang 0 sampai ${maks}.`);
+            throw new Error(`Poin koreksi harus berada di rentang 0 sampai ${maks}.`);
           }
           if (inp.dataset.tipe === 'Uraian') skorUraian = bulatDua(skorUraian + val);
           else skorPg = bulatDua(skorPg + val);
@@ -7475,7 +7479,7 @@ function bukaModalKoreksiHasil(hasilId, hanyaBaca = false) {
       tutupModalFormDnc();
       resetCacheMenu(['DNC-M1', 'DNC-M6']);
       await muatM6HasilNilai(true);
-      tampilkanToast(`Koreksi tersimpan. Skor akhir: ${skorAkhir} (${statusKetuntasan}).`);
+      tampilkanToast(`Koreksi tersimpan. Nilai akhir: ${skorAkhir} (${statusKetuntasan}).`);
     }
   });
 }
