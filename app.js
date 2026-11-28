@@ -9209,6 +9209,10 @@ async function inisialisasiAplikasiDnc() {
   document.getElementById('btn-muat-ulang-m1')?.addEventListener('click', () => muatM1Dashboard(true));
 
   // --- Event Poin Otomatis & Hitung Ulang Nilai RAD (DNC-M3 & DNC-M4) ---
+  // --- Event Kepemilikan Mapel & KKM Per Guru (DNC-M2) ---
+  document.getElementById('filter-pemilik-mapel')?.addEventListener('change', renderTabelMapel);
+  document.getElementById('btn-tetapkan-pemilik-mapel')?.addEventListener('click', bukaModalAturPemilikMapel);
+
   document.getElementById('btn-sinkron-bobot-m3')?.addEventListener('click', sinkronkanBobotBankSoalOtomatis);
   document.getElementById('btn-hitung-ulang-nilai-m4')?.addEventListener('click', () => hitungUlangNilaiPaketRad(''));
   document.getElementById('tbody-paket')?.addEventListener('click', e => {
