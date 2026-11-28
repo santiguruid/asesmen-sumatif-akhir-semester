@@ -2147,14 +2147,30 @@ function renderTabelKelas() {
 }
 
 function renderTabelMapel() {
+  const adalahGuru = adalahRoleGuru(penggunaAktif?.role);
   const q = teks(document.getElementById('cari-mapel')?.value || '');
-  const data = stateMemori.mataPelajaran.filter(m =>
-    !q || `${teks(m.kodeMapel)} ${teks(m.namaMapel)}`.includes(q)
-  );
+  const fPemilik = document.getElementById('filter-pemilik-mapel')?.value || '';
+
+  const data = stateMemori.mataPelajaran.filter(m => {
+    if (adalahGuru && !bolehKelolaMapel(m)) return false;
+    if (!adalahGuru) {
+      if (fPemilik === 'tanpa_pemilik' && m.dibuatOleh) return false;
+      if (fPemilik && fPemilik !== 'tanpa_pemilik' && m.dibuatOleh !== fPemilik) return false;
+    }
+    if (q && !`${teks(m.kodeMapel)} ${teks(m.namaMapel)} ${teks(namaPemilikSoal(m.dibuatOleh))}`.includes(q)) return false;
+    return true;
+  });
+
   renderTabelDnc('tbody-mapel', data, [
     { label: 'Kode Mapel', render: m => `<span class="dnc-mono">${esc(m.kodeMapel)}</span>` },
     { label: 'Nama Mata Pelajaran', key: 'namaMapel' },
     { label: 'KKM', render: m => `<strong>${esc(m.kkm)}</strong>` },
+    {
+      label: 'Pemilik',
+      render: m => m.dibuatOleh
+        ? `<span class="dnc-badge dnc-badge-biru">${esc(namaPemilikSoal(m.dibuatOleh))}</span>`
+        : `<span class="dnc-badge dnc-badge-amber">Belum Ditetapkan</span>`
+    },
     {
       label: 'Aksi', aksi: true,
       render: m => `<div class="dnc-aksi-baris">
@@ -2162,7 +2178,7 @@ function renderTabelMapel() {
         <button type="button" class="dnc-tombol dnc-tombol-bahaya dnc-tombol-kecil" data-hapus-mapel="${esc(m.id)}">Hapus</button>
       </div>`
     }
-  ], 'Belum ada data mata pelajaran');
+  ], adalahGuru ? 'Belum ada mata pelajaran milik Anda. Klik "Tambah Mata Pelajaran" untuk mulai mengisi.' : 'Belum ada data mata pelajaran');
 }
 
 function bukaFormKelas(item = null) {
