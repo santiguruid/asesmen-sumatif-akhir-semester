@@ -7520,18 +7520,16 @@ function analisisNomorBenarSalahHasil(hasil, daftarSoalIdsKanonik) {
     const no = idx + 1;
     const soal = cariById('bankSoal', soalId);
     const j = petaJwb.get(soalId);
-    const bobot = Number(soal?.bobotNilai || 0);
+    const bobot = poinEfektifSoal(soal);
     let skorButir = 0;
 
     if (j) {
-      if (hasil?.statusUjian === 'Sedang Dikerjakan') {
-        skorButir = soal && soal.tipeSoal !== 'Uraian'
-          ? hitungSkorButirOtomatis(soal, j.jawaban)
-          : Number(j.skor || 0);
-      } else if (typeof j.skor === 'number') {
-        skorButir = j.skor;
-      } else if (soal && soal.tipeSoal !== 'Uraian') {
-        skorButir = hitungSkorButirOtomatis(soal, j.jawaban);
+      if (soal && soal.tipeSoal !== 'Uraian') {
+        skorButir = hasil?.statusUjian !== 'Sedang Dikerjakan' && typeof j.skor === 'number' && j.skor <= bobot
+          ? j.skor
+          : hitungSkorButirOtomatis(soal, j.jawaban);
+      } else {
+        skorButir = Number(j.skor || 0);
       }
     }
 
