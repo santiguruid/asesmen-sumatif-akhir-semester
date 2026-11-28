@@ -6866,7 +6866,7 @@ function renderSoalAktifM5() {
 }
 
 function hitungSkorButirOtomatis(soal, jawabanSiswaRaw) {
-  const bobot = Number(soal.bobotNilai || 0);
+  const bobot = poinEfektifSoal(soal);
   if (bobot <= 0) return 0;
 
   if (soal.tipeSoal === 'Pilihan Ganda') {
@@ -6879,14 +6879,8 @@ function hitungSkorButirOtomatis(soal, jawabanSiswaRaw) {
     const kunciSet = parseKunciKompleksSet(soal.kunciJawaban);
     const jwbSet = parseKunciKompleksSet(jawabanSiswaRaw);
     if (!kunciSet.size || !jwbSet.size) return 0;
-    let benar = 0;
-    let salah = 0;
-    jwbSet.forEach(k => {
-      if (kunciSet.has(k)) benar++;
-      else salah++;
-    });
-    const rasio = Math.max(0, (benar - salah) / kunciSet.size);
-    return bulatDua(rasio * bobot);
+    const tepat = kunciSet.size === jwbSet.size && [...kunciSet].every(k => jwbSet.has(k));
+    return tepat ? bobot : 0;
   }
 
   if (soal.tipeSoal === 'Benar/Salah') {
@@ -6916,7 +6910,7 @@ function konfirmasiKumpulUjian() {
   const terjawab = sesiUjianAktif.daftarSoal.filter(s => String(sesiUjianAktif.petaJawaban[s.id]?.jawaban || '').trim() !== '').length;
   const ragu = sesiUjianAktif.daftarSoal.filter(s => sesiUjianAktif.petaJawaban[s.id]?.ragu).length;
   bukaKonfirmasi({
-    judul: 'Kumpulkan Lembar Ujian ASAS',
+    judul: 'Kumpulkan Lembar Ruang Asesmen Digital (RAD)',
     pesan: `Ringkasan: ${terjawab} dari ${total} soal terjawab (${total - terjawab} belum dijawab, ${ragu} ditandai ragu-ragu). Setelah dikumpulkan, jawaban tidak dapat diubah lagi. Lanjutkan?`,
     labelYa: 'Ya, Kumpulkan Ujian',
     kelasTombol: 'dnc-tombol-sukses',
@@ -6940,8 +6934,8 @@ async function selesaikanUjianSiswa(otomatis = false, alasan = 'manual') {
 
   const jawabanFinal = daftarSoal.map(s => {
     const j = petaJawaban[s.id] || { soalId: s.id, jawaban: '', ragu: false, skor: 0 };
-    const bobot = Number(s.bobotNilai || 0);
-    totalBobot += bobot;
+    const bobot = poinEfektifSoal(s);
+    totalBobot = bulatDua(totalBobot + bobot);
     if (s.tipeSoal === 'Uraian') {
       adaUraian = true;
       return { soalId: s.id, jawaban: j.jawaban || '', ragu: Boolean(j.ragu), skor: 0 };
@@ -6972,7 +6966,7 @@ async function selesaikanUjianSiswa(otomatis = false, alasan = 'manual') {
   nonaktifkanWakeLockSiswa();
   resetCacheMenu(['DNC-M1', 'DNC-M5', 'DNC-M6']);
   await muatM5RuangUjian(true);
-  if (alasan === 'manual') tampilkanToast(paket.modeBimbel ? `Latihan selesai! Skor Anda: ${skorAkhir}.` : 'Lembar ujian ASAS berhasil dikumpulkan.');
+  if (alasan === 'manual') tampilkanToast(paket.modeBimbel ? `Latihan selesai! Skor Anda: ${skorAkhir}.` : 'Lembar ujian Ruang Asesmen Digital (RAD) berhasil dikumpulkan.');
   else if (alasan === 'waktu_habis') tampilkanToast('Ujian selesai otomatis karena waktu habis.');
 }
 // ===== AKHIR BLOK: DNC_M5_RUANG_UJIAN =====
