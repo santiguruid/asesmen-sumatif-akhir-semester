@@ -6452,7 +6452,7 @@ function bukaModalTokenUjian(paketId) {
   if (!paket) return;
 
   bukaModalFormDnc({
-    judul: 'Verifikasi Token Ujian ASAS',
+    judul: 'Verifikasi Token Ruang Asesmen Digital (RAD)',
     labelSimpan: 'Buka Lembar Soal',
     htmlKonten: `
       <div class="dnc-pratinjau-soal dnc-mb-12">
@@ -6470,7 +6470,7 @@ function bukaModalTokenUjian(paketId) {
       const tMulai = keDate(paketTerbaru.waktuMulai)?.getTime() || 0;
       const tSelesai = keDate(paketTerbaru.waktuSelesai)?.getTime() || 0;
 
-      if (paketTerbaru.statusPaket !== 'Aktif') throw new Error('Paket ASAS ini tidak berstatus Aktif.');
+      if (paketTerbaru.statusPaket !== 'Aktif') throw new Error('Paket RAD ini tidak berstatus Aktif.');
       if (!paketTerbaru.ujianDibuka) throw new Error('Guru belum menekan tombol Mulai Ujian atau sesi telah dihentikan.');
       if (sekarang < tMulai) throw new Error(`Jadwal ujian belum dimulai. Mulai pada ${formatTanggal(paketTerbaru.waktuMulai, true)}.`);
       if (sekarang > tSelesai) throw new Error('Rentang jadwal ujian untuk paket ini telah berakhir.');
@@ -6481,7 +6481,7 @@ function bukaModalTokenUjian(paketId) {
       const hasilId = `${paketTerbaru.id}_${penggunaAktif.id}`;
       let hasil = await dbGetById(COLLECTIONS.hasilUjian, hasilId);
       if (hasil && hasil.statusUjian !== 'Sedang Dikerjakan') {
-        throw new Error('Anda sudah menyelesaikan paket ASAS ini.');
+        throw new Error('Anda sudah menyelesaikan paket RAD ini.');
       }
       if (!hasil) {
         const { urutanSoalIds, urutanOpsiMap } = buatPetaAcakSiswa(paketTerbaru);
