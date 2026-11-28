@@ -3790,34 +3790,37 @@ function unduhDokumenWordSederhana(barisTeks, namaFile) {
 
 function unduhTemplatWordDocx() {
   unduhDokumenWordSederhana([
-    'TEMPLAT SOAL ASAS LENGKAP (KUNCI & PEDOMAN PENSKORAN) - DIGITALNETCARE',
+    'TEMPLAT SOAL RUANG ASESMEN DIGITAL (RAD) - DIGITALNETCARE',
+    'Petunjuk: Tidak perlu menulis bobot/skor tiap butir soal. Sistem otomatis memberi poin PG = 1, PG Kompleks = 1, Benar/Salah = 1, dan Isian Singkat = 2.',
     '',
-    'A. PILIHAN GANDA (Skor @10)',
+    'A. PILIHAN GANDA',
     '1. Hasil dari 24 x 5 adalah ...',
     'A. 100',
     'B. 120',
     'C. 125',
     'D. 140',
     '',
-    'B. PILIHAN GANDA KOMPLEKS (Skor @20)',
+    'B. PILIHAN GANDA KOMPLEKS',
     '2. Pilih lebih dari satu bilangan prima di bawah ini:',
     'A. 2',
     'B. 9',
     'C. 11',
     'D. 15',
     '',
-    'C. ISIAN SINGKAT (Skor @20)',
-    '3. Ibukota Provinsi Daerah Istimewa Yogyakarta adalah ....',
+    'C. BENAR/SALAH',
+    '3. Tentukan Benar atau Salah untuk pernyataan berikut!',
+    'Pernyataan 1: Matahari terbit dari arah timur.',
+    'Pernyataan 2: Air mendidih pada suhu 0 derajat Celsius.',
     '',
-    'D. URAIAN (Skor @50)',
-    '4. Jelaskan mengapa tumbuhan hijau memerlukan cahaya matahari dalam proses fotosintesis!',
+    'D. ISIAN SINGKAT',
+    '4. Ibukota Provinsi Daerah Istimewa Yogyakarta adalah ....',
     '',
-    'KUNCI JAWABAN DAN PEDOMAN PENSKORAN',
-    '1. B (Skor: 10)',
-    '2. A, C (Skor: 20)',
-    '3. Yogyakarta (Skor: 20)',
-    '4. Cahaya matahari digunakan sebagai sumber energi untuk mengubah air dan karbon dioksida menjadi glukosa dan oksigen. (Skor: 50)'
-  ], 'Templat_Soal_Lengkap_ASAS_DigitalNetCare.docx');
+    'KUNCI JAWABAN',
+    '1. B',
+    '2. A, C',
+    '3. 1. Benar, 2. Salah',
+    '4. Yogyakarta'
+  ], 'Templat_Soal_RAD_DigitalNetCare.docx');
 }
 
 function parseCsvBaris(teksCsv) {
