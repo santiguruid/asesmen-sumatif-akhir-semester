@@ -6561,6 +6561,17 @@ function hitungSkorButirOtomatis(soal, jawabanSiswaRaw) {
     return bulatDua(rasio * bobot);
   }
 
+  if (soal.tipeSoal === 'Benar/Salah') {
+    const kunciList = parseKunciBenarSalah(soal.kunciJawaban);
+    if (!kunciList.length) return 0;
+    const jwbMap = parseJawabanBenarSalahMap(jawabanSiswaRaw);
+    let benar = 0;
+    kunciList.forEach(it => {
+      if (jwbMap[String(it.no)] === it.nilai) benar++;
+    });
+    return bulatDua((benar / kunciList.length) * bobot);
+  }
+
   if (soal.tipeSoal === 'Isian Singkat') {
     const jNorm = normalisasiIsian(jawabanSiswaRaw);
     if (!jNorm) return 0;
