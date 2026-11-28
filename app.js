@@ -1806,7 +1806,7 @@ async function keluarAplikasi() {
   document.getElementById('dnc-aplikasi').classList.add('dnc-disembunyikan');
   document.getElementById('dnc-halaman-login').classList.remove('dnc-disembunyikan');
   document.getElementById('input-login-password').value = '';
-  tampilkanToast('Anda telah keluar dari Portal ASAS.', 'info');
+  tampilkanToast('Anda telah keluar dari Ruang Asesmen Digital (RAD).', 'info');
 }
 
 function bangunNavigasiRole() {
