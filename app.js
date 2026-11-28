@@ -29,8 +29,8 @@ const MENU_DAFTAR = [
   { id: 'DNC-M1', label: 'Dashboard', pendek: 'Beranda', icon: 'icon-dashboard', roles: ['Admin', 'Guru', 'Guru Bimbel'] },
   { id: 'DNC-M2', label: 'Master Kelas & Mapel', pendek: 'Master', icon: 'icon-master', roles: ['Admin'] },
   { id: 'DNC-M3', label: 'Bank Soal', pendek: 'Soal', icon: 'icon-bank', roles: ['Admin', 'Guru', 'Guru Bimbel'] },
-  { id: 'DNC-M4', label: 'Jadwal & Paket ASAS', pendek: 'Paket', icon: 'icon-jadwal', roles: ['Admin', 'Guru'] },
-  { id: 'DNC-M5', label: 'Ruang Ujian ASAS', pendek: 'Ujian', icon: 'icon-ujian', roles: ['Siswa', 'Siswa Bimbel'] },
+  { id: 'DNC-M4', label: 'Jadwal & Paket Ruang Asesmen Digital (RAD)', pendek: 'Paket', icon: 'icon-jadwal', roles: ['Admin', 'Guru'] },
+  { id: 'DNC-M5', label: 'Ruang Asesmen Digital (RAD)', pendek: 'Ujian', icon: 'icon-ujian', roles: ['Siswa', 'Siswa Bimbel'] },
   { id: 'DNC-M6', label: 'Hasil & Rekap Nilai', pendek: 'Nilai', icon: 'icon-hasil', roles: ['Admin', 'Guru', 'Guru Bimbel', 'Siswa', 'Siswa Bimbel'] },
   { id: 'DNC-M7', label: 'Manajemen Pengguna', pendek: 'Pengguna', icon: 'icon-users', roles: ['Admin'] },
   { id: 'DNC-M8', label: 'Profil & Sandi', pendek: 'Profil', icon: 'icon-users', roles: ['Siswa Bimbel'] }
@@ -46,8 +46,8 @@ function inisialisasiPwaDnc() {
   try {
     const ikonSvg = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect width='192' height='192' rx='36' fill='%232563EB'/%3E%3Cpath d='M48 64h96M48 96h68M48 128h46' stroke='%23FFFFFF' stroke-width='14' stroke-linecap='round'/%3E%3Ccircle cx='136' cy='124' r='22' fill='%23F59E0B'/%3E%3C/svg%3E";
     const manifestObj = {
-      name: 'Sistem Asesmen Sumatif Akhir Semester (ASAS) - DigitalNetCare',
-      short_name: 'Portal ASAS',
+      name: 'Ruang Asesmen Digital (RAD) - DigitalNetCare',
+      short_name: 'Portal RAD',
       start_url: location.href,
       scope: './',
       display: 'standalone',
