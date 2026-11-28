@@ -5493,7 +5493,7 @@ async function muatM4PaketAsas(paksa = false) {
 function hitungTotalBobotPaket(daftarSoalIds) {
   return bulatDua((daftarSoalIds || []).reduce((total, sid) => {
     const s = cariById('bankSoal', sid);
-    return total + Number(s?.bobotNilai || 0);
+    return total + poinEfektifSoal(s);
   }, 0));
 }
 
@@ -5518,7 +5518,7 @@ function renderTabelPaket() {
     { label: 'Mapel & Semester', render: p => `${esc(namaMapelById(p.mapelId))}<div class="dnc-form-bantuan">Semester ${esc(p.semester)}</div>` },
     { label: 'Kelas Sasaran', render: p => esc((p.kelasIds || []).map(id => cariById('kelas', id)?.kodeKelas || id).join(', ') || '-') },
     { label: 'Jadwal & Durasi', render: p => `${formatTanggal(p.waktuMulai, true)}<div class="dnc-form-bantuan">s.d. ${formatTanggal(p.waktuSelesai, true)} (${esc(p.durasiMenit)} mnt)</div>` },
-    { label: 'Soal & Bobot', render: p => `${(p.daftarSoalIds || []).length} soal<div class="dnc-form-bantuan">Total Bobot: ${hitungTotalBobotPaket(p.daftarSoalIds)}</div>` },
+    { label: 'Soal & Poin Maks', render: p => `${(p.daftarSoalIds || []).length} soal<div class="dnc-form-bantuan">Poin Maks: ${hitungTotalBobotPaket(p.daftarSoalIds)}</div>` },
     { label: 'Token', render: p => `<span class="dnc-mono">${esc(p.tokenUjian)}</span>` },
     {
       label: 'Status & Kontrol Sesi',
@@ -5544,12 +5544,13 @@ function renderTabelPaket() {
     {
       label: 'Aksi', aksi: true,
       render: p => `<div class="dnc-aksi-baris">
+        <button type="button" class="dnc-tombol dnc-tombol-aksen dnc-tombol-kecil" data-rehitung-paket="${esc(p.id)}">Hitung Ulang</button>
         <button type="button" class="dnc-tombol dnc-tombol-sekunder dnc-tombol-kecil" data-token-paket="${esc(p.id)}">Token Baru</button>
         <button type="button" class="dnc-tombol dnc-tombol-sekunder dnc-tombol-kecil" data-ubah-paket="${esc(p.id)}">Ubah</button>
         <button type="button" class="dnc-tombol dnc-tombol-bahaya dnc-tombol-kecil" data-hapus-paket="${esc(p.id)}">Hapus</button>
       </div>`
     }
-  ], 'Belum ada jadwal dan paket ASAS');
+  ], 'Belum ada jadwal dan paket Ruang Asesmen Digital (RAD)');
 }
 
 async function mulaiSesiUjianOlehGuru(paketId) {
