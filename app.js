@@ -5915,18 +5915,128 @@ function hapusPaketDenganProteksi(id) {
   const p = cariById('paketAsas', id);
   if (!p) return;
   bukaKonfirmasi({
-    judul: 'Hapus Paket ASAS',
+    judul: 'Hapus Paket Ruang Asesmen Digital (RAD)',
     pesan: `Yakin ingin menghapus paket "${p.judulPaket}"?`,
     labelYa: 'Ya, Hapus',
     onYa: async () => {
       const hasils = await dbList(COLLECTIONS.hasilUjian);
       if (hasils.some(h => h.paketId === id)) {
-        throw new Error('Paket ASAS tidak dapat dihapus karena sudah memiliki rekaman hasil ujian peserta didik.');
+        throw new Error('Paket RAD tidak dapat dihapus karena sudah memiliki rekaman hasil ujian peserta didik.');
       }
       await dbDelete(COLLECTIONS.paketAsas, id);
       resetCacheMenu(['DNC-M1', 'DNC-M4', 'DNC-M5', 'DNC-M6']);
       await muatM4PaketAsas(true);
-      tampilkanToast('Paket ASAS berhasil dihapus.');
+      tampilkanToast('Paket RAD berhasil dihapus.');
+    }
+  });
+}
+
+async function hitungUlangNilaiPaketRad(paketIdTarget = '') {
+  const paketTunggal = paketIdTarget ? cariById('paketAsas', paketIdTarget) : null;
+  if (paketIdTarget && !paketTunggal) {
+    tampilkanToast('Paket tidak ditemukan.', 'error');
+    return;
+  }
+  if (paketTunggal && !bolehKelolaPaket(paketTunggal)) {
+    tampilkanToast('Anda tidak memiliki izin menghitung ulang nilai paket milik guru lain.', 'error');
+    return;
+  }
+
+  const labelSasaran = paketTunggal
+    ? `paket "${paketTunggal.judulPaket}"`
+    : (penggunaAktif?.role === 'Admin'
+      ? 'SELURUH paket RAD & latihan yang sudah dilaksanakan'
+      : 'seluruh paket RAD milik Anda yang sudah dilaksanakan');
+
+  bukaKonfirmasi({
+    judul: 'Hitung Ulang Nilai Standar RAD',
+    pesan: `Hitung ulang nilai hasil ujian pada ${labelSasaran} menggunakan aturan poin terbaru (PG = 1, PG Kompleks = 1, Benar/Salah = 1, Isian Singkat = 2; Nilai = (Perolehan / Poin Maks) × 100)?`,
+    labelYa: 'Ya, Hitung Ulang Nilai',
+    kelasTombol: 'dnc-tombol-aksen',
+    onYa: async () => {
+      const [semuaSoal, semuaPaket, semuaHasil] = await Promise.all([
+        dbList(COLLECTIONS.bankSoal, { batas: 2000 }),
+        dbList(COLLECTIONS.paketAsas, { batas: 300 }),
+        dbList(COLLECTIONS.hasilUjian, { batas: 1000 })
+      ]);
+
+      const petaSoal = new Map(semuaSoal.map(s => [s.id, s]));
+      const petaPaket = new Map(semuaPaket.map(p => [p.id, p]));
+      const paketDiizinkanSet = new Set(stateMemori.paketAsas.map(p => p.id));
+
+      const targetHasil = semuaHasil.filter(h => {
+        if (h.statusUjian === 'Sedang Dikerjakan') return false;
+        if (paketIdTarget) return h.paketId === paketIdTarget;
+        if (penggunaAktif?.role === 'Admin') return true;
+        return paketDiizinkanSet.has(h.paketId);
+      });
+
+      if (!targetHasil.length) {
+        tampilkanToast('Belum ada hasil ujian selesai yang perlu dihitung ulang pada cakupan ini.', 'info');
+        return;
+      }
+
+      let jmlDiperbarui = 0;
+      for (const h of targetHasil) {
+        const paketObj = petaPaket.get(h.paketId) || null;
+        const daftarSoalIds = (Array.isArray(paketObj?.daftarSoalIds) && paketObj.daftarSoalIds.length)
+          ? paketObj.daftarSoalIds
+          : (Array.isArray(h.daftarSoalIds) && h.daftarSoalIds.length
+            ? h.daftarSoalIds
+            : (Array.isArray(h.urutanSoalIds) && h.urutanSoalIds.length
+              ? h.urutanSoalIds
+              : (h.jawabanSiswa || []).map(j => j.soalId)));
+
+        const totalPoinMaks = bulatDua(daftarSoalIds.reduce((acc, sid) => {
+          const s = petaSoal.get(sid);
+          return acc + (s ? poinEfektifSoal(s) : 1);
+        }, 0));
+
+        let skorPg = 0;
+        let skorUraian = 0;
+        let adaUraian = false;
+
+        const jawabanBaru = (h.jawabanSiswa || []).map(j => {
+          const s = petaSoal.get(j.soalId);
+          if (!s) {
+            const skorTetap = Number(j.skor || 0);
+            skorPg = bulatDua(skorPg + skorTetap);
+            return j;
+          }
+          if (s.tipeSoal === 'Uraian') {
+            adaUraian = true;
+            const maksUraian = poinEfektifSoal(s);
+            const skorLama = Math.min(maksUraian, Math.max(0, Number(j.skor || 0)));
+            skorUraian = bulatDua(skorUraian + skorLama);
+            return { ...j, skor: skorLama };
+          }
+          const skorButir = hitungSkorButirOtomatis(s, j.jawaban);
+          skorPg = bulatDua(skorPg + skorButir);
+          return { ...j, skor: skorButir };
+        });
+
+        const totalPerolehan = bulatDua(skorPg + skorUraian);
+        const skorAkhir = totalPoinMaks > 0 ? bulatDua((totalPerolehan / totalPoinMaks) * 100) : 0;
+        const kkm = Number(cariById('mataPelajaran', h.mapelId)?.kkm ?? 75);
+        const statusUjian = h.statusUjian === 'Menunggu Koreksi' && adaUraian ? 'Menunggu Koreksi' : 'Selesai';
+        const statusKetuntasan = statusUjian === 'Menunggu Koreksi'
+          ? 'Menunggu Koreksi'
+          : (skorAkhir >= kkm ? 'Tuntas' : 'Belum Tuntas');
+
+        await dbUpdate(COLLECTIONS.hasilUjian, h.id, {
+          jawabanSiswa: jawabanBaru,
+          skorPg,
+          skorUraian,
+          skorAkhir,
+          statusUjian,
+          statusKetuntasan
+        });
+        jmlDiperbarui++;
+      }
+
+      resetCacheMenu(['DNC-M1', 'DNC-M4', 'DNC-M5', 'DNC-M6']);
+      await muatM4PaketAsas(true);
+      tampilkanToast(`${jmlDiperbarui} hasil ujian berhasil dihitung ulang sesuai rumus poin otomatis RAD.`);
     }
   });
 }
